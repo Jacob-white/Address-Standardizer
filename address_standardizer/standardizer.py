@@ -12,9 +12,10 @@ Standardizes US and International addresses to USPS Publication 28 and ISO stand
   - Commercial formation / registered agent hub detection.
 """
 
+import copy
 import unicodedata
 import logging
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict, Any
 
 try:
     import usaddress
@@ -22,6 +23,15 @@ except ImportError:
     usaddress = None
 
 from address_standardizer.models import StandardizedAddress
+from address_standardizer.confidence import (
+    RoutingTier,
+    compute_confidence_score,
+)
+from address_standardizer.audit import get_audit_ledger
+from address_standardizer.cache import (
+    get_default_cache,
+    make_cache_key,
+)
 from address_standardizer.tables import (
     DIRECTIONALS,
     STREET_SUFFIXES,
@@ -843,6 +853,31 @@ def generate_normalized_address_key(
     return std.normalized_address_key
 
 
+def _finalize_standardized_address(
+    std: StandardizedAddress,
+    raw_input: Optional[Dict[str, Any]] = None,
+    cache_key: Optional[str] = None,
+) -> StandardizedAddress:
+    conf = compute_confidence_score(std, raw_input=raw_input)
+    std.confidence_score = conf.composite_score
+    std.routing_tier = conf.routing_tier
+    std.failure_reason_codes = conf.failure_reason_codes
+    if (
+        conf.routing_tier == RoutingTier.MANUAL_STEWARDSHIP
+        or std.is_registered_agent_hub
+        or std.address_status == "parse_failed"
+    ):
+        audit_rec = get_audit_ledger().record_standardized_address(
+            std, conf, raw_input=raw_input
+        )
+        std.audit_record = audit_rec
+    if cache_key is not None:
+        cache = get_default_cache()
+        if cache.is_enabled():
+            cache.set(cache_key, copy.copy(std))
+    return std
+
+
 def standardize_address(
     street1: Optional[str] = None,
     street2: Optional[str] = None,
@@ -856,6 +891,23 @@ def standardize_address(
     Generates deterministic normalized_address_key, building_key, phonetic_key,
     and flags registered agent hubs and private residences.
     """
+    raw_dict = {
+        "street1": street1,
+        "street2": street2,
+        "city": city,
+        "state": state,
+        "postal_code": postal_code,
+        "country": country,
+    }
+
+    cache = get_default_cache()
+    cache_key = None
+    if cache.is_enabled():
+        cache_key = make_cache_key(street1, street2, city, state, postal_code, country)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return copy.copy(cached)
+
     # Tier 0: Pre-Flight Sanity & Unicode NFKC Normalization
     s1_raw = unicodedata.normalize('NFKC', street1).strip() if street1 else ""
     s2_raw = unicodedata.normalize('NFKC', street2).strip() if street2 else ""
@@ -869,7 +921,7 @@ def standardize_address(
 
     # Empty / garbage check
     if not raw_components:
-        return StandardizedAddress(
+        empty_std = StandardizedAddress(
             street1="",
             street2="",
             city="",
@@ -884,9 +936,10 @@ def standardize_address(
             phonetic_key=None,
             is_registered_agent_hub=False,
         )
+        return _finalize_standardized_address(empty_std, raw_dict, cache_key)
 
     if len(raw_components) == 1 and s1_raw.upper() in ("N/A", "NONE", "NULL", "UNKNOWN", "-", ".", "NO ADDRESS"):
-        return StandardizedAddress(
+        garbage_std = StandardizedAddress(
             street1="",
             street2="",
             city="",
@@ -901,6 +954,7 @@ def standardize_address(
             phonetic_key=None,
             is_registered_agent_hub=False,
         )
+        return _finalize_standardized_address(garbage_std, raw_dict, cache_key)
 
     # Detect country code
     country_iso = normalize_country_code(country_raw, state_raw, postal_raw, raw_street=raw_street_address)
@@ -918,7 +972,7 @@ def standardize_address(
             is_hub_func=is_registered_agent_hub_address,
         )
         if fast_res is not None:
-            return fast_res
+            return _finalize_standardized_address(fast_res, raw_dict, cache_key)
 
     # Tier 2 & Tier 3: Deterministic Rule Matrix and Statistical CRF Fallback
     if is_us:
@@ -968,7 +1022,7 @@ def standardize_address(
             raw_street=raw_street_address,
         )
 
-        return StandardizedAddress(
+        std_us = StandardizedAddress(
             street1=norm_s1,
             street2=norm_s2,
             city=norm_city,
@@ -984,6 +1038,7 @@ def standardize_address(
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
         )
+        return _finalize_standardized_address(std_us, raw_dict, cache_key)
     else:
         # International Pipeline
         raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
@@ -1072,7 +1127,7 @@ def standardize_address(
             raw_street=raw_street_address,
         )
 
-        return StandardizedAddress(
+        std_intl = StandardizedAddress(
             street1=norm_s1,
             street2=norm_s2,
             city=norm_city,
@@ -1088,3 +1143,4 @@ def standardize_address(
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
         )
+        return _finalize_standardized_address(std_intl, raw_dict, cache_key)

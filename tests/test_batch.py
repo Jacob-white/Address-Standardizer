@@ -221,6 +221,37 @@ class TestStreamStandardizeCSV:
             assert rows[0]["latitude"] == "40.7061"
             assert rows[1]["latitude"] == "40.7533"
 
+    def test_stream_standardize_geocode_partial_matches(self, tmp_path):
+        input_csv = tmp_path / "in_geo_partial.csv"
+        output_csv = tmp_path / "out_geo_partial.csv"
+
+        with open(input_csv, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["id", "street1", "city", "state", "postal_code", "country"])
+            w.writerow(["1", "100 Wall St", "New York", "NY", "10005", "USA"])
+            w.writerow(["2", "Unmatched Address", "Nowhere", "NY", "10005", "USA"])
+
+        mock_geocoder = MagicMock(spec=CensusGeocoder)
+        # Only row "0" is matched; row "1" is omitted from geocoder result
+        mock_geocoder.geocode_batch.return_value = {
+            "0": {"latitude": 40.7061, "longitude": -74.0060, "precision": "rooftop"},
+        }
+
+        total = stream_standardize_csv(
+            input_path=str(input_csv),
+            output_path=str(output_csv),
+            chunk_size=5,
+            max_workers=1,
+            geocode=True,
+            geocoder=mock_geocoder,
+        )
+        assert total == 2
+        with open(output_csv, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            assert rows[0]["latitude"] == "40.7061"
+            assert rows[1]["latitude"] == ""
+
     def test_stream_standardize_geocode_non_us(self, tmp_path):
         input_csv = tmp_path / "in_geo_non_us.csv"
         output_csv = tmp_path / "out_geo_non_us.csv"
@@ -280,3 +311,47 @@ class TestStreamStandardizeCSV:
         rss_growth_mb = mem_after - mem_before
         # Growth during streaming must remain tiny (< 50MB)
         assert rss_growth_mb < 50.0, f"Memory grew excessively: {rss_growth_mb:.2f} MB"
+
+    def test_batch_with_confidence_single_and_multi_worker(self, tmp_path):
+        input_csv = tmp_path / "conf_in.csv"
+        out_single = tmp_path / "conf_out_single.csv"
+        out_multi = tmp_path / "conf_out_multi.csv"
+
+        with open(input_csv, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(["id", "street1", "street2", "city", "state", "postal_code", "country"])
+            w.writerow(["1", "100 Wall St", "Suite 400", "New York", "NY", "10005", "USA"])
+            w.writerow(["2", "1209 North Orange St", "Suite 100", "Wilmington", "DE", "19801", "USA"])
+
+        # Test single worker
+        total_1 = stream_standardize_csv(
+            input_path=str(input_csv),
+            output_path=str(out_single),
+            chunk_size=10,
+            max_workers=1,
+            include_confidence=True,
+        )
+        assert total_1 == 2
+        with open(out_single, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            assert "confidence_score" in rows[0]
+            assert "routing_tier" in rows[0]
+            assert float(rows[0]["confidence_score"]) >= 0.95
+            assert rows[0]["routing_tier"] == "AUTO_PASS"
+
+        # Test multi worker
+        total_2 = stream_standardize_csv(
+            input_path=str(input_csv),
+            output_path=str(out_multi),
+            chunk_size=1,
+            max_workers=2,
+            include_confidence=True,
+        )
+        assert total_2 == 2
+        with open(out_multi, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            assert rows[1]["std_street1"] == "1209 N ORANGE ST"
+            assert rows[1]["is_registered_agent_hub"] == "True"
+            assert "confidence_score" in rows[1]

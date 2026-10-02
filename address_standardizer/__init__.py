@@ -26,14 +26,42 @@ from address_standardizer.phonetics import (
 from address_standardizer.geocoder import (
     CensusGeocoder,
     get_fallback_centroid,
+    VerificationCascade,
+    CascadeResult,
+    CascadePrecision,
+    resolve_verification_cascade,
 )
 from address_standardizer.batch import (
     chunk_generator,
     process_chunk,
     stream_standardize_csv,
 )
+from address_standardizer.confidence import (
+    RoutingTier,
+    ConfidenceResult,
+    ConfidenceScorer,
+    compute_confidence_score,
+)
+from address_standardizer.audit import (
+    StewardshipAuditRecord,
+    StewardshipAuditLedger,
+    AUDIT_LEDGER_DDL,
+    get_audit_ledger,
+    ActionType,
+    ReviewStatus,
+)
+from address_standardizer.cache import (
+    MultiTierCache,
+    LRUCache,
+    SQLiteCache,
+    get_default_cache,
+    configure_cache,
+    clear_cache,
+    get_cache_stats,
+    make_cache_key,
+)
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 __all__ = [
     "StandardizedAddress",
@@ -55,5 +83,31 @@ __all__ = [
     "chunk_generator",
     "process_chunk",
     "stream_standardize_csv",
+    # Confidence scoring
+    "RoutingTier",
+    "ConfidenceResult",
+    "ConfidenceScorer",
+    "compute_confidence_score",
+    # Audit ledger
+    "StewardshipAuditRecord",
+    "StewardshipAuditLedger",
+    "AUDIT_LEDGER_DDL",
+    "get_audit_ledger",
+    "ActionType",
+    "ReviewStatus",
+    # Caching
+    "MultiTierCache",
+    "LRUCache",
+    "SQLiteCache",
+    "get_default_cache",
+    "configure_cache",
+    "clear_cache",
+    "get_cache_stats",
+    "make_cache_key",
+    # Verification cascade
+    "CascadePrecision",
+    "CascadeResult",
+    "VerificationCascade",
+    "resolve_verification_cascade",
     "__version__",
 ]

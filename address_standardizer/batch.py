@@ -39,6 +39,8 @@ def _process_row_dict(
     state_col: str = "state",
     zip_col: str = "postal_code",
     country_col: str = "country",
+    include_confidence: bool = False,
+    collect_audit: bool = False,
 ) -> Dict[str, Any]:
     """Standardizes a single row dictionary and appends standardized fields."""
     s1 = row.get(street_col) or ""
@@ -70,16 +72,23 @@ def _process_row_dict(
     res_row["is_registered_agent_hub"] = str(st.is_registered_agent_hub)
     res_row["is_private_residence"] = str(st.is_private_residence)
     res_row["address_status"] = st.address_status
+    if include_confidence:
+        res_row["confidence_score"] = f"{st.confidence_score:.4f}" if st.confidence_score is not None else ""
+        res_row["routing_tier"] = st.routing_tier or ""
+    if collect_audit and getattr(st, "audit_record", None) is not None:
+        res_row["_audit_record"] = st.audit_record.as_dict()
     return res_row
 
 
 def _worker_process_chunk(
-    args: Tuple[List[Dict[str, Any]], str, str, str, str, str, str]
-) -> List[Dict[str, Any]]:
+    args: Tuple[List[Dict[str, Any]], str, str, str, str, str, str, bool]
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Worker function for multiprocessing pool to process a single chunk."""
-    chunk, street_col, street2_col, city_col, state_col, zip_col, country_col = args
-    return [
-        _process_row_dict(
+    chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence = args
+    processed_rows = []
+    audit_records = []
+    for row in chunk:
+        res = _process_row_dict(
             row,
             street_col=street_col,
             street2_col=street2_col,
@@ -87,9 +96,14 @@ def _worker_process_chunk(
             state_col=state_col,
             zip_col=zip_col,
             country_col=country_col,
+            include_confidence=include_confidence,
+            collect_audit=True,
         )
-        for row in chunk
-    ]
+        aud = res.pop("_audit_record", None)
+        if aud is not None:
+            audit_records.append(aud)
+        processed_rows.append(res)
+    return processed_rows, audit_records
 
 
 def process_chunk(
@@ -100,9 +114,13 @@ def process_chunk(
     state_col: str = "state",
     zip_col: str = "postal_code",
     country_col: str = "country",
+    include_confidence: bool = False,
 ) -> List[Dict[str, Any]]:
     """Standardizes a chunk of rows."""
-    return _worker_process_chunk((chunk, street_col, street2_col, city_col, state_col, zip_col, country_col))
+    processed_rows, _ = _worker_process_chunk(
+        (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence)
+    )
+    return processed_rows
 
 
 def stream_standardize_csv(
@@ -118,12 +136,17 @@ def stream_standardize_csv(
     country_col: str = "country",
     geocode: bool = False,
     geocoder: Optional[CensusGeocoder] = None,
+    include_confidence: bool = False,
+    audit_csv_path: Optional[str] = None,
 ) -> int:
     """
     Streams CSV address standardization with constant O(chunk_size) RSS memory footprint (< 100MB).
     Strictly enforces resource throttling rules: max_workers is capped at 2.
     Returns total number of rows processed.
     """
+    import json
+    from address_standardizer.audit import get_audit_ledger, StewardshipAuditRecord
+
     # Enforce strict system resource limit (max 2 workers)
     effective_workers = max(1, min(max_workers, 2))
     total_processed = 0
@@ -135,64 +158,94 @@ def stream_standardize_csv(
             "std_country", "normalized_address_key", "building_key", "phonetic_key",
             "is_registered_agent_hub", "is_private_residence", "address_status"
         ]
+        if include_confidence:
+            fieldnames.extend(["confidence_score", "routing_tier"])
         if geocode:
             fieldnames.extend(["latitude", "longitude", "geocode_precision"])
 
-        with open(output_path, mode="w", encoding="utf-8", newline="") as fout:
-            writer = csv.DictWriter(fout, fieldnames=fieldnames)
-            writer.writeheader()
+        audit_file = None
+        audit_writer = None
+        if audit_csv_path:
+            audit_file = open(audit_csv_path, mode="w", encoding="utf-8", newline="")
+            audit_fieldnames = [
+                "audit_id", "record_id", "batch_id", "timestamp_utc", "agent_or_system_id",
+                "action_type", "confidence_score", "failure_reason_codes",
+                "normalized_address_key", "building_key", "phonetic_key",
+                "is_registered_agent_hub", "is_private_residence", "dpv_confirmation_code",
+                "raw_input_payload", "proposed_standardized_payload", "final_committed_payload",
+                "steward_commentary", "review_status", "reviewed_by", "reviewed_at"
+            ]
+            audit_writer = csv.DictWriter(audit_file, fieldnames=audit_fieldnames)
+            audit_writer.writeheader()
 
-            active_geocoder = geocoder or (CensusGeocoder() if geocode else None)
+        ledger = get_audit_ledger()
 
-            def _apply_geocoding_to_chunk(processed_chunk: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-                geo_batch = []
-                for idx, r in enumerate(processed_chunk):
-                    if r.get("std_country") == "USA" and r.get("std_street1"):
-                        geo_batch.append((str(idx), r["std_street1"], r["std_city"], r["std_state"], r["std_postal_code"]))
-                if geo_batch:
-                    geo_results = active_geocoder.geocode_batch(geo_batch)
+        def _handle_chunk_audits(audit_records: List[Dict[str, Any]]):
+            for aud in audit_records:
+                ledger.record(StewardshipAuditRecord.from_dict(aud))
+                if audit_writer:
+                    row_to_write = dict(aud)
+                    for k in ("failure_reason_codes", "raw_input_payload", "proposed_standardized_payload", "final_committed_payload"):
+                        val = row_to_write.get(k)
+                        if isinstance(val, (dict, list)):
+                            row_to_write[k] = json.dumps(val)
+                    audit_writer.writerow(row_to_write)
+
+        try:
+            with open(output_path, mode="w", encoding="utf-8", newline="") as fout:
+                writer = csv.DictWriter(fout, fieldnames=fieldnames)
+                writer.writeheader()
+
+                active_geocoder = geocoder or (CensusGeocoder() if geocode else None)
+
+                def _apply_geocoding_to_chunk(processed_chunk: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+                    geo_batch = []
                     for idx, r in enumerate(processed_chunk):
-                        idx_str = str(idx)
-                        if idx_str in geo_results:
-                            r["latitude"] = geo_results[idx_str]["latitude"]
-                            r["longitude"] = geo_results[idx_str]["longitude"]
-                            r["geocode_precision"] = geo_results[idx_str]["precision"]
-                        else:
+                        if r.get("std_country") == "USA" and r.get("std_street1"):
+                            geo_batch.append((str(idx), r["std_street1"], r["std_city"], r["std_state"], r["std_postal_code"]))
+                    if geo_batch:
+                        geo_results = active_geocoder.geocode_batch(geo_batch)
+                        for idx, r in enumerate(processed_chunk):
+                            idx_str = str(idx)
+                            if idx_str in geo_results:
+                                r["latitude"] = geo_results[idx_str]["latitude"]
+                                r["longitude"] = geo_results[idx_str]["longitude"]
+                                r["geocode_precision"] = geo_results[idx_str]["precision"]
+                            else:
+                                r["latitude"] = ""
+                                r["longitude"] = ""
+                                r["geocode_precision"] = ""
+                    else:
+                        for r in processed_chunk:
                             r["latitude"] = ""
                             r["longitude"] = ""
                             r["geocode_precision"] = ""
-                else:
-                    for r in processed_chunk:
-                        r["latitude"] = ""
-                        r["longitude"] = ""
-                        r["geocode_precision"] = ""
-                return processed_chunk
+                    return processed_chunk
 
-            if effective_workers <= 1:
-                for chunk in chunk_generator(reader, chunk_size):
-                    processed = process_chunk(
-                        chunk,
-                        street_col=street_col,
-                        street2_col=street2_col,
-                        city_col=city_col,
-                        state_col=state_col,
-                        zip_col=zip_col,
-                        country_col=country_col,
-                    )
-                    if geocode:
-                        processed = _apply_geocoding_to_chunk(processed)
-                    writer.writerows(processed)
-                    total_processed += len(processed)
-            else:
-                chunk_args_gen = (
-                    (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col)
-                    for chunk in chunk_generator(reader, chunk_size)
-                )
-                with multiprocessing.Pool(processes=effective_workers) as pool:
-                    for processed_chunk in pool.imap(_worker_process_chunk, chunk_args_gen):
+                if effective_workers <= 1:
+                    for chunk in chunk_generator(reader, chunk_size):
+                        processed, chunk_audits = _worker_process_chunk(
+                            (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence)
+                        )
+                        _handle_chunk_audits(chunk_audits)
                         if geocode:
-                            processed_chunk = _apply_geocoding_to_chunk(processed_chunk)
-                        writer.writerows(processed_chunk)
-                        total_processed += len(processed_chunk)
+                            processed = _apply_geocoding_to_chunk(processed)
+                        writer.writerows(processed)
+                        total_processed += len(processed)
+                else:
+                    chunk_args_gen = (
+                        (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence)
+                        for chunk in chunk_generator(reader, chunk_size)
+                    )
+                    with multiprocessing.Pool(processes=effective_workers) as pool:
+                        for processed_chunk, chunk_audits in pool.imap(_worker_process_chunk, chunk_args_gen):
+                            _handle_chunk_audits(chunk_audits)
+                            if geocode:
+                                processed_chunk = _apply_geocoding_to_chunk(processed_chunk)
+                            writer.writerows(processed_chunk)
+                            total_processed += len(processed_chunk)
+        finally:
+            if audit_file:
+                audit_file.close()
 
     return total_processed

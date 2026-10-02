@@ -1,7 +1,7 @@
 """Data structures for standardized address representations."""
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 
 @dataclass
@@ -22,8 +22,61 @@ class StandardizedAddress:
     phonetic_key: Optional[str] = None
     is_registered_agent_hub: bool = False
 
-    def as_dict(self) -> Dict[str, Any]:
-        return {
+    def __post_init__(self):
+        if not hasattr(self, "_confidence_score"):
+            self._confidence_score: Optional[float] = None
+        if not hasattr(self, "_routing_tier"):
+            self._routing_tier: Optional[str] = None
+        if not hasattr(self, "_failure_reason_codes"):
+            self._failure_reason_codes: Optional[List[str]] = None
+        if not hasattr(self, "_audit_record"):
+            self._audit_record: Optional[Any] = None
+        if not hasattr(self, "_cascade_result"):
+            self._cascade_result: Optional[Any] = None
+
+    @property
+    def confidence_score(self) -> Optional[float]:
+        return getattr(self, "_confidence_score", None)
+
+    @confidence_score.setter
+    def confidence_score(self, value: Optional[float]):
+        self._confidence_score = value
+
+    @property
+    def routing_tier(self) -> Optional[str]:
+        return getattr(self, "_routing_tier", None)
+
+    @routing_tier.setter
+    def routing_tier(self, value: Optional[str]):
+        self._routing_tier = value
+
+    @property
+    def failure_reason_codes(self) -> List[str]:
+        val = getattr(self, "_failure_reason_codes", None)
+        return list(val) if val is not None else []
+
+    @failure_reason_codes.setter
+    def failure_reason_codes(self, value: List[str]):
+        self._failure_reason_codes = list(value)
+
+    @property
+    def audit_record(self) -> Optional[Any]:
+        return getattr(self, "_audit_record", None)
+
+    @audit_record.setter
+    def audit_record(self, value: Optional[Any]):
+        self._audit_record = value
+
+    @property
+    def cascade_result(self) -> Optional[Any]:
+        return getattr(self, "_cascade_result", None)
+
+    @cascade_result.setter
+    def cascade_result(self, value: Optional[Any]):
+        self._cascade_result = value
+
+    def as_dict(self, include_metadata: bool = False) -> Dict[str, Any]:
+        d = {
             "street1": self.street1,
             "street2": self.street2,
             "city": self.city,
@@ -39,3 +92,20 @@ class StandardizedAddress:
             "is_private_residence": self.is_private_residence,
             "is_registered_agent_hub": self.is_registered_agent_hub,
         }
+        if include_metadata:
+            d["confidence_score"] = self.confidence_score
+            d["routing_tier"] = self.routing_tier
+            d["failure_reason_codes"] = self.failure_reason_codes
+            if self.audit_record is not None:
+                d["audit_id"] = getattr(self.audit_record, "audit_id", None)
+            if self.cascade_result is not None:
+                d["cascade"] = (
+                    self.cascade_result.as_dict()
+                    if hasattr(self.cascade_result, "as_dict")
+                    else self.cascade_result
+                )
+        return d
+
+    def as_extended_dict(self) -> Dict[str, Any]:
+        """Returns comprehensive enterprise dictionary including all risk, confidence, and audit metadata."""
+        return self.as_dict(include_metadata=True)
