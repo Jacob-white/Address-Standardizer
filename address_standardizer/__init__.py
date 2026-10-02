@@ -17,6 +17,7 @@ from address_standardizer.standardizer import (
     normalize_us_postal_code,
     get_state_from_zip3,
     num_to_ordinal,
+    _split_international_secondary_unit,
 )
 from address_standardizer.phonetics import (
     compute_soundex,
@@ -43,6 +44,7 @@ __all__ = [
     "normalize_us_postal_code",
     "get_state_from_zip3",
     "num_to_ordinal",
+    "_split_international_secondary_unit",
     "CensusGeocoder",
     "get_fallback_centroid",
     "__version__",

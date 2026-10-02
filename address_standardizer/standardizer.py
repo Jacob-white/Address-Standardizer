@@ -318,10 +318,9 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
     return st1, st2, True, p_city, p_state, p_zip
 
 
-def _parse_us_street_lines(street1_raw: str, street2_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
+def _parse_us_address_components(street1_raw: str, street2_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
     """
-    Parses and standardizes US street1 and street2 into USPS Pub 28 format.
-    Splits embedded secondary units into street2 and extracts city, state, zip if present.
+    Parses US address lines and returns (st1, st2, ok, p_city, p_state, p_zip).
     """
     combined = " ".join(filter(None, [street1_raw.strip(), street2_raw.strip()]))
     if not combined:
@@ -342,6 +341,15 @@ def _parse_us_street_lines(street1_raw: str, street2_raw: str = "") -> Tuple[str
         return f"PO BOX {po_box_num}", "", True, "", "", ""
 
     return _parse_us_street_tokens(combined)
+
+
+def _parse_us_street_lines(street1_raw: str, street2_raw: str = "") -> Tuple[str, str, bool]:
+    """
+    Parses and standardizes US street1 and street2 into USPS Pub 28 format.
+    Splits embedded secondary units into street2. Returns (st1, st2, ok).
+    """
+    st1, st2, ok, _, _, _ = _parse_us_address_components(street1_raw, street2_raw)
+    return st1, st2, ok
 
 
 def _split_international_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
@@ -490,7 +498,7 @@ def standardize_address(
 
     if is_us:
         # US Pipeline (USPS Pub 28)
-        norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_street_lines(s1_raw, s2_raw)
+        norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(s1_raw, s2_raw)
         if not city_raw and p_city:
             city_raw = p_city
         if not state_raw and p_state:
