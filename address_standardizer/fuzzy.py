@@ -6,6 +6,7 @@ by state and ZIP3 for misspelled street suffixes, names, and city tokens,
 along with digit transposition recovery for postal codes and street numbers.
 """
 
+import functools
 import re
 import unicodedata
 from typing import Dict, List, Optional, Tuple
@@ -19,6 +20,7 @@ from address_standardizer.tables import (
 from address_standardizer._patterns import MULTI_WORD_CITIES
 
 
+@functools.lru_cache(maxsize=16384)
 def damerau_levenshtein_distance(s1: str, s2: str) -> int:
     """
     Computes true Damerau-Levenshtein edit distance between s1 and s2.
@@ -122,6 +124,7 @@ PROTECTED_STREET_WORDS: frozenset[str] = frozenset({
 })
 
 
+@functools.lru_cache(maxsize=4096)
 def heal_street_suffix(token: str, max_distance: int = 2) -> Optional[str]:
     """
     Recovers misspelled street suffixes using Damerau-Levenshtein distance <= max_distance.
@@ -164,6 +167,7 @@ def heal_street_suffix(token: str, max_distance: int = 2) -> Optional[str]:
     return best_match
 
 
+@functools.lru_cache(maxsize=4096)
 def heal_city_token(
     city_raw: str,
     state: Optional[str] = None,
@@ -217,6 +221,7 @@ def heal_city_token(
     return best_match
 
 
+@functools.lru_cache(maxsize=4096)
 def heal_street_name(name_raw: str, max_distance: int = 1) -> Optional[str]:
     """
     Recovers prominent misspelled street names using edit distance <= max_distance.

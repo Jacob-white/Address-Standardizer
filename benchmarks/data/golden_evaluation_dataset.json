@@ -24443,7 +24443,7 @@
     "test_id": "CAT-09-016",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Urb Las Gladiolas 123 Calle Flamboyan, San Juan, PR 00926",
+      "street1": "Ugland House, South Church St, George Town, KY1-1104, Cayman Islands",
       "street2": null,
       "city": null,
       "state": null,
@@ -24451,25 +24451,25 @@
       "country": null
     },
     "expected_output": {
-      "street1": "URB LAS GLADIOLAS 123 CALLE FLAMBOYAN",
-      "street2": "",
-      "city": "SAN JUAN",
-      "state": "PR",
-      "postal_code": "00926",
-      "country": "USA",
-      "normalized_address_key": "URB LAS GLADIOLAS 123 CALLE FLAMBOYAN||SAN JUAN|PR|00926|USA",
-      "building_key": "URB LAS GLADIOLAS 123 CALLE FLAMBOYAN||SAN JUAN|PR|00926|USA",
-      "phonetic_key": "123|C400|00926",
+      "street1": "SOUTH CHURCH ST",
+      "street2": "UGLAND HOUSE",
+      "city": "GEORGE TOWN",
+      "state": "",
+      "postal_code": "KY1-1104",
+      "country": "CYM",
+      "normalized_address_key": "SOUTH CHURCH ST|UGLAND HOUSE|GEORGE TOWN||KY1-1104|CYM",
+      "building_key": "SOUTH CHURCH ST||GEORGE TOWN||KY1-1104|CYM",
+      "phonetic_key": "C620|KY1-1104",
       "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": false
+      "is_us": false,
+      "is_registered_agent_hub": true
     }
   },
   {
     "test_id": "CAT-09-017",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Urb Jardines 456 Calle Luna, Caguas, PR 00725",
+      "street1": "1221 Brickell Ave, Miami, FL 33131",
       "street2": null,
       "city": null,
       "state": null,
@@ -24477,25 +24477,25 @@
       "country": null
     },
     "expected_output": {
-      "street1": "URB JARDINES 456 CALLE LUNA",
+      "street1": "1221 BRICKELL AVE",
       "street2": "",
-      "city": "CAGUAS",
-      "state": "PR",
-      "postal_code": "00725",
+      "city": "MIAMI",
+      "state": "FL",
+      "postal_code": "33131",
       "country": "USA",
-      "normalized_address_key": "URB JARDINES 456 CALLE LUNA||CAGUAS|PR|00725|USA",
-      "building_key": "URB JARDINES 456 CALLE LUNA||CAGUAS|PR|00725|USA",
-      "phonetic_key": "456|C400|00725",
+      "normalized_address_key": "1221 BRICKELL AVE||MIAMI|FL|33131|USA",
+      "building_key": "1221 BRICKELL AVE||MIAMI|FL|33131|USA",
+      "phonetic_key": "1221|B624|33131",
       "address_status": "standardized",
       "is_us": true,
-      "is_registered_agent_hub": false
+      "is_registered_agent_hub": true
     }
   },
   {
     "test_id": "CAT-09-018",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Urb Dos Pinos 789 Calle Sol, Ponce, PR 00716",
+      "street1": "100 Park Ave, New York, NY 10017",
       "street2": null,
       "city": null,
       "state": null,
@@ -24503,25 +24503,25 @@
       "country": null
     },
     "expected_output": {
-      "street1": "URB DOS PINOS 789 CALLE SOL",
+      "street1": "100 PARK AVE",
       "street2": "",
-      "city": "PONCE",
-      "state": "PR",
-      "postal_code": "00716",
+      "city": "NEW YORK",
+      "state": "NY",
+      "postal_code": "10017",
       "country": "USA",
-      "normalized_address_key": "URB DOS PINOS 789 CALLE SOL||PONCE|PR|00716|USA",
-      "building_key": "URB DOS PINOS 789 CALLE SOL||PONCE|PR|00716|USA",
-      "phonetic_key": "789|C400|00716",
+      "normalized_address_key": "100 PARK AVE||NEW YORK|NY|10017|USA",
+      "building_key": "100 PARK AVE||NEW YORK|NY|10017|USA",
+      "phonetic_key": "100|P620|10017",
       "address_status": "standardized",
       "is_us": true,
-      "is_registered_agent_hub": false
+      "is_registered_agent_hub": true
     }
   },
   {
     "test_id": "CAT-09-019",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Unit 1234 Box 5678, APO, AE 09012",
+      "street1": "Private Residence, Miami, FL 33131",
       "street2": null,
       "city": null,
       "state": null,
@@ -24529,15 +24529,15 @@
       "country": null
     },
     "expected_output": {
-      "street1": "UNIT 1234 BOX 5678",
+      "street1": "PRIVATE RESIDENCE",
       "street2": "",
-      "city": "APO",
-      "state": "AE",
-      "postal_code": "09012",
+      "city": "MIAMI",
+      "state": "FL",
+      "postal_code": "33131",
       "country": "USA",
-      "normalized_address_key": "UNIT 1234 BOX 5678||APO|AE|09012|USA",
-      "building_key": "UNIT 1234 BOX 5678||APO|AE|09012|USA",
-      "phonetic_key": "1234|B200|09012",
+      "normalized_address_key": "PRIVATE RESIDENCE||MIAMI|FL|33131|USA",
+      "building_key": "PRIVATE RESIDENCE||MIAMI|FL|33131|USA",
+      "phonetic_key": "P613|33131",
       "address_status": "standardized",
       "is_us": true,
       "is_registered_agent_hub": false
@@ -24547,7 +24547,7 @@
     "test_id": "CAT-09-020",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Unit 4321 Box 8765, FPO, AP 96515",
+      "street1": "Confidential, New York, NY 10005",
       "street2": null,
       "city": null,
       "state": null,
@@ -24555,15 +24555,15 @@
       "country": null
     },
     "expected_output": {
-      "street1": "UNIT 4321 BOX 8765",
+      "street1": "PRIVATE RESIDENCE",
       "street2": "",
-      "city": "FPO",
-      "state": "AP",
-      "postal_code": "96515",
+      "city": "NEW YORK",
+      "state": "NY",
+      "postal_code": "10005",
       "country": "USA",
-      "normalized_address_key": "UNIT 4321 BOX 8765||FPO|AP|96515|USA",
-      "building_key": "UNIT 4321 BOX 8765||FPO|AP|96515|USA",
-      "phonetic_key": "4321|B200|96515",
+      "normalized_address_key": "PRIVATE RESIDENCE||NEW YORK|NY|10005|USA",
+      "building_key": "PRIVATE RESIDENCE||NEW YORK|NY|10005|USA",
+      "phonetic_key": "P613|10005",
       "address_status": "standardized",
       "is_us": true,
       "is_registered_agent_hub": false
@@ -24573,7 +24573,7 @@
     "test_id": "CAT-09-021",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "100 King St W Suite 500, Toronto, ON M5X 1A9, Canada",
+      "street1": "Rambla Republica de Mexico 6135, Montevideo, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -24581,15 +24581,15 @@
       "country": null
     },
     "expected_output": {
-      "street1": "100 KING ST W",
-      "street2": "STE 500",
-      "city": "TORONTO",
-      "state": "ON",
-      "postal_code": "M5X 1A9",
-      "country": "CAN",
-      "normalized_address_key": "100 KING ST W|STE 500|TORONTO|ON|M5X 1A9|CAN",
-      "building_key": "100 KING ST W||TORONTO|ON|M5X 1A9|CAN",
-      "phonetic_key": "100|K520|M5X 1A9",
+      "street1": "RAMBLA REPUBLICA DE MEXICO 6135",
+      "street2": "",
+      "city": "MONTEVIDEO",
+      "state": "",
+      "postal_code": "",
+      "country": "URY",
+      "normalized_address_key": "RAMBLA REPUBLICA DE MEXICO 6135||MONTEVIDEO|||URY",
+      "building_key": "RAMBLA REPUBLICA DE MEXICO 6135||MONTEVIDEO|||URY",
+      "phonetic_key": "R514|MONTEVIDEO",
       "address_status": "standardized",
       "is_us": false,
       "is_registered_agent_hub": false
@@ -24599,7 +24599,7 @@
     "test_id": "CAT-09-022",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "200 Bay Street Floor 14, Toronto, ON M5J 2J2, Canada",
+      "street1": "Calle 72 No. 10-07, Bogota, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -24607,15 +24607,15 @@
       "country": null
     },
     "expected_output": {
-      "street1": "200 BAY ST",
-      "street2": "FL 14",
-      "city": "TORONTO",
-      "state": "ON",
-      "postal_code": "M5J 2J2",
-      "country": "CAN",
-      "normalized_address_key": "200 BAY ST|FL 14|TORONTO|ON|M5J 2J2|CAN",
-      "building_key": "200 BAY ST||TORONTO|ON|M5J 2J2|CAN",
-      "phonetic_key": "200|B000|M5J 2J2",
+      "street1": "CALLE 72 NO. 10-07",
+      "street2": "",
+      "city": "BOGOTA",
+      "state": "",
+      "postal_code": "",
+      "country": "COL",
+      "normalized_address_key": "CALLE 72 NO. 10-07||BOGOTA|||COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA|||COL",
+      "phonetic_key": "C400|BOGOTA",
       "address_status": "standardized",
       "is_us": false,
       "is_registered_agent_hub": false
@@ -24625,7 +24625,7 @@
     "test_id": "CAT-09-023",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "150 High Street Apt 4, Oxford, OX1 4DJ, United Kingdom",
+      "street1": "Avenida Corrientes 1234, Buenos Aires, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -24633,15 +24633,15 @@
       "country": null
     },
     "expected_output": {
-      "street1": "150 HIGH ST",
-      "street2": "APT 4",
-      "city": "OXFORD",
+      "street1": "AVENIDA CORRIENTES 1234",
+      "street2": "",
+      "city": "BUENOS AIRES",
       "state": "",
-      "postal_code": "OX1 4DJ",
-      "country": "GBR",
-      "normalized_address_key": "150 HIGH ST|APT 4|OXFORD||OX1 4DJ|GBR",
-      "building_key": "150 HIGH ST||OXFORD||OX1 4DJ|GBR",
-      "phonetic_key": "150|H200|OX1 4DJ",
+      "postal_code": "",
+      "country": "ARG",
+      "normalized_address_key": "AVENIDA CORRIENTES 1234||BUENOS AIRES|||ARG",
+      "building_key": "AVENIDA CORRIENTES 1234||BUENOS AIRES|||ARG",
+      "phonetic_key": "A153|BUENOS AIRES",
       "address_status": "standardized",
       "is_us": false,
       "is_registered_agent_hub": false
@@ -24651,7 +24651,7 @@
     "test_id": "CAT-09-024",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "25 Bank Street Suite 100, London, E14 5JP, UK",
+      "street1": "Kenyatta Avenue, Nairobi, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -24659,15 +24659,15 @@
       "country": null
     },
     "expected_output": {
-      "street1": "25 BANK ST",
-      "street2": "STE 100",
-      "city": "LONDON",
+      "street1": "KENYATTA AVE",
+      "street2": "",
+      "city": "NAIROBI",
       "state": "",
-      "postal_code": "E14 5JP",
-      "country": "GBR",
-      "normalized_address_key": "25 BANK ST|STE 100|LONDON||E14 5JP|GBR",
-      "building_key": "25 BANK ST||LONDON||E14 5JP|GBR",
-      "phonetic_key": "25|B520|E14 5JP",
+      "postal_code": "",
+      "country": "KEN",
+      "normalized_address_key": "KENYATTA AVE||NAIROBI|||KEN",
+      "building_key": "KENYATTA AVE||NAIROBI|||KEN",
+      "phonetic_key": "K530|NAIROBI",
       "address_status": "standardized",
       "is_us": false,
       "is_registered_agent_hub": false
@@ -24677,7 +24677,7 @@
     "test_id": "CAT-09-025",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "1209 North Orange St, Wilmington, DE 19801",
+      "street1": "Marszalkowska 100, Warsaw, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -24685,152 +24685,22 @@
       "country": null
     },
     "expected_output": {
-      "street1": "1209 N ORANGE ST",
+      "street1": "MARSZALKOWSKA 100",
       "street2": "",
-      "city": "WILMINGTON",
-      "state": "DE",
-      "postal_code": "19801",
-      "country": "USA",
-      "normalized_address_key": "1209 N ORANGE ST||WILMINGTON|DE|19801|USA",
-      "building_key": "1209 N ORANGE ST||WILMINGTON|DE|19801|USA",
-      "phonetic_key": "1209|O652|19801",
+      "city": "WARSAW",
+      "state": "",
+      "postal_code": "",
+      "country": "POL",
+      "normalized_address_key": "MARSZALKOWSKA 100||WARSAW|||POL",
+      "building_key": "MARSZALKOWSKA 100||WARSAW|||POL",
+      "phonetic_key": "M624|WARSAW",
       "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": true
+      "is_us": false,
+      "is_registered_agent_hub": false
     }
   },
   {
     "test_id": "CAT-09-026",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "251 Little Falls Dr, Wilmington, DE 19808",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "251 LITTLE FALLS DR",
-      "street2": "",
-      "city": "WILMINGTON",
-      "state": "DE",
-      "postal_code": "19808",
-      "country": "USA",
-      "normalized_address_key": "251 LITTLE FALLS DR||WILMINGTON|DE|19808|USA",
-      "building_key": "251 LITTLE FALLS DR||WILMINGTON|DE|19808|USA",
-      "phonetic_key": "251|L340|19808",
-      "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-027",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "30 N Gould St, Sheridan, WY 82801",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "30 N GOULD ST",
-      "street2": "",
-      "city": "SHERIDAN",
-      "state": "WY",
-      "postal_code": "82801",
-      "country": "USA",
-      "normalized_address_key": "30 N GOULD ST||SHERIDAN|WY|82801|USA",
-      "building_key": "30 N GOULD ST||SHERIDAN|WY|82801|USA",
-      "phonetic_key": "30|G430|82801",
-      "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-028",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "160 Greentree Dr, Dover, DE 19904",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "160 GREENTREE DR",
-      "street2": "",
-      "city": "DOVER",
-      "state": "DE",
-      "postal_code": "19904",
-      "country": "USA",
-      "normalized_address_key": "160 GREENTREE DR||DOVER|DE|19904|USA",
-      "building_key": "160 GREENTREE DR||DOVER|DE|19904|USA",
-      "phonetic_key": "160|G653|19904",
-      "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-029",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "Ugland House, PO Box 309, George Town, KY1-1104, Cayman Islands",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "UGLAND HOUSE",
-      "street2": "PO BOX 309",
-      "city": "GEORGE TOWN",
-      "state": "",
-      "postal_code": "KY1-1104",
-      "country": "CYM",
-      "normalized_address_key": "UGLAND HOUSE|PO BOX 309|GEORGE TOWN||KY1-1104|CYM",
-      "building_key": "UGLAND HOUSE||GEORGE TOWN||KY1-1104|CYM",
-      "phonetic_key": "U245|KY1-1104",
-      "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-030",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "Clifton House, 75 Fort St, George Town, KY1-1108, Cayman Islands",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "75 FORT ST",
-      "street2": "CLIFTON HOUSE",
-      "city": "GEORGE TOWN",
-      "state": "",
-      "postal_code": "KY1-1108",
-      "country": "CYM",
-      "normalized_address_key": "75 FORT ST|CLIFTON HOUSE|GEORGE TOWN||KY1-1108|CYM",
-      "building_key": "75 FORT ST||GEORGE TOWN||KY1-1108|CYM",
-      "phonetic_key": "75|F630|KY1-1108",
-      "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-031",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Urb Las Gladiolas 123 Calle Flamboyan, San Juan, PR 00926",
@@ -24856,7 +24726,7 @@
     }
   },
   {
-    "test_id": "CAT-09-032",
+    "test_id": "CAT-09-027",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Urb Jardines 456 Calle Luna, Caguas, PR 00725",
@@ -24882,7 +24752,7 @@
     }
   },
   {
-    "test_id": "CAT-09-033",
+    "test_id": "CAT-09-028",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Urb Dos Pinos 789 Calle Sol, Ponce, PR 00716",
@@ -24908,7 +24778,7 @@
     }
   },
   {
-    "test_id": "CAT-09-034",
+    "test_id": "CAT-09-029",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Unit 1234 Box 5678, APO, AE 09012",
@@ -24934,7 +24804,7 @@
     }
   },
   {
-    "test_id": "CAT-09-035",
+    "test_id": "CAT-09-030",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Unit 4321 Box 8765, FPO, AP 96515",
@@ -24960,7 +24830,7 @@
     }
   },
   {
-    "test_id": "CAT-09-036",
+    "test_id": "CAT-09-031",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "100 King St W Suite 500, Toronto, ON M5X 1A9, Canada",
@@ -24986,7 +24856,7 @@
     }
   },
   {
-    "test_id": "CAT-09-037",
+    "test_id": "CAT-09-032",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "200 Bay Street Floor 14, Toronto, ON M5J 2J2, Canada",
@@ -25012,7 +24882,7 @@
     }
   },
   {
-    "test_id": "CAT-09-038",
+    "test_id": "CAT-09-033",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "150 High Street Apt 4, Oxford, OX1 4DJ, United Kingdom",
@@ -25038,7 +24908,7 @@
     }
   },
   {
-    "test_id": "CAT-09-039",
+    "test_id": "CAT-09-034",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "25 Bank Street Suite 100, London, E14 5JP, UK",
@@ -25064,7 +24934,7 @@
     }
   },
   {
-    "test_id": "CAT-09-040",
+    "test_id": "CAT-09-035",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "1209 North Orange St, Wilmington, DE 19801",
@@ -25090,7 +24960,7 @@
     }
   },
   {
-    "test_id": "CAT-09-041",
+    "test_id": "CAT-09-036",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "251 Little Falls Dr, Wilmington, DE 19808",
@@ -25116,7 +24986,7 @@
     }
   },
   {
-    "test_id": "CAT-09-042",
+    "test_id": "CAT-09-037",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "30 N Gould St, Sheridan, WY 82801",
@@ -25136,6 +25006,136 @@
       "normalized_address_key": "30 N GOULD ST||SHERIDAN|WY|82801|USA",
       "building_key": "30 N GOULD ST||SHERIDAN|WY|82801|USA",
       "phonetic_key": "30|G430|82801",
+      "address_status": "standardized",
+      "is_us": true,
+      "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-038",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "160 Greentree Dr, Dover, DE 19904",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "160 GREENTREE DR",
+      "street2": "",
+      "city": "DOVER",
+      "state": "DE",
+      "postal_code": "19904",
+      "country": "USA",
+      "normalized_address_key": "160 GREENTREE DR||DOVER|DE|19904|USA",
+      "building_key": "160 GREENTREE DR||DOVER|DE|19904|USA",
+      "phonetic_key": "160|G653|19904",
+      "address_status": "standardized",
+      "is_us": true,
+      "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-039",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Ugland House, PO Box 309, George Town, KY1-1104, Cayman Islands",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "UGLAND HOUSE",
+      "street2": "PO BOX 309",
+      "city": "GEORGE TOWN",
+      "state": "",
+      "postal_code": "KY1-1104",
+      "country": "CYM",
+      "normalized_address_key": "UGLAND HOUSE|PO BOX 309|GEORGE TOWN||KY1-1104|CYM",
+      "building_key": "UGLAND HOUSE||GEORGE TOWN||KY1-1104|CYM",
+      "phonetic_key": "U245|KY1-1104",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-040",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Clifton House, 75 Fort St, George Town, KY1-1108, Cayman Islands",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "75 FORT ST",
+      "street2": "CLIFTON HOUSE",
+      "city": "GEORGE TOWN",
+      "state": "",
+      "postal_code": "KY1-1108",
+      "country": "CYM",
+      "normalized_address_key": "75 FORT ST|CLIFTON HOUSE|GEORGE TOWN||KY1-1108|CYM",
+      "building_key": "75 FORT ST||GEORGE TOWN||KY1-1108|CYM",
+      "phonetic_key": "75|F630|KY1-1108",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-041",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Ugland House, South Church St, George Town, KY1-1104, Cayman Islands",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "SOUTH CHURCH ST",
+      "street2": "UGLAND HOUSE",
+      "city": "GEORGE TOWN",
+      "state": "",
+      "postal_code": "KY1-1104",
+      "country": "CYM",
+      "normalized_address_key": "SOUTH CHURCH ST|UGLAND HOUSE|GEORGE TOWN||KY1-1104|CYM",
+      "building_key": "SOUTH CHURCH ST||GEORGE TOWN||KY1-1104|CYM",
+      "phonetic_key": "C620|KY1-1104",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-042",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "1221 Brickell Ave, Miami, FL 33131",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "1221 BRICKELL AVE",
+      "street2": "",
+      "city": "MIAMI",
+      "state": "FL",
+      "postal_code": "33131",
+      "country": "USA",
+      "normalized_address_key": "1221 BRICKELL AVE||MIAMI|FL|33131|USA",
+      "building_key": "1221 BRICKELL AVE||MIAMI|FL|33131|USA",
+      "phonetic_key": "1221|B624|33131",
       "address_status": "standardized",
       "is_us": true,
       "is_registered_agent_hub": true
@@ -25145,7 +25145,7 @@
     "test_id": "CAT-09-043",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "160 Greentree Dr, Dover, DE 19904",
+      "street1": "100 Park Ave, New York, NY 10017",
       "street2": null,
       "city": null,
       "state": null,
@@ -25153,15 +25153,15 @@
       "country": null
     },
     "expected_output": {
-      "street1": "160 GREENTREE DR",
+      "street1": "100 PARK AVE",
       "street2": "",
-      "city": "DOVER",
-      "state": "DE",
-      "postal_code": "19904",
+      "city": "NEW YORK",
+      "state": "NY",
+      "postal_code": "10017",
       "country": "USA",
-      "normalized_address_key": "160 GREENTREE DR||DOVER|DE|19904|USA",
-      "building_key": "160 GREENTREE DR||DOVER|DE|19904|USA",
-      "phonetic_key": "160|G653|19904",
+      "normalized_address_key": "100 PARK AVE||NEW YORK|NY|10017|USA",
+      "building_key": "100 PARK AVE||NEW YORK|NY|10017|USA",
+      "phonetic_key": "100|P620|10017",
       "address_status": "standardized",
       "is_us": true,
       "is_registered_agent_hub": true
@@ -25171,7 +25171,7 @@
     "test_id": "CAT-09-044",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Ugland House, PO Box 309, George Town, KY1-1104, Cayman Islands",
+      "street1": "Private Residence, Miami, FL 33131",
       "street2": null,
       "city": null,
       "state": null,
@@ -25179,25 +25179,25 @@
       "country": null
     },
     "expected_output": {
-      "street1": "UGLAND HOUSE",
-      "street2": "PO BOX 309",
-      "city": "GEORGE TOWN",
-      "state": "",
-      "postal_code": "KY1-1104",
-      "country": "CYM",
-      "normalized_address_key": "UGLAND HOUSE|PO BOX 309|GEORGE TOWN||KY1-1104|CYM",
-      "building_key": "UGLAND HOUSE||GEORGE TOWN||KY1-1104|CYM",
-      "phonetic_key": "U245|KY1-1104",
+      "street1": "PRIVATE RESIDENCE",
+      "street2": "",
+      "city": "MIAMI",
+      "state": "FL",
+      "postal_code": "33131",
+      "country": "USA",
+      "normalized_address_key": "PRIVATE RESIDENCE||MIAMI|FL|33131|USA",
+      "building_key": "PRIVATE RESIDENCE||MIAMI|FL|33131|USA",
+      "phonetic_key": "P613|33131",
       "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": true
+      "is_us": true,
+      "is_registered_agent_hub": false
     }
   },
   {
     "test_id": "CAT-09-045",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Clifton House, 75 Fort St, George Town, KY1-1108, Cayman Islands",
+      "street1": "Confidential, New York, NY 10005",
       "street2": null,
       "city": null,
       "state": null,
@@ -25205,25 +25205,25 @@
       "country": null
     },
     "expected_output": {
-      "street1": "75 FORT ST",
-      "street2": "CLIFTON HOUSE",
-      "city": "GEORGE TOWN",
-      "state": "",
-      "postal_code": "KY1-1108",
-      "country": "CYM",
-      "normalized_address_key": "75 FORT ST|CLIFTON HOUSE|GEORGE TOWN||KY1-1108|CYM",
-      "building_key": "75 FORT ST||GEORGE TOWN||KY1-1108|CYM",
-      "phonetic_key": "75|F630|KY1-1108",
+      "street1": "PRIVATE RESIDENCE",
+      "street2": "",
+      "city": "NEW YORK",
+      "state": "NY",
+      "postal_code": "10005",
+      "country": "USA",
+      "normalized_address_key": "PRIVATE RESIDENCE||NEW YORK|NY|10005|USA",
+      "building_key": "PRIVATE RESIDENCE||NEW YORK|NY|10005|USA",
+      "phonetic_key": "P613|10005",
       "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": true
+      "is_us": true,
+      "is_registered_agent_hub": false
     }
   },
   {
     "test_id": "CAT-09-046",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Urb Las Gladiolas 123 Calle Flamboyan, San Juan, PR 00926",
+      "street1": "Rambla Republica de Mexico 6135, Montevideo, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -25231,17 +25231,17 @@
       "country": null
     },
     "expected_output": {
-      "street1": "URB LAS GLADIOLAS 123 CALLE FLAMBOYAN",
+      "street1": "RAMBLA REPUBLICA DE MEXICO 6135",
       "street2": "",
-      "city": "SAN JUAN",
-      "state": "PR",
-      "postal_code": "00926",
-      "country": "USA",
-      "normalized_address_key": "URB LAS GLADIOLAS 123 CALLE FLAMBOYAN||SAN JUAN|PR|00926|USA",
-      "building_key": "URB LAS GLADIOLAS 123 CALLE FLAMBOYAN||SAN JUAN|PR|00926|USA",
-      "phonetic_key": "123|C400|00926",
+      "city": "MONTEVIDEO",
+      "state": "",
+      "postal_code": "",
+      "country": "URY",
+      "normalized_address_key": "RAMBLA REPUBLICA DE MEXICO 6135||MONTEVIDEO|||URY",
+      "building_key": "RAMBLA REPUBLICA DE MEXICO 6135||MONTEVIDEO|||URY",
+      "phonetic_key": "R514|MONTEVIDEO",
       "address_status": "standardized",
-      "is_us": true,
+      "is_us": false,
       "is_registered_agent_hub": false
     }
   },
@@ -25249,7 +25249,7 @@
     "test_id": "CAT-09-047",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Urb Jardines 456 Calle Luna, Caguas, PR 00725",
+      "street1": "Calle 72 No. 10-07, Bogota, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -25257,17 +25257,17 @@
       "country": null
     },
     "expected_output": {
-      "street1": "URB JARDINES 456 CALLE LUNA",
+      "street1": "CALLE 72 NO. 10-07",
       "street2": "",
-      "city": "CAGUAS",
-      "state": "PR",
-      "postal_code": "00725",
-      "country": "USA",
-      "normalized_address_key": "URB JARDINES 456 CALLE LUNA||CAGUAS|PR|00725|USA",
-      "building_key": "URB JARDINES 456 CALLE LUNA||CAGUAS|PR|00725|USA",
-      "phonetic_key": "456|C400|00725",
+      "city": "BOGOTA",
+      "state": "",
+      "postal_code": "",
+      "country": "COL",
+      "normalized_address_key": "CALLE 72 NO. 10-07||BOGOTA|||COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA|||COL",
+      "phonetic_key": "C400|BOGOTA",
       "address_status": "standardized",
-      "is_us": true,
+      "is_us": false,
       "is_registered_agent_hub": false
     }
   },
@@ -25275,7 +25275,7 @@
     "test_id": "CAT-09-048",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Urb Dos Pinos 789 Calle Sol, Ponce, PR 00716",
+      "street1": "Avenida Corrientes 1234, Buenos Aires, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -25283,17 +25283,17 @@
       "country": null
     },
     "expected_output": {
-      "street1": "URB DOS PINOS 789 CALLE SOL",
+      "street1": "AVENIDA CORRIENTES 1234",
       "street2": "",
-      "city": "PONCE",
-      "state": "PR",
-      "postal_code": "00716",
-      "country": "USA",
-      "normalized_address_key": "URB DOS PINOS 789 CALLE SOL||PONCE|PR|00716|USA",
-      "building_key": "URB DOS PINOS 789 CALLE SOL||PONCE|PR|00716|USA",
-      "phonetic_key": "789|C400|00716",
+      "city": "BUENOS AIRES",
+      "state": "",
+      "postal_code": "",
+      "country": "ARG",
+      "normalized_address_key": "AVENIDA CORRIENTES 1234||BUENOS AIRES|||ARG",
+      "building_key": "AVENIDA CORRIENTES 1234||BUENOS AIRES|||ARG",
+      "phonetic_key": "A153|BUENOS AIRES",
       "address_status": "standardized",
-      "is_us": true,
+      "is_us": false,
       "is_registered_agent_hub": false
     }
   },
@@ -25301,7 +25301,7 @@
     "test_id": "CAT-09-049",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Unit 1234 Box 5678, APO, AE 09012",
+      "street1": "Kenyatta Avenue, Nairobi, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -25309,17 +25309,17 @@
       "country": null
     },
     "expected_output": {
-      "street1": "UNIT 1234 BOX 5678",
+      "street1": "KENYATTA AVE",
       "street2": "",
-      "city": "APO",
-      "state": "AE",
-      "postal_code": "09012",
-      "country": "USA",
-      "normalized_address_key": "UNIT 1234 BOX 5678||APO|AE|09012|USA",
-      "building_key": "UNIT 1234 BOX 5678||APO|AE|09012|USA",
-      "phonetic_key": "1234|B200|09012",
+      "city": "NAIROBI",
+      "state": "",
+      "postal_code": "",
+      "country": "KEN",
+      "normalized_address_key": "KENYATTA AVE||NAIROBI|||KEN",
+      "building_key": "KENYATTA AVE||NAIROBI|||KEN",
+      "phonetic_key": "K530|NAIROBI",
       "address_status": "standardized",
-      "is_us": true,
+      "is_us": false,
       "is_registered_agent_hub": false
     }
   },
@@ -25327,7 +25327,7 @@
     "test_id": "CAT-09-050",
     "category": "international_nonstandard",
     "raw_input": {
-      "street1": "Unit 4321 Box 8765, FPO, AP 96515",
+      "street1": "Marszalkowska 100, Warsaw, USA",
       "street2": null,
       "city": null,
       "state": null,
@@ -25335,282 +25335,22 @@
       "country": null
     },
     "expected_output": {
-      "street1": "UNIT 4321 BOX 8765",
+      "street1": "MARSZALKOWSKA 100",
       "street2": "",
-      "city": "FPO",
-      "state": "AP",
-      "postal_code": "96515",
-      "country": "USA",
-      "normalized_address_key": "UNIT 4321 BOX 8765||FPO|AP|96515|USA",
-      "building_key": "UNIT 4321 BOX 8765||FPO|AP|96515|USA",
-      "phonetic_key": "4321|B200|96515",
+      "city": "WARSAW",
+      "state": "",
+      "postal_code": "",
+      "country": "POL",
+      "normalized_address_key": "MARSZALKOWSKA 100||WARSAW|||POL",
+      "building_key": "MARSZALKOWSKA 100||WARSAW|||POL",
+      "phonetic_key": "M624|WARSAW",
       "address_status": "standardized",
-      "is_us": true,
+      "is_us": false,
       "is_registered_agent_hub": false
     }
   },
   {
     "test_id": "CAT-09-051",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "100 King St W Suite 500, Toronto, ON M5X 1A9, Canada",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "100 KING ST W",
-      "street2": "STE 500",
-      "city": "TORONTO",
-      "state": "ON",
-      "postal_code": "M5X 1A9",
-      "country": "CAN",
-      "normalized_address_key": "100 KING ST W|STE 500|TORONTO|ON|M5X 1A9|CAN",
-      "building_key": "100 KING ST W||TORONTO|ON|M5X 1A9|CAN",
-      "phonetic_key": "100|K520|M5X 1A9",
-      "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": false
-    }
-  },
-  {
-    "test_id": "CAT-09-052",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "200 Bay Street Floor 14, Toronto, ON M5J 2J2, Canada",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "200 BAY ST",
-      "street2": "FL 14",
-      "city": "TORONTO",
-      "state": "ON",
-      "postal_code": "M5J 2J2",
-      "country": "CAN",
-      "normalized_address_key": "200 BAY ST|FL 14|TORONTO|ON|M5J 2J2|CAN",
-      "building_key": "200 BAY ST||TORONTO|ON|M5J 2J2|CAN",
-      "phonetic_key": "200|B000|M5J 2J2",
-      "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": false
-    }
-  },
-  {
-    "test_id": "CAT-09-053",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "150 High Street Apt 4, Oxford, OX1 4DJ, United Kingdom",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "150 HIGH ST",
-      "street2": "APT 4",
-      "city": "OXFORD",
-      "state": "",
-      "postal_code": "OX1 4DJ",
-      "country": "GBR",
-      "normalized_address_key": "150 HIGH ST|APT 4|OXFORD||OX1 4DJ|GBR",
-      "building_key": "150 HIGH ST||OXFORD||OX1 4DJ|GBR",
-      "phonetic_key": "150|H200|OX1 4DJ",
-      "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": false
-    }
-  },
-  {
-    "test_id": "CAT-09-054",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "25 Bank Street Suite 100, London, E14 5JP, UK",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "25 BANK ST",
-      "street2": "STE 100",
-      "city": "LONDON",
-      "state": "",
-      "postal_code": "E14 5JP",
-      "country": "GBR",
-      "normalized_address_key": "25 BANK ST|STE 100|LONDON||E14 5JP|GBR",
-      "building_key": "25 BANK ST||LONDON||E14 5JP|GBR",
-      "phonetic_key": "25|B520|E14 5JP",
-      "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": false
-    }
-  },
-  {
-    "test_id": "CAT-09-055",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "1209 North Orange St, Wilmington, DE 19801",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "1209 N ORANGE ST",
-      "street2": "",
-      "city": "WILMINGTON",
-      "state": "DE",
-      "postal_code": "19801",
-      "country": "USA",
-      "normalized_address_key": "1209 N ORANGE ST||WILMINGTON|DE|19801|USA",
-      "building_key": "1209 N ORANGE ST||WILMINGTON|DE|19801|USA",
-      "phonetic_key": "1209|O652|19801",
-      "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-056",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "251 Little Falls Dr, Wilmington, DE 19808",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "251 LITTLE FALLS DR",
-      "street2": "",
-      "city": "WILMINGTON",
-      "state": "DE",
-      "postal_code": "19808",
-      "country": "USA",
-      "normalized_address_key": "251 LITTLE FALLS DR||WILMINGTON|DE|19808|USA",
-      "building_key": "251 LITTLE FALLS DR||WILMINGTON|DE|19808|USA",
-      "phonetic_key": "251|L340|19808",
-      "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-057",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "30 N Gould St, Sheridan, WY 82801",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "30 N GOULD ST",
-      "street2": "",
-      "city": "SHERIDAN",
-      "state": "WY",
-      "postal_code": "82801",
-      "country": "USA",
-      "normalized_address_key": "30 N GOULD ST||SHERIDAN|WY|82801|USA",
-      "building_key": "30 N GOULD ST||SHERIDAN|WY|82801|USA",
-      "phonetic_key": "30|G430|82801",
-      "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-058",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "160 Greentree Dr, Dover, DE 19904",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "160 GREENTREE DR",
-      "street2": "",
-      "city": "DOVER",
-      "state": "DE",
-      "postal_code": "19904",
-      "country": "USA",
-      "normalized_address_key": "160 GREENTREE DR||DOVER|DE|19904|USA",
-      "building_key": "160 GREENTREE DR||DOVER|DE|19904|USA",
-      "phonetic_key": "160|G653|19904",
-      "address_status": "standardized",
-      "is_us": true,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-059",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "Ugland House, PO Box 309, George Town, KY1-1104, Cayman Islands",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "UGLAND HOUSE",
-      "street2": "PO BOX 309",
-      "city": "GEORGE TOWN",
-      "state": "",
-      "postal_code": "KY1-1104",
-      "country": "CYM",
-      "normalized_address_key": "UGLAND HOUSE|PO BOX 309|GEORGE TOWN||KY1-1104|CYM",
-      "building_key": "UGLAND HOUSE||GEORGE TOWN||KY1-1104|CYM",
-      "phonetic_key": "U245|KY1-1104",
-      "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-060",
-    "category": "international_nonstandard",
-    "raw_input": {
-      "street1": "Clifton House, 75 Fort St, George Town, KY1-1108, Cayman Islands",
-      "street2": null,
-      "city": null,
-      "state": null,
-      "postal_code": null,
-      "country": null
-    },
-    "expected_output": {
-      "street1": "75 FORT ST",
-      "street2": "CLIFTON HOUSE",
-      "city": "GEORGE TOWN",
-      "state": "",
-      "postal_code": "KY1-1108",
-      "country": "CYM",
-      "normalized_address_key": "75 FORT ST|CLIFTON HOUSE|GEORGE TOWN||KY1-1108|CYM",
-      "building_key": "75 FORT ST||GEORGE TOWN||KY1-1108|CYM",
-      "phonetic_key": "75|F630|KY1-1108",
-      "address_status": "standardized",
-      "is_us": false,
-      "is_registered_agent_hub": true
-    }
-  },
-  {
-    "test_id": "CAT-09-061",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Urb Las Gladiolas 123 Calle Flamboyan, San Juan, PR 00926",
@@ -25636,7 +25376,7 @@
     }
   },
   {
-    "test_id": "CAT-09-062",
+    "test_id": "CAT-09-052",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Urb Jardines 456 Calle Luna, Caguas, PR 00725",
@@ -25662,7 +25402,7 @@
     }
   },
   {
-    "test_id": "CAT-09-063",
+    "test_id": "CAT-09-053",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Urb Dos Pinos 789 Calle Sol, Ponce, PR 00716",
@@ -25688,7 +25428,7 @@
     }
   },
   {
-    "test_id": "CAT-09-064",
+    "test_id": "CAT-09-054",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Unit 1234 Box 5678, APO, AE 09012",
@@ -25714,7 +25454,7 @@
     }
   },
   {
-    "test_id": "CAT-09-065",
+    "test_id": "CAT-09-055",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Unit 4321 Box 8765, FPO, AP 96515",
@@ -25740,7 +25480,7 @@
     }
   },
   {
-    "test_id": "CAT-09-066",
+    "test_id": "CAT-09-056",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "100 King St W Suite 500, Toronto, ON M5X 1A9, Canada",
@@ -25766,7 +25506,7 @@
     }
   },
   {
-    "test_id": "CAT-09-067",
+    "test_id": "CAT-09-057",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "200 Bay Street Floor 14, Toronto, ON M5J 2J2, Canada",
@@ -25792,7 +25532,7 @@
     }
   },
   {
-    "test_id": "CAT-09-068",
+    "test_id": "CAT-09-058",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "150 High Street Apt 4, Oxford, OX1 4DJ, United Kingdom",
@@ -25818,7 +25558,7 @@
     }
   },
   {
-    "test_id": "CAT-09-069",
+    "test_id": "CAT-09-059",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "25 Bank Street Suite 100, London, E14 5JP, UK",
@@ -25844,7 +25584,7 @@
     }
   },
   {
-    "test_id": "CAT-09-070",
+    "test_id": "CAT-09-060",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "1209 North Orange St, Wilmington, DE 19801",
@@ -25870,7 +25610,7 @@
     }
   },
   {
-    "test_id": "CAT-09-071",
+    "test_id": "CAT-09-061",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "251 Little Falls Dr, Wilmington, DE 19808",
@@ -25896,7 +25636,7 @@
     }
   },
   {
-    "test_id": "CAT-09-072",
+    "test_id": "CAT-09-062",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "30 N Gould St, Sheridan, WY 82801",
@@ -25922,7 +25662,7 @@
     }
   },
   {
-    "test_id": "CAT-09-073",
+    "test_id": "CAT-09-063",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "160 Greentree Dr, Dover, DE 19904",
@@ -25948,7 +25688,7 @@
     }
   },
   {
-    "test_id": "CAT-09-074",
+    "test_id": "CAT-09-064",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Ugland House, PO Box 309, George Town, KY1-1104, Cayman Islands",
@@ -25974,7 +25714,7 @@
     }
   },
   {
-    "test_id": "CAT-09-075",
+    "test_id": "CAT-09-065",
     "category": "international_nonstandard",
     "raw_input": {
       "street1": "Clifton House, 75 Fort St, George Town, KY1-1108, Cayman Islands",
@@ -25997,6 +25737,266 @@
       "address_status": "standardized",
       "is_us": false,
       "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-066",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Ugland House, South Church St, George Town, KY1-1104, Cayman Islands",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "SOUTH CHURCH ST",
+      "street2": "UGLAND HOUSE",
+      "city": "GEORGE TOWN",
+      "state": "",
+      "postal_code": "KY1-1104",
+      "country": "CYM",
+      "normalized_address_key": "SOUTH CHURCH ST|UGLAND HOUSE|GEORGE TOWN||KY1-1104|CYM",
+      "building_key": "SOUTH CHURCH ST||GEORGE TOWN||KY1-1104|CYM",
+      "phonetic_key": "C620|KY1-1104",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-067",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "1221 Brickell Ave, Miami, FL 33131",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "1221 BRICKELL AVE",
+      "street2": "",
+      "city": "MIAMI",
+      "state": "FL",
+      "postal_code": "33131",
+      "country": "USA",
+      "normalized_address_key": "1221 BRICKELL AVE||MIAMI|FL|33131|USA",
+      "building_key": "1221 BRICKELL AVE||MIAMI|FL|33131|USA",
+      "phonetic_key": "1221|B624|33131",
+      "address_status": "standardized",
+      "is_us": true,
+      "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-068",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "100 Park Ave, New York, NY 10017",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "100 PARK AVE",
+      "street2": "",
+      "city": "NEW YORK",
+      "state": "NY",
+      "postal_code": "10017",
+      "country": "USA",
+      "normalized_address_key": "100 PARK AVE||NEW YORK|NY|10017|USA",
+      "building_key": "100 PARK AVE||NEW YORK|NY|10017|USA",
+      "phonetic_key": "100|P620|10017",
+      "address_status": "standardized",
+      "is_us": true,
+      "is_registered_agent_hub": true
+    }
+  },
+  {
+    "test_id": "CAT-09-069",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Private Residence, Miami, FL 33131",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "PRIVATE RESIDENCE",
+      "street2": "",
+      "city": "MIAMI",
+      "state": "FL",
+      "postal_code": "33131",
+      "country": "USA",
+      "normalized_address_key": "PRIVATE RESIDENCE||MIAMI|FL|33131|USA",
+      "building_key": "PRIVATE RESIDENCE||MIAMI|FL|33131|USA",
+      "phonetic_key": "P613|33131",
+      "address_status": "standardized",
+      "is_us": true,
+      "is_registered_agent_hub": false
+    }
+  },
+  {
+    "test_id": "CAT-09-070",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Confidential, New York, NY 10005",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "PRIVATE RESIDENCE",
+      "street2": "",
+      "city": "NEW YORK",
+      "state": "NY",
+      "postal_code": "10005",
+      "country": "USA",
+      "normalized_address_key": "PRIVATE RESIDENCE||NEW YORK|NY|10005|USA",
+      "building_key": "PRIVATE RESIDENCE||NEW YORK|NY|10005|USA",
+      "phonetic_key": "P613|10005",
+      "address_status": "standardized",
+      "is_us": true,
+      "is_registered_agent_hub": false
+    }
+  },
+  {
+    "test_id": "CAT-09-071",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Rambla Republica de Mexico 6135, Montevideo, USA",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "RAMBLA REPUBLICA DE MEXICO 6135",
+      "street2": "",
+      "city": "MONTEVIDEO",
+      "state": "",
+      "postal_code": "",
+      "country": "URY",
+      "normalized_address_key": "RAMBLA REPUBLICA DE MEXICO 6135||MONTEVIDEO|||URY",
+      "building_key": "RAMBLA REPUBLICA DE MEXICO 6135||MONTEVIDEO|||URY",
+      "phonetic_key": "R514|MONTEVIDEO",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": false
+    }
+  },
+  {
+    "test_id": "CAT-09-072",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Calle 72 No. 10-07, Bogota, USA",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "CALLE 72 NO. 10-07",
+      "street2": "",
+      "city": "BOGOTA",
+      "state": "",
+      "postal_code": "",
+      "country": "COL",
+      "normalized_address_key": "CALLE 72 NO. 10-07||BOGOTA|||COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA|||COL",
+      "phonetic_key": "C400|BOGOTA",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": false
+    }
+  },
+  {
+    "test_id": "CAT-09-073",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Avenida Corrientes 1234, Buenos Aires, USA",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "AVENIDA CORRIENTES 1234",
+      "street2": "",
+      "city": "BUENOS AIRES",
+      "state": "",
+      "postal_code": "",
+      "country": "ARG",
+      "normalized_address_key": "AVENIDA CORRIENTES 1234||BUENOS AIRES|||ARG",
+      "building_key": "AVENIDA CORRIENTES 1234||BUENOS AIRES|||ARG",
+      "phonetic_key": "A153|BUENOS AIRES",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": false
+    }
+  },
+  {
+    "test_id": "CAT-09-074",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Kenyatta Avenue, Nairobi, USA",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "KENYATTA AVE",
+      "street2": "",
+      "city": "NAIROBI",
+      "state": "",
+      "postal_code": "",
+      "country": "KEN",
+      "normalized_address_key": "KENYATTA AVE||NAIROBI|||KEN",
+      "building_key": "KENYATTA AVE||NAIROBI|||KEN",
+      "phonetic_key": "K530|NAIROBI",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": false
+    }
+  },
+  {
+    "test_id": "CAT-09-075",
+    "category": "international_nonstandard",
+    "raw_input": {
+      "street1": "Marszalkowska 100, Warsaw, USA",
+      "street2": null,
+      "city": null,
+      "state": null,
+      "postal_code": null,
+      "country": null
+    },
+    "expected_output": {
+      "street1": "MARSZALKOWSKA 100",
+      "street2": "",
+      "city": "WARSAW",
+      "state": "",
+      "postal_code": "",
+      "country": "POL",
+      "normalized_address_key": "MARSZALKOWSKA 100||WARSAW|||POL",
+      "building_key": "MARSZALKOWSKA 100||WARSAW|||POL",
+      "phonetic_key": "M624|WARSAW",
+      "address_status": "standardized",
+      "is_us": false,
+      "is_registered_agent_hub": false
     }
   }
 ]

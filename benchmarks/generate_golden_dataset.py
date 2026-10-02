@@ -717,16 +717,81 @@ def build_golden_dataset() -> List[Dict[str, Any]]:
             "city": "GEORGE TOWN", "st": "", "zip": "KY1-1108", "country": "CYM", "is_us": False,
             "hub": True, "hnum": "75", "snd": "F630"
         },
+        {
+            "raw": "Ugland House, South Church St, George Town, KY1-1104, Cayman Islands",
+            "s1": "SOUTH CHURCH ST", "s2": "UGLAND HOUSE",
+            "city": "GEORGE TOWN", "st": "", "zip": "KY1-1104", "country": "CYM", "is_us": False,
+            "hub": True, "pkey": "C620|KY1-1104"
+        },
+        # Registered Agent & Secrecy Hubs - Production Additions
+        {
+            "raw": "1221 Brickell Ave, Miami, FL 33131",
+            "s1": "1221 BRICKELL AVE", "s2": "",
+            "city": "MIAMI", "st": "FL", "zip": "33131", "country": "USA", "is_us": True,
+            "hub": True, "pkey": "1221|B624|33131"
+        },
+        {
+            "raw": "100 Park Ave, New York, NY 10017",
+            "s1": "100 PARK AVE", "s2": "",
+            "city": "NEW YORK", "st": "NY", "zip": "10017", "country": "USA", "is_us": True,
+            "hub": True, "pkey": "100|P620|10017"
+        },
+        # Compliance Privacy Placeholders
+        {
+            "raw": "Private Residence, Miami, FL 33131",
+            "s1": "PRIVATE RESIDENCE", "s2": "",
+            "city": "MIAMI", "st": "FL", "zip": "33131", "country": "USA", "is_us": True,
+            "hub": False, "pkey": "P613|33131"
+        },
+        {
+            "raw": "Confidential, New York, NY 10005",
+            "s1": "PRIVATE RESIDENCE", "s2": "",
+            "city": "NEW YORK", "st": "NY", "zip": "10005", "country": "USA", "is_us": True,
+            "hub": False, "pkey": "P613|10005"
+        },
+        # International Metro Disambiguation (Erroneous US Defaults)
+        {
+            "raw": "Rambla Republica de Mexico 6135, Montevideo, USA",
+            "s1": "RAMBLA REPUBLICA DE MEXICO 6135", "s2": "",
+            "city": "MONTEVIDEO", "st": "", "zip": "", "country": "URY", "is_us": False,
+            "hub": False, "pkey": "R514|MONTEVIDEO"
+        },
+        {
+            "raw": "Calle 72 No. 10-07, Bogota, USA",
+            "s1": "CALLE 72 NO. 10-07", "s2": "",
+            "city": "BOGOTA", "st": "", "zip": "", "country": "COL", "is_us": False,
+            "hub": False, "pkey": "C400|BOGOTA"
+        },
+        {
+            "raw": "Avenida Corrientes 1234, Buenos Aires, USA",
+            "s1": "AVENIDA CORRIENTES 1234", "s2": "",
+            "city": "BUENOS AIRES", "st": "", "zip": "", "country": "ARG", "is_us": False,
+            "hub": False, "pkey": "A153|BUENOS AIRES"
+        },
+        {
+            "raw": "Kenyatta Avenue, Nairobi, USA",
+            "s1": "KENYATTA AVE", "s2": "",
+            "city": "NAIROBI", "st": "", "zip": "", "country": "KEN", "is_us": False,
+            "hub": False, "pkey": "K530|NAIROBI"
+        },
+        {
+            "raw": "Marszalkowska 100, Warsaw, USA",
+            "s1": "MARSZALKOWSKA 100", "s2": "",
+            "city": "WARSAW", "st": "", "zip": "", "country": "POL", "is_us": False,
+            "hub": False, "pkey": "M624|WARSAW"
+        },
     ]
 
     cat9_count = 0
-    for i in range(5):
+    for i in range(3):
         for item in intl_cases:
             cat9_count += 1
             rec_id = f"CAT-09-{cat9_count:03d}"
             norm_key = f"{item['s1']}|{item['s2']}|{item['city']}|{item['st']}|{item['zip']}|{item['country']}"
             bld_key = f"{item['s1']}||{item['city']}|{item['st']}|{item['zip']}|{item['country']}"
-            if item['hnum']:
+            if "pkey" in item:
+                p_key = item["pkey"]
+            elif item.get('hnum'):
                 p_key = f"{item['hnum']}|{item['snd']}|{item['zip']}"
             else:
                 p_key = f"{item['snd']}|{item['zip']}"

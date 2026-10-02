@@ -217,3 +217,61 @@ class TestPatternsAndPhoneticsEdgeCases:
         assert res is not None
         assert res.street1 == "100 MAIN ST"
         assert res.street2 == "FL 3 STE 200"
+
+
+class TestFastPathPrivacyPlaceholders:
+    """Tests fast-path sub-millisecond handling of compliance privacy placeholders."""
+
+    def test_structured_privacy_placeholders(self):
+        placeholders = [
+            "Private Residence",
+            "CONFIDENTIAL",
+            "Personal Residence",
+            "Home Office",
+            "Undisclosed",
+            "Residence Only",
+            "Private Address",
+        ]
+        for ph in placeholders:
+            res = fast_path_parse(
+                street1=ph,
+                city="Miami",
+                state="FL",
+                postal_code="33131",
+            )
+            assert res is not None, f"Failed for {ph}"
+            assert res.street1 == "PRIVATE RESIDENCE"
+            assert res.street2 == ""
+            assert res.city == "MIAMI"
+            assert res.state == "FL"
+            assert res.postal_code == "33131"
+            assert res.is_private_residence is True
+            assert res.is_registered_agent_hub is False
+            assert res.normalized_address_key == "PRIVATE RESIDENCE||MIAMI|FL|33131|USA"
+            assert res.building_key == "PRIVATE RESIDENCE||MIAMI|FL|33131|USA"
+
+    def test_comma_delimited_privacy_placeholders(self):
+        # Plain privacy placeholder
+        res1 = fast_path_parse(street1="Private Residence, Miami, FL 33131")
+        assert res1 is not None
+        assert res1.street1 == "PRIVATE RESIDENCE"
+        assert res1.street2 == ""
+        assert res1.city == "MIAMI"
+        assert res1.state == "FL"
+        assert res1.postal_code == "33131"
+        assert res1.is_private_residence is True
+        assert res1.is_registered_agent_hub is False
+
+        # With unit prefix attached to placeholder
+        res2 = fast_path_parse(street1="Confidential, Ste 400, New York, NY 10005")
+        assert res2 is not None
+        assert res2.street1 == "PRIVATE RESIDENCE"
+        assert res2.city == "NEW YORK"
+        assert res2.state == "NY"
+        assert res2.postal_code == "10005"
+        assert res2.is_private_residence is True
+
+        # Invalid state code falls through
+        res_invalid_state = fast_path_parse(street1="Private Residence, Miami, ZZ 33131")
+        assert res_invalid_state is None
+

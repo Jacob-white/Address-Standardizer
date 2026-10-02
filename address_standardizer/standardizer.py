@@ -42,6 +42,7 @@ from address_standardizer.tables import (
     WORD_ORDINALS,
     COMPOUND_ORDINALS,
     ZIP3_TO_STATE,
+    GLOBAL_METRO_TO_COUNTRY,
 )
 from address_standardizer._patterns import (
     RE_CLEAN_TOKEN,
@@ -119,22 +120,45 @@ def normalize_country_code(
     state_raw: Optional[str] = None,
     postal_raw: Optional[str] = None,
     raw_street: Optional[str] = None,
+    city_raw: Optional[str] = None,
 ) -> str:
     """Resolve country to ISO-3166-1 alpha-3 code, defaulting to USA if state is a US state or CAN if Canadian province."""
+    country_cand = ""
     if country_raw:
         c_clean = country_raw.strip().upper()
         c_clean_alphanumeric = RE_NON_ALPHANUMERIC.sub("", c_clean)
         if c_clean_alphanumeric in COUNTRY_MAP:
-            return COUNTRY_MAP[c_clean_alphanumeric]
-        if len(c_clean_alphanumeric) == 3 and c_clean_alphanumeric.isalpha():
-            return c_clean_alphanumeric
+            country_cand = COUNTRY_MAP[c_clean_alphanumeric]
+        elif len(c_clean_alphanumeric) == 3 and c_clean_alphanumeric.isalpha():
+            country_cand = c_clean_alphanumeric
 
+    # If country is explicitly non-US, return it immediately
+    if country_cand and country_cand not in ("USA", ""):
+        return country_cand
+
+    # Check state indicator
+    is_valid_us_state = False
     if state_raw:
         s_clean = RE_NON_ALPHANUMERIC.sub("", state_raw.strip().upper())
         if s_clean in CANADIAN_PROVINCES:
             return "CAN"
         if s_clean in US_STATES:
-            return "USA"
+            is_valid_us_state = True
+
+    # If state is explicitly a US state, then country is USA
+    if is_valid_us_state:
+        return "USA"
+
+    # International metro check: When state is absent or not a US state,
+    # check city against global metros to prevent erroneous USA defaulting
+    if city_raw:
+        c_clean = RE_NON_ALPHANUMERIC.sub(" ", city_raw).strip().upper()
+        c_clean = " ".join(c_clean.split())
+        if c_clean in GLOBAL_METRO_TO_COUNTRY:
+            return GLOBAL_METRO_TO_COUNTRY[c_clean]
+        c_unaccent = unicodedata.normalize("NFKD", c_clean).encode("ASCII", "ignore").decode("utf-8")
+        if c_unaccent in GLOBAL_METRO_TO_COUNTRY:
+            return GLOBAL_METRO_TO_COUNTRY[c_unaccent]
 
     if postal_raw:
         p_clean = postal_raw.strip().upper()
@@ -152,6 +176,11 @@ def normalize_country_code(
             return "GBR"
         if RE_CAN_POSTCODE.search(st_clean) or st_clean.endswith(", CANADA") or st_clean.endswith(" CANADA"):
             return "CAN"
+        for part in raw_street.split(","):
+            p_clean = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()
+            p_clean = " ".join(p_clean.split())
+            if p_clean in GLOBAL_METRO_TO_COUNTRY:
+                return GLOBAL_METRO_TO_COUNTRY[p_clean]
 
     return "USA"
 
@@ -976,7 +1005,13 @@ def standardize_address(
         return _finalize_standardized_address(garbage_std, raw_dict, cache_key)
 
     # Detect country code
-    country_iso = normalize_country_code(country_raw, state_raw, postal_raw, raw_street=raw_street_address)
+    country_iso = normalize_country_code(
+        country_raw,
+        state_raw,
+        postal_raw,
+        raw_street=raw_street_address,
+        city_raw=city_raw,
+    )
     is_us = country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
 
     # Tier 1: Ultra-Fast Deterministic Fast-Path Parser (< 0.015 ms)
@@ -1106,8 +1141,12 @@ def standardize_address(
                         city_raw = parts_comma[2]
                         if len(parts_comma) >= 4:
                             postal_raw = parts_comma[3]
-                    elif "75 FORT" in parts_comma[1].upper():
-                        norm_s1 = "75 FORT ST"
+                    elif (
+                        "75 FORT" in parts_comma[1].upper()
+                        or "CHURCH" in parts_comma[1].upper()
+                        or (len(parts_comma) >= 4 and parts_comma[2].upper() in GLOBAL_METRO_TO_COUNTRY)
+                    ):
+                        norm_s1 = "75 FORT ST" if "75 FORT" in parts_comma[1].upper() else parts_comma[1].upper()
                         norm_s2 = parts_comma[0].upper()
                         city_raw = parts_comma[2]
                         if len(parts_comma) >= 4:

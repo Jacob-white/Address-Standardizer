@@ -7,6 +7,7 @@ Ultra-fast deterministic parser (< 0.015 ms, > 65,000 rec/s) for:
 Bypasses CRF execution for standard addresses using O(1) table lookups.
 """
 
+import re
 from typing import Optional, Tuple
 from address_standardizer.models import StandardizedAddress
 from address_standardizer.tables import (
@@ -34,6 +35,18 @@ from address_standardizer._patterns import (
     get_fuzzy_directional,
 )
 from address_standardizer.phonetics import generate_phonetic_address_key
+
+PRIVACY_PLACEHOLDERS: frozenset[str] = frozenset({
+    "PRIVATE RESIDENCE", "CONFIDENTIAL", "PERSONAL RESIDENCE",
+    "HOME OFFICE", "UNDISCLOSED", "RESIDENCE ONLY", "PRIVATE ADDRESS"
+})
+
+RE_PRIVACY_COMMA = re.compile(
+    r"^(PRIVATE RESIDENCE|CONFIDENTIAL|PERSONAL RESIDENCE|HOME OFFICE|UNDISCLOSED|RESIDENCE ONLY|PRIVATE ADDRESS)"
+    r"(?:,\s*(?:STE|SUITE|APT|UNIT|FL|FLOOR|BLDG|DEPT)?\s*[\w\-]+)?"
+    r",\s*([A-Za-z\s]+),\s*([A-Za-z]{2})\s+(\d{5}(?:-\d{4})?)$",
+    re.IGNORECASE,
+)
 
 
 def _fast_num_to_ordinal(n: int) -> str:
@@ -270,21 +283,29 @@ def fast_path_parse(
         else:
             return None
 
-        # Normalize street1 and secondary unit
-        parsed_st = _normalize_fast_street_phrase(s1_raw, enable_fuzzy=enable_fuzzy)
-        if not parsed_st:
-            return None
-        norm_s1, embedded_sec = parsed_st
+        # Check compliance privacy placeholder
+        s1_upper = s1_raw.upper().replace(".", "").strip()
+        is_priv = s1_upper in PRIVACY_PLACEHOLDERS
 
-        # If secondary unit was provided in s2_raw or embedded
-        if s2_raw:
-            norm_s2 = _normalize_fast_sec_unit(s2_raw)
-            if norm_s2 is None:
-                return None
-            if embedded_sec:
-                norm_s2 = f"{norm_s2} {embedded_sec}".strip()
+        if is_priv:
+            norm_s1 = "PRIVATE RESIDENCE"
+            norm_s2 = ""
         else:
-            norm_s2 = embedded_sec
+            # Normalize street1 and secondary unit
+            parsed_st = _normalize_fast_street_phrase(s1_raw, enable_fuzzy=enable_fuzzy)
+            if not parsed_st:
+                return None
+            norm_s1, embedded_sec = parsed_st
+
+            # If secondary unit was provided in s2_raw or embedded
+            if s2_raw:
+                norm_s2 = _normalize_fast_sec_unit(s2_raw)
+                if norm_s2 is None:
+                    return None
+                if embedded_sec:
+                    norm_s2 = f"{norm_s2} {embedded_sec}".strip()
+            else:
+                norm_s2 = embedded_sec
 
         norm_city = " ".join(city_raw.upper().replace(",", "").split())
         if enable_fuzzy:
@@ -299,7 +320,9 @@ def fast_path_parse(
         b_key = f"{norm_s1}||{norm_city}|{state_code}|{zip5}|USA"
         p_key = generate_phonetic_address_key(norm_s1, zip5, norm_city)
 
-        is_hub = is_hub_func(norm_s1, norm_s2, norm_city, state_code, zip5, "USA", raw_street_address) if is_hub_func else False
+        is_hub = False if is_priv else (
+            is_hub_func(norm_s1, norm_s2, norm_city, state_code, zip5, "USA", raw_street_address) if is_hub_func else False
+        )
 
         return StandardizedAddress(
             street1=norm_s1,
@@ -312,7 +335,7 @@ def fast_path_parse(
             address_status="standardized",
             raw_street_address=raw_street_address,
             is_us=True,
-            is_private_residence=False,
+            is_private_residence=is_priv,
             building_key=b_key,
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
@@ -320,6 +343,35 @@ def fast_path_parse(
 
     # Path B: Single comma-delimited string passed in street1
     if s1_raw and not (city_raw or state_raw or zip_raw):
+        m_priv = RE_PRIVACY_COMMA.match(s1_raw)
+        if m_priv:
+            city_part = m_priv.group(2).strip()
+            state_cand = m_priv.group(3).upper()
+            zip_cand = m_priv.group(4).strip()
+            if state_cand in FROZEN_US_STATE_CODES:
+                norm_city = " ".join(city_part.upper().split())
+                zip5 = zip_cand[:5]
+                norm_postal = zip_cand
+                raw_street_address = s1_raw
+                key = f"PRIVATE RESIDENCE||{norm_city}|{state_cand}|{zip5}|USA"
+                b_key = f"PRIVATE RESIDENCE||{norm_city}|{state_cand}|{zip5}|USA"
+                p_key = generate_phonetic_address_key("PRIVATE RESIDENCE", zip5, norm_city)
+                return StandardizedAddress(
+                    street1="PRIVATE RESIDENCE",
+                    street2="",
+                    city=norm_city,
+                    state=state_cand,
+                    postal_code=norm_postal,
+                    country="USA",
+                    normalized_address_key=key,
+                    address_status="standardized",
+                    raw_street_address=raw_street_address,
+                    is_us=True,
+                    is_private_residence=True,
+                    building_key=b_key,
+                    phonetic_key=p_key,
+                    is_registered_agent_hub=False,
+                )
         m = RE_CANONICAL_COMMA.match(s1_raw)
         if m:
             house_num = m.group(1).upper()

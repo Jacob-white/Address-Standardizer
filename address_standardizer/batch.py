@@ -83,26 +83,56 @@ def _process_row_dict(
 def _worker_process_chunk(
     args: Tuple[List[Dict[str, Any]], str, str, str, str, str, str, bool]
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Worker function for multiprocessing pool to process a single chunk."""
+    """Worker function for multiprocessing pool to process a single chunk with memoization."""
     chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence = args
     processed_rows = []
     audit_records = []
+    row_cache: Dict[Tuple[str, str, str, str, str, str], Tuple[Dict[str, Any], Optional[Dict[str, Any]]]] = {}
+
     for row in chunk:
-        res = _process_row_dict(
-            row,
-            street_col=street_col,
-            street2_col=street2_col,
-            city_col=city_col,
-            state_col=state_col,
-            zip_col=zip_col,
-            country_col=country_col,
-            include_confidence=include_confidence,
-            collect_audit=True,
-        )
-        aud = res.pop("_audit_record", None)
-        if aud is not None:
-            audit_records.append(aud)
-        processed_rows.append(res)
+        s1 = row.get(street_col) or ""
+        s2 = row.get(street2_col) or ""
+        city = row.get(city_col) or ""
+        state = row.get(state_col) or ""
+        postal = row.get(zip_col) or ""
+        country = row.get(country_col) or "USA"
+        cache_key = (s1, s2, city, state, postal, country)
+
+        if cache_key in row_cache:
+            cached_fields, cached_aud = row_cache[cache_key]
+            res = dict(row)
+            res.update(cached_fields)
+            if cached_aud is not None:
+                audit_records.append(cached_aud)
+            processed_rows.append(res)
+        else:
+            res = _process_row_dict(
+                row,
+                street_col=street_col,
+                street2_col=street2_col,
+                city_col=city_col,
+                state_col=state_col,
+                zip_col=zip_col,
+                country_col=country_col,
+                include_confidence=include_confidence,
+                collect_audit=True,
+            )
+            aud = res.pop("_audit_record", None)
+            if aud is not None:
+                audit_records.append(aud)
+
+            std_fields = {
+                k: v for k, v in res.items()
+                if k in (
+                    "std_street1", "std_street2", "std_city", "std_state", "std_postal_code",
+                    "std_country", "normalized_address_key", "building_key", "phonetic_key",
+                    "is_registered_agent_hub", "is_private_residence", "address_status",
+                    "confidence_score", "routing_tier"
+                )
+            }
+            row_cache[cache_key] = (std_fields, aud)
+            processed_rows.append(res)
+
     return processed_rows, audit_records
 
 

@@ -867,12 +867,69 @@ class TestRuleBasedFallbackAndEdgeCases:
         assert get_state_from_zip3("10005") == "NY"
 
     def test_normalize_country_code_edge_cases(self):
-        """Test normalize_country_code edge cases."""
+        """Test normalize_country_code edge cases and global metro auto-correction."""
         assert normalize_country_code(None, state_raw="CA") == "USA"
         assert normalize_country_code(None, state_raw="ZZ") == "USA"
         assert normalize_country_code("USA") == "USA"
         assert normalize_country_code("U.S.A.") == "USA"
         assert normalize_country_code("XYZ") == "XYZ"
+
+        # Global Metros auto-correct when state is absent or non-US
+        assert normalize_country_code("USA", city_raw="Montevideo") == "URY"
+        assert normalize_country_code("USA", city_raw="Bogota") == "COL"
+        assert normalize_country_code("USA", city_raw="Bogotá") == "COL"
+        assert normalize_country_code("USA", city_raw="Bògòta") == "COL"
+        assert normalize_country_code("USA", city_raw="Warsaw", state_raw="Mazowieckie") == "POL"
+        assert normalize_country_code("USA", city_raw="Nairobi") == "KEN"
+        assert normalize_country_code(None, city_raw="Taipei") == "TWN"
+        assert normalize_country_code("USA", city_raw="Buenos Aires") == "ARG"
+
+        # UK postal code
+        assert normalize_country_code(None, postal_raw="SW1A 1AA") == "GBR"
+
+        # US State presence overrides global metro names (e.g. Montevideo, MN or Paris, TX)
+        assert normalize_country_code("USA", state_raw="MN", city_raw="Montevideo") == "USA"
+        assert normalize_country_code("USA", state_raw="TX", city_raw="Paris") == "USA"
+
+        # Raw street scan for international metros and postcodes
+        assert normalize_country_code("USA", raw_street="Avenida 18 de Julio 1234, Montevideo") == "URY"
+        assert normalize_country_code("USA", raw_street="Ugland House, South Church St, George Town") == "CYM"
+
+    def test_standardize_address_international_metro_disambiguation(self):
+        """Test end-to-end standardize_address with erroneous USA default and foreign metros."""
+        # Regulatory filing defaulting country to USA for foreign office
+        res_mvd = standardize_address(
+            street1="Rambla Republica de Mexico 6135",
+            city="Montevideo",
+            country="USA",
+        )
+        assert res_mvd.country == "URY"
+        assert res_mvd.is_us is False
+        assert res_mvd.city == "MONTEVIDEO"
+        assert res_mvd.address_status == "standardized"
+
+        # Bogota office
+        res_bog = standardize_address(
+            street1="Calle 72 No. 10-07",
+            city="Bogotá",
+            country="USA",
+        )
+        assert res_bog.country == "COL"
+        assert res_bog.is_us is False
+        assert res_bog.city == "BOGOTÁ"
+
+        # Legitimate US address with same city name (Montevideo, MN)
+        res_us = standardize_address(
+            street1="100 Main St",
+            city="Montevideo",
+            state="MN",
+            postal_code="56265",
+            country="USA",
+        )
+        assert res_us.country == "USA"
+        assert res_us.is_us is True
+        assert res_us.state == "MN"
+        assert res_us.city == "MONTEVIDEO"
 
     def test_normalize_us_postal_code_edge_cases(self):
         """Test normalize_us_postal_code with missing, short, or invalid formats."""

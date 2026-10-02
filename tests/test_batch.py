@@ -103,6 +103,49 @@ class TestProcessRowAndChunk:
         assert results[0]["std_street1"] == "100 WALL ST"
         assert results[1]["std_street1"] == "PO BOX 456"
 
+    def test_process_chunk_with_duplicate_rows_memoization(self):
+        chunk = [
+            {"street1": "100 Wall St", "city": "New York", "state": "NY", "postal_code": "10005"},
+            {"street1": "100 Wall St", "city": "New York", "state": "NY", "postal_code": "10005"},
+        ]
+        results = process_chunk(chunk, include_confidence=True)
+        assert len(results) == 2
+        assert results[0]["std_street1"] == "100 WALL ST"
+        assert results[1]["std_street1"] == "100 WALL ST"
+        assert results[0]["building_key"] == results[1]["building_key"]
+
+    def test_worker_process_chunk_with_cached_audit(self):
+        from unittest.mock import patch, MagicMock
+        from address_standardizer.batch import _worker_process_chunk
+        mock_audit = MagicMock()
+        mock_audit.as_dict.return_value = {"record_id": "test"}
+        with patch("address_standardizer.batch.standardize_address") as mock_std:
+            std_obj = MagicMock()
+            std_obj.street1 = "100 WALL ST"
+            std_obj.street2 = ""
+            std_obj.city = "NEW YORK"
+            std_obj.state = "NY"
+            std_obj.postal_code = "10005"
+            std_obj.country = "USA"
+            std_obj.normalized_address_key = "100 WALL ST||NEW YORK|NY|10005|USA"
+            std_obj.building_key = "100 WALL ST||NEW YORK|NY|10005|USA"
+            std_obj.phonetic_key = "KEY"
+            std_obj.is_registered_agent_hub = False
+            std_obj.is_private_residence = False
+            std_obj.address_status = "standardized"
+            std_obj.confidence_score = 0.95
+            std_obj.routing_tier = "AUTO_PASS"
+            std_obj.audit_record = mock_audit
+            mock_std.return_value = std_obj
+
+            chunk = [
+                {"street1": "100 Wall St", "city": "New York", "state": "NY", "postal_code": "10005"},
+                {"street1": "100 Wall St", "city": "New York", "state": "NY", "postal_code": "10005"},
+            ]
+            rows, audits = _worker_process_chunk((chunk, "street1", "street2", "city", "state", "postal_code", "country", True))
+            assert len(rows) == 2
+            assert len(audits) == 2
+
 
 class TestStreamStandardizeCSV:
     """Tests streaming CSV standardization, multiprocessing pool, and memory bounding."""
