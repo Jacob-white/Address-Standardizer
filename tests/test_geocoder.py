@@ -169,3 +169,49 @@ class TestGeocoder:
             assert "rec_err" in res
             assert res["rec_err"]["precision"] == "zip_centroid"
             assert round(res["rec_err"]["latitude"], 2) == 40.71
+
+    def test_fallback_centroid_leading_zero_zip(self):
+        """Verify 4-digit ZIPs with omitted leading zeros map to the correct state centroid."""
+        # 7030 -> 07030 (Hoboken, NJ) should map to NJ, not LA (703)
+        coords_nj = get_fallback_centroid(zip5="7030")
+        assert coords_nj is not None
+        assert round(coords_nj[0], 2) == 40.30
+        assert round(coords_nj[1], 2) == -74.52
+
+        # 2110 -> 02110 (Boston, MA) should map to MA, not MD (211)
+        coords_ma = get_fallback_centroid(zip5="2110")
+        assert coords_ma is not None
+        assert round(coords_ma[0], 2) == 42.36
+        assert round(coords_ma[1], 2) == -71.06
+
+    def test_fallback_centroid_full_state_name(self):
+        """Verify that full state names are correctly resolved to state centroids."""
+        coords_ca = get_fallback_centroid(state="California")
+        assert coords_ca is not None
+        assert round(coords_ca[0], 2) == 36.12
+
+        coords_tx = get_fallback_centroid(state="Texas")
+        assert coords_tx is not None
+        assert round(coords_tx[0], 2) == 31.05
+
+        coords_ny = get_fallback_centroid(state="New York")
+        assert coords_ny is not None
+        assert round(coords_ny[0], 2) == 42.17
+
+    def test_census_geocoder_geocode_address_helper(self):
+        """Verify single address geocoding helper method."""
+        geocoder = CensusGeocoder()
+        mock_resp = {
+            "1": {
+                "latitude": 40.7061,
+                "longitude": -74.0060,
+                "precision": "rooftop",
+            }
+        }
+        with patch.object(geocoder, "geocode_batch", return_value=mock_resp):
+            res = geocoder.geocode_address("100 Wall St", "New York", "NY", "10005")
+            assert res is not None
+            assert res["latitude"] == 40.7061
+            assert res["longitude"] == -74.0060
+            assert res["precision"] == "rooftop"
+

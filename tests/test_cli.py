@@ -218,3 +218,42 @@ class TestCLI:
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert data["street1"] == "100 WALL ST"
+
+    def test_cli_unknown_flag_exits_2(self):
+        """Verify that unknown option flags starting with '-' exit with code 2 rather than parsing as addresses."""
+        test_args = ["address-standardizer", "--unknown-flag"]
+        with patch.object(sys, "argv", test_args):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 2
+
+    def test_cli_help_flags(self, capsys):
+        """Verify that -h and --help print usage and exit with 0."""
+        for flag in ["-h", "--help"]:
+            with patch.object(sys, "argv", ["address-standardizer", flag]):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == 0
+                captured = capsys.readouterr()
+                assert "usage:" in captured.out.lower() or "address-standardizer" in captured.out.lower()
+
+    def test_cli_parse_international_address(self, capsys):
+        """Verify CLI parse subcommand handles international addresses."""
+        test_args = [
+            "address-standardizer",
+            "parse",
+            "--street1", "25 Bank Street",
+            "--city", "London",
+            "--zip", "E14 5JP",
+            "--country", "United Kingdom",
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["street1"] == "25 BANK ST"
+        assert data["city"] == "LONDON"
+        assert data["country"] == "GBR"
+        assert data["is_us"] is False
+

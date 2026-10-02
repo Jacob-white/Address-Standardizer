@@ -111,3 +111,30 @@ class TestPhonetics:
         assert generate_phonetic_address_key("") is None
         assert generate_phonetic_address_key("   ") is None
         assert generate_phonetic_address_key(None) is None
+
+    def test_phonetic_address_key_punctuation_tolerance(self):
+        """Verify that periods, commas, and colons in street strings do not break directional/suffix stripping."""
+        k_nodots = generate_phonetic_address_key("100 N Main St", "10001")
+        k_dots = generate_phonetic_address_key("100 N. Main St.", "10001")
+        assert k_nodots == "100|M500|10001"
+        assert k_dots == k_nodots
+
+        k_unit = generate_phonetic_address_key("100 Wall St., Suite #400", "10005")
+        assert k_unit == "100|W400|10005"
+
+    def test_phonetic_address_key_po_box_variants(self):
+        """Verify that P.O. Box, POB, and Post Office Box all generate identical blocking keys."""
+        k1 = generate_phonetic_address_key("PO Box 123", "10001")
+        k2 = generate_phonetic_address_key("P.O. Box 123", "10001")
+        k3 = generate_phonetic_address_key("POB 123", "10001")
+        k4 = generate_phonetic_address_key("Post Office Box 123", "10001")
+        assert k1 == "POB 123|10001"
+        assert k2 == k1
+        assert k3 == k1
+        assert k4 == k1
+
+    def test_phonetic_address_key_whitespace_postal(self):
+        """Verify that leading or trailing whitespace in postal code is trimmed."""
+        k = generate_phonetic_address_key("100 Main St", "  10001  ", "New York")
+        assert k == "100|M500|10001"
+

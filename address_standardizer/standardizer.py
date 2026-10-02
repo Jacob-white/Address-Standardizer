@@ -62,8 +62,12 @@ def _clean_token(t: str) -> str:
     return re.sub(r"^[,\.#;:]+|[,\.#;:]+$", "", t.strip())
 
 
-def normalize_country_code(country_raw: Optional[str], state_raw: Optional[str] = None) -> str:
-    """Resolve country to ISO-3166-1 alpha-3 code, defaulting to USA if state is a US state."""
+def normalize_country_code(
+    country_raw: Optional[str],
+    state_raw: Optional[str] = None,
+    postal_raw: Optional[str] = None,
+) -> str:
+    """Resolve country to ISO-3166-1 alpha-3 code, defaulting to USA if state is a US state or CAN if Canadian province."""
     if country_raw:
         c_clean = country_raw.strip().upper()
         c_clean_alphanumeric = re.sub(r"[^\w\s]", "", c_clean)
@@ -74,8 +78,17 @@ def normalize_country_code(country_raw: Optional[str], state_raw: Optional[str] 
 
     if state_raw:
         s_clean = re.sub(r"[^\w\s]", "", state_raw.strip().upper())
+        if s_clean in CANADIAN_PROVINCES:
+            return "CAN"
         if s_clean in US_STATES:
             return "USA"
+
+    if postal_raw:
+        p_clean = postal_raw.strip().upper()
+        if re.match(r"^[A-Z]\d[A-Z]\s?\d[A-Z]\d$", p_clean):
+            return "CAN"
+        if re.match(r"^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$", p_clean):
+            return "GBR"
 
     return "USA"
 
@@ -129,23 +142,23 @@ def is_registered_agent_hub_address(
             return True
 
     # US Delaware / Corporate Service Hubs
-    if "1209 N ORANGE" in combined or "1209 NORTH ORANGE" in combined:
+    if ("1209 N ORANGE" in combined or "1209 NORTH ORANGE" in combined) and ("WILMINGTON" in combined or "19801" in combined or "DE" in combined):
         return True  # Corporation Trust Center, Wilmington DE
     if "160 GREENTREE" in combined and ("DOVER" in combined or "19904" in combined or "DE" in combined):
         return True  # National Registered Agents, Dover DE
-    if ("251 LITTLE FALLS" in combined or "2711 CENTERVILLE" in combined) and ("WILMINGTON" in combined or "DE" in combined):
+    if ("251 LITTLE FALLS" in combined or "2711 CENTERVILLE" in combined) and ("WILMINGTON" in combined or "19808" in combined or "DE" in combined):
         return True  # CSC, Wilmington DE
-    if "850 NEW BURTON" in combined and ("DOVER" in combined or "19904" in combined):
+    if "850 NEW BURTON" in combined and ("DOVER" in combined or "19904" in combined or "DE" in combined):
         return True  # Cogency Global, Dover DE
-    if "820 BEAR TAVERN" in combined and ("TRENTON" in combined or "NJ" in combined):
+    if "820 BEAR TAVERN" in combined and ("TRENTON" in combined or "08628" in combined or "NJ" in combined):
         return True  # Corporation Trust Company, NJ
-    if "16192 COASTAL" in combined and ("LEWES" in combined or "19958" in combined):
+    if "16192 COASTAL" in combined and ("LEWES" in combined or "19958" in combined or "DE" in combined):
         return True  # Harvard Business Services, DE
     if "30 N GOULD" in combined and ("SHERIDAN" in combined or "82801" in combined or "WY" in combined):
         return True  # Registered Agents Inc, WY
-    if "3500 S DUPONT" in combined and ("DOVER" in combined or "19901" in combined):
+    if "3500 S DUPONT" in combined and ("DOVER" in combined or "19901" in combined or "DE" in combined):
         return True  # Registered Agents Inc, DE
-    if "3773 HOWARD HUGHES" in combined and ("LAS VEGAS" in combined or "89169" in combined):
+    if "3773 HOWARD HUGHES" in combined and ("LAS VEGAS" in combined or "89169" in combined or "NV" in combined):
         return True  # Incorp Services, NV
 
     return False
@@ -168,19 +181,18 @@ def _rule_based_us_street_parse(address_str: str) -> Tuple[str, str, bool]:
         rem = clean_addr[:m_po.start()] + clean_addr[m_po.end():]
         rem = rem.strip(" ,.-")
         if rem:
-            st1_sub, _, _ = _rule_based_us_street_parse(rem)
-            return st1_sub, f"PO BOX {pob_num}", True
+            st1_sub, sec_sub, _ = _rule_based_us_street_parse(rem)
+            sec_out = f"{sec_sub} PO BOX {pob_num}".strip() if sec_sub else f"PO BOX {pob_num}"
+            return (st1_sub or f"PO BOX {pob_num}"), (sec_out if st1_sub else sec_sub), True
         return f"PO BOX {pob_num}", "", True
 
     # Secondary unit extraction
     sec_unit = ""
     sec_pat = (
         r"\b(SUITE|STE|SUIT|UNIT|UNT|APT|APARTMENT|APPT|FLOOR|FL|FLR|ROOM|RM|BLDG|BUILDING|BLD|"
-        r"DEPT|DEPARTMENT|LOT|SPC|SPACE|LEVEL|LVL|PH|PENTHOUSE|BSMT|BASEMENT|OFC|OFFICE|"
-        r"HNGR|HANGAR|LBBY|LOBBY|LOWR|LOWER|MEZZ|MEZZANINE|PIER|REAR|SIDE|SLIP|STP|STOP|"
-        r"TRLR|TRAILER|UPPR|UPPER|FRNT|FRONT|KEY)\b\.?\s*#?\s*([A-Z0-9\-]+)|"
-        r"(?:^|\s)#\s*([A-Z0-9\-]+)|"
-        r"\b(BSMT|BASEMENT|FRNT|FRONT|LBBY|LOBBY|LOWR|LOWER|MEZZ|MEZZANINE|OFC|OFFICE|PH|PENTHOUSE|REAR|SIDE|UPPR|UPPER)\b$"
+        r"DEPT|DEPARTMENT|LOT|SPC|SPACE|LEVEL|LVL|HNGR|HANGAR|KEY|PIER|SLIP|STP|STOP|TRLR|TRAILER)\b\.?\s*#?\s*([A-Z0-9\-]+)|"
+        r"#\s*([A-Z0-9\-]+)|"
+        r"\b(BSMT|BASEMENT|FRNT|FRONT|LBBY|LOBBY|LOWR|LOWER|MEZZ|MEZZANINE|OFC|OFFICE|PH|PENTHOUSE|REAR|SIDE|UPPR|UPPER)\b\.?(?:\s*#?\s*(\d+[A-Z0-9\-]*|[A-Z]\b))?"
     )
     m_sec = re.search(sec_pat, clean_addr)
     if m_sec:
@@ -191,7 +203,9 @@ def _rule_based_us_street_parse(address_str: str) -> Tuple[str, str, bool]:
         elif m_sec.group(3):
             sec_unit = f"STE {m_sec.group(3)}"
         elif m_sec.group(4):
-            sec_unit = SECONDARY_UNITS.get(m_sec.group(4), m_sec.group(4))
+            sec_type = SECONDARY_UNITS.get(m_sec.group(4), m_sec.group(4))
+            sec_val = m_sec.group(5)
+            sec_unit = f"{sec_type} {sec_val}" if sec_val else sec_type
         clean_addr = clean_addr[:m_sec.start()] + clean_addr[m_sec.end():]
         clean_addr = re.sub(r"\s+", " ", clean_addr).strip()
 
@@ -260,7 +274,41 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
                 st_input = ""
                 p_city = before_sz.strip()
             else:
-                st_input = before_sz.strip()
+                tokens = before_sz.split()
+                split_found = False
+                m_po = re.search(r"\b(P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+([A-Z0-9\-]+)\b", before_sz, re.IGNORECASE)
+                if m_po:
+                    end_idx = m_po.end()
+                    st_cand = before_sz[:end_idx].strip()
+                    rem_cand = before_sz[end_idx:].strip()
+                    if rem_cand:
+                        st_input = st_cand
+                        p_city = rem_cand
+                        split_found = True
+                if not split_found:
+                    for k in range(1, len(tokens)):
+                        t_clean = re.sub(r"[^\w]", "", tokens[k]).upper()
+                        if t_clean in STREET_SUFFIXES:
+                            curr = k
+                            if curr + 1 < len(tokens):
+                                next_clean = re.sub(r"[^\w]", "", tokens[curr + 1]).upper()
+                                if next_clean in DIRECTIONALS:
+                                    curr += 1
+                            if curr + 1 < len(tokens):
+                                sec_cand = re.sub(r"[^\w]", "", tokens[curr + 1]).upper()
+                                if sec_cand in SECONDARY_UNITS:
+                                    curr += 1
+                                    if curr + 1 < len(tokens):
+                                        val_cand = re.sub(r"[^\w\-]", "", tokens[curr + 1]).upper()
+                                        if val_cand:
+                                            curr += 1
+                            if curr + 1 < len(tokens):
+                                st_input = " ".join(tokens[:curr+1])
+                                p_city = " ".join(tokens[curr+1:])
+                                split_found = True
+                            break
+                if not split_found:
+                    st_input = before_sz.strip()
         rb_st1, rb_st2, ok = _rule_based_us_street_parse(st_input)
         return rb_st1, rb_st2, ok, p_city, p_st, p_zp
 
@@ -329,7 +377,7 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
                 if i + 1 < len(parsed):
                     next_tok, next_lbl = parsed[i + 1]
                     next_clean = _clean_token(next_tok).upper()
-                    if next_lbl in ("ZipCode", "PlaceName", "OccupancyIdentifier", "SubaddressIdentifier") and (len(next_clean) <= 4 or next_clean.isalnum()):
+                    if next_lbl in ("OccupancyIdentifier", "SubaddressIdentifier") or re.match(r"^(\d+[A-Z0-9\-]*|[A-Z]\d+|[A-Z])$", next_clean):
                         sec_parts.append(f"{sec_type} {next_clean}")
                         i += 2
                         continue
@@ -390,11 +438,12 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "") -> Tup
         remaining = combined[:po_box_match.start()] + combined[po_box_match.end():]
         remaining = remaining.strip(" ,.-")
         if remaining:
-            st1, _, _, p_city, p_state, p_zip = _parse_us_street_tokens(remaining)
+            st1, st2, _, p_city, p_state, p_zip = _parse_us_street_tokens(remaining)
             if st1:
-                return st1, f"PO BOX {po_box_num}", True, p_city, p_state, p_zip
+                combined_st2 = f"{st2} PO BOX {po_box_num}".strip() if st2 else f"PO BOX {po_box_num}"
+                return st1, combined_st2, True, p_city, p_state, p_zip
             else:
-                return f"PO BOX {po_box_num}", "", True, p_city, p_state, p_zip
+                return f"PO BOX {po_box_num}", st2, True, p_city, p_state, p_zip
         return f"PO BOX {po_box_num}", "", True, "", "", ""
 
     return _parse_us_street_tokens(combined)
@@ -550,7 +599,7 @@ def standardize_address(
         )
 
     # Country detection
-    country_iso = normalize_country_code(country_raw, state_raw)
+    country_iso = normalize_country_code(country_raw, state_raw, postal_raw)
     is_us = country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
 
     if is_us:
@@ -618,9 +667,17 @@ def standardize_address(
         )
     else:
         # International Pipeline
-        norm_s1_base = re.sub(r"\s+", " ", re.sub(r"[,\.]+", " ", s1_raw).strip().upper())
-        norm_s2_base = re.sub(r"\s+", " ", re.sub(r"[,\.]+", " ", s2_raw).strip().upper())
-        norm_s1, norm_s2 = _split_international_secondary_unit(norm_s1_base, norm_s2_base)
+        raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
+        is_priv = any(p in raw_combined_upper for p in [
+            "PRIVATE RESIDENCE", "RESIDENTIAL", "PRIVATE ADDRESS", "CONFIDENTIAL", "RESIDENCE ONLY", "PERSONAL RESIDENCE"
+        ])
+        if is_priv:
+            norm_s1 = "PRIVATE RESIDENCE"
+            norm_s2 = ""
+        else:
+            norm_s1_base = re.sub(r"\s+", " ", re.sub(r"[,\.]+", " ", s1_raw).strip().upper())
+            norm_s2_base = re.sub(r"\s+", " ", re.sub(r"[,\.]+", " ", s2_raw).strip().upper())
+            norm_s1, norm_s2 = _split_international_secondary_unit(norm_s1_base, norm_s2_base)
 
         norm_city = re.sub(r"\s+", " ", re.sub(r"[,\.]+", " ", city_raw).strip().upper())
         norm_state = re.sub(r"\s+", " ", re.sub(r"[,\.]+", " ", state_raw).strip().upper())
@@ -663,7 +720,7 @@ def standardize_address(
             address_status=status,
             raw_street_address=raw_street_address,
             is_us=False,
-            is_private_residence=False,
+            is_private_residence=is_priv,
             building_key=b_key,
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,

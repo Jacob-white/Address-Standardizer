@@ -24,6 +24,7 @@ from address_standardizer import (
 from address_standardizer.standardizer import (
     _rule_based_us_street_parse,
     _parse_us_street_lines,
+    _parse_us_street_tokens,
     _clean_token,
 )
 
@@ -831,3 +832,178 @@ class TestRuleBasedFallbackAndEdgeCases:
         # Standalone keys return None on empty
         assert generate_normalized_address_key() is None
         assert generate_building_key() is None
+
+    def test_registered_agent_hub_false_positives(self):
+        """Verify that 1209 N Orange outside Delaware does not trigger false positive hub flag."""
+        la_res = standardize_address(
+            street1="1209 North Orange Dr",
+            city="Los Angeles",
+            state="CA",
+            postal_code="90038",
+        )
+        assert la_res.is_registered_agent_hub is False
+
+        orlando_res = standardize_address(
+            street1="1209 North Orange Ave",
+            city="Orlando",
+            state="FL",
+            postal_code="32804",
+        )
+        assert orlando_res.is_registered_agent_hub is False
+
+        # Legitimate Delaware hub is still recognized
+        de_res = standardize_address(
+            street1="1209 North Orange Street",
+            city="Wilmington",
+            state="DE",
+            postal_code="19801",
+        )
+        assert de_res.is_registered_agent_hub is True
+
+    def test_street_secondary_unit_and_po_box_combined(self):
+        """Verify that addresses containing street, secondary unit, and PO Box preserve all components."""
+        res = standardize_address("100 Main St, Suite 200, PO Box 456, New York, NY 10001")
+        assert res.address_status == "standardized"
+        assert res.street1 == "100 MAIN ST"
+        assert res.street2 == "STE 200 PO BOX 456"
+        assert res.city == "NEW YORK"
+        assert res.state == "NY"
+        assert res.postal_code == "10001"
+
+        # Secondary unit and PO Box without street address
+        res_unit_box = standardize_address("Suite 200, PO Box 456, New York, NY 10001")
+        assert res_unit_box.address_status == "standardized"
+        assert res_unit_box.street1 == "PO BOX 456"
+        assert res_unit_box.street2 == "STE 200"
+        assert res_unit_box.city == "NEW YORK"
+
+    def test_standalone_secondary_unit_with_city_no_comma(self):
+        """Verify that standalone secondary units without commas do not swallow city names."""
+        # Unnumbered Penthouse followed by city
+        res = standardize_address("100 Main St Penthouse Denver, CO 80202")
+        assert res.street1 == "100 MAIN ST"
+        assert res.street2 == "PH"
+        assert res.city == "DENVER"
+        assert res.state == "CO"
+
+        # Penthouse with numeric identifier
+        res_num = standardize_address("100 Main St Penthouse 4 Denver, CO 80202")
+        assert res_num.street1 == "100 MAIN ST"
+        assert res_num.street2 == "PH 4"
+        assert res_num.city == "DENVER"
+
+        # Penthouse with letter identifier
+        res_letter = standardize_address("100 Main St Penthouse A Denver, CO 80202")
+        assert res_letter.street1 == "100 MAIN ST"
+        assert res_letter.street2 == "PH A"
+        assert res_letter.city == "DENVER"
+
+        # Basement followed by city
+        res_bsmt = standardize_address("100 Main St Basement Miami, FL 33131")
+        assert res_bsmt.street1 == "100 MAIN ST"
+        assert res_bsmt.street2 == "BSMT"
+        assert res_bsmt.city == "MIAMI"
+
+    def test_rule_based_street_secondary_unit_and_po_box(self):
+        """Verify secondary unit preservation with PO Box in pure rule-based fallback mode."""
+        with patch("address_standardizer.standardizer.usaddress", None):
+            res = standardize_address("100 Main St Suite 200 PO Box 456, New York, NY 10001")
+            assert res.street1 == "100 MAIN ST"
+            assert res.street2 == "STE 200 PO BOX 456"
+            assert res.city == "NEW YORK"
+
+            res_box = standardize_address("Suite 200 PO Box 456, New York, NY 10001")
+            assert res_box.street1 == "PO BOX 456"
+            assert res_box.street2 == "STE 200"
+
+    def test_rule_based_hash_unit_without_whitespace(self):
+        """Verify that # without whitespace is recognized in pure rule-based fallback mode."""
+        with patch("address_standardizer.standardizer.usaddress", None):
+            res = standardize_address("100 Main St#101, New York, NY 10001")
+            assert res.street1 == "100 MAIN ST"
+            assert res.street2 == "STE 101"
+
+    def test_rule_based_no_comma_street_city_split(self):
+        """Verify intelligent street and city splitting without comma in rule-based fallback mode."""
+        with patch("address_standardizer.standardizer.usaddress", None):
+            res_ny = standardize_address("100 Wall Street New York NY 10005")
+            assert res_ny.street1 == "100 WALL ST"
+            assert res_ny.city == "NEW YORK"
+            assert res_ny.state == "NY"
+            assert res_ny.postal_code == "10005"
+
+            res_cir = standardize_address("100 Main St Circle MT 59215")
+            assert res_cir.street1 == "100 MAIN ST"
+            assert res_cir.city == "CIRCLE"
+            assert res_cir.state == "MT"
+            assert res_cir.postal_code == "59215"
+
+    def test_international_private_residence(self):
+        """Verify that private residence indicators are detected in international addresses."""
+        res_uk = standardize_address(street1="Private Residence", city="London", country="UK")
+        assert res_uk.is_private_residence is True
+        assert res_uk.street1 == "PRIVATE RESIDENCE"
+        assert res_uk.country == "GBR"
+
+        res_can = standardize_address(street1="Confidential Address", city="Toronto", country="Canada")
+        assert res_can.is_private_residence is True
+        assert res_can.street1 == "PRIVATE RESIDENCE"
+        assert res_can.country == "CAN"
+
+    def test_country_auto_detection_from_province_or_postal(self):
+        """Verify country auto-detection when country is omitted but province/postal code is unique."""
+        res_can = standardize_address(
+            street1="100 King St",
+            city="Toronto",
+            state="ON",
+            postal_code="M5J 2S1",
+        )
+        assert res_can.country == "CAN"
+        assert res_can.is_us is False
+        assert res_can.state == "ON"
+        assert res_can.postal_code == "M5J 2S1"
+
+        res_uk = standardize_address(
+            street1="10 Downing Street",
+            city="London",
+            postal_code="SW1A 2AA",
+        )
+        assert res_uk.country == "GBR"
+        assert res_uk.is_us is False
+
+        # Postal code alone triggers CAN detection
+        assert normalize_country_code(None, postal_raw="M5J 2S1") == "CAN"
+
+    def test_rule_based_no_comma_complex_patterns(self):
+        """Verify rule-based comma-free parsing for PO Box, post-directional, and secondary units."""
+        with patch("address_standardizer.standardizer.usaddress", None):
+            # PO Box without comma
+            res_pob = standardize_address("PO Box 123 New York NY 10001")
+            assert res_pob.street1 == "PO BOX 123"
+            assert res_pob.city == "NEW YORK"
+            assert res_pob.state == "NY"
+            assert res_pob.postal_code == "10001"
+
+            # Post-directional without comma
+            res_dir = standardize_address("100 Main St East New York NY 10005")
+            assert res_dir.street1 == "100 MAIN ST E"
+            assert res_dir.city == "NEW YORK"
+            assert res_dir.state == "NY"
+            assert res_dir.postal_code == "10005"
+
+            # Secondary unit without comma
+            res_sec = standardize_address("100 Main St Suite 200 New York NY 10005")
+            assert res_sec.street1 == "100 MAIN ST"
+            assert res_sec.street2 == "STE 200"
+            assert res_sec.city == "NEW YORK"
+            assert res_sec.state == "NY"
+            assert res_sec.postal_code == "10005"
+            # Direct helper call on single string with PO Box and city state zip
+            st1_pob, st2_pob, ok_pob, city_pob, state_pob, zip_pob = _parse_us_street_tokens("PO Box 123 New York NY 10001")
+            assert ok_pob is True
+            assert st1_pob == "PO BOX 123"
+            assert city_pob == "New York"
+            assert state_pob == "NY"
+            assert zip_pob == "10001"
+
+
