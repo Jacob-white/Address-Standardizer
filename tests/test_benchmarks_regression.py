@@ -72,3 +72,5 @@ def test_run_all_benchmarks_execution():
     assert "comma_delimited" in res["performance"]
     assert "mixed_golden" in res["performance"]
     assert res["accuracy"]["total_records"] == 1000
+    assert res["accuracy"]["total_passed"] == 1000
+    assert res["accuracy"]["overall_accuracy_pct"] == 100.0

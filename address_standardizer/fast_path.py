@@ -24,6 +24,9 @@ from address_standardizer._patterns import (
     RE_QUEENS_BOROUGH,
     RE_FRACTIONAL_HOUSE,
     RE_NUMBERED_STREET,
+    RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
+    RE_ATTACHED_SUFFIX_BARE_UNIT,
+    RE_SAINT_HYPHEN,
     FROZEN_US_STATE_CODES,
     FROZEN_DIRECTIONAL_VALUES,
     ROUTE_PREFIXES,
@@ -67,7 +70,7 @@ def _normalize_fast_sec_unit(sec_raw: str) -> Optional[str]:
     return None
 
 
-def _normalize_fast_street_phrase(phrase: str) -> Optional[Tuple[str, str]]:
+def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Optional[Tuple[str, str]]:
     """
     Parses clean street phrase e.g. '100 Main St' or '200 Park Ave Suite 1200'.
     Returns (normalized_street1, normalized_street2) or None if complex/ambiguous.
@@ -75,6 +78,12 @@ def _normalize_fast_street_phrase(phrase: str) -> Optional[Tuple[str, str]]:
     phrase_upper = phrase.strip().upper()
     if not phrase_upper:
         return None
+
+    # Normalize Saint hyphenation e.g. 'St-Charles' -> 'St Charles'
+    phrase_upper = RE_SAINT_HYPHEN.sub(r"\1 \2", phrase_upper)
+    # Suffix-attached unit: 'Main St-Ste 200' -> 'Main St STE 200', 'Main St-4B' -> 'Main St APT 4B'
+    phrase_upper = RE_ATTACHED_SUFFIX_EXPLICIT_UNIT.sub(r"\1 \2 \3", phrase_upper)
+    phrase_upper = RE_ATTACHED_SUFFIX_BARE_UNIT.sub(r"\1 APT \2", phrase_upper)
 
     # Edge-case checks: if PO Box, Queens hyphen, rural route, fractional, or complex: fallback
     if RE_PO_BOX.search(phrase_upper) or RE_QUEENS_BOROUGH.match(phrase_upper) or RE_FRACTIONAL_HOUSE.match(phrase_upper):
@@ -128,7 +137,7 @@ def _normalize_fast_street_phrase(phrase: str) -> Optional[Tuple[str, str]]:
         if rem_tokens[0] in DIRECTIONALS:
             pre_dir = DIRECTIONALS[rem_tokens[0]]
             rem_tokens = rem_tokens[1:]
-        else:
+        elif enable_fuzzy:
             f_pre = get_fuzzy_directional(rem_tokens[0])
             if f_pre:
                 pre_dir = f_pre
@@ -140,7 +149,7 @@ def _normalize_fast_street_phrase(phrase: str) -> Optional[Tuple[str, str]]:
         if rem_tokens[-1] in DIRECTIONALS:
             post_dir = DIRECTIONALS[rem_tokens[-1]]
             rem_tokens = rem_tokens[:-1]
-        else:
+        elif enable_fuzzy:
             f_post = get_fuzzy_directional(rem_tokens[-1])
             if f_post:
                 post_dir = f_post
@@ -151,7 +160,7 @@ def _normalize_fast_street_phrase(phrase: str) -> Optional[Tuple[str, str]]:
     if rem_tokens[-1] in STREET_SUFFIXES:
         suffix = STREET_SUFFIXES[rem_tokens[-1]]
         name_tokens = rem_tokens[:-1]
-    else:
+    elif enable_fuzzy:
         # Check fuzzy suffix
         f_suf = get_fuzzy_suffix(rem_tokens[-1])
         if f_suf:
@@ -159,6 +168,8 @@ def _normalize_fast_street_phrase(phrase: str) -> Optional[Tuple[str, str]]:
             name_tokens = rem_tokens[:-1]
         else:
             return None
+    else:
+        return None
 
     if not name_tokens:
         return None
@@ -185,6 +196,10 @@ def _normalize_fast_street_phrase(phrase: str) -> Optional[Tuple[str, str]]:
             m_num = RE_NUMBERED_STREET.match(t)
             if m_num:
                 norm_name_parts.append(_fast_num_to_ordinal(int(m_num.group(1))))
+            elif enable_fuzzy:
+                from address_standardizer.fuzzy import heal_street_name
+                h_name = heal_street_name(t)
+                norm_name_parts.append(h_name if h_name else t)
             else:
                 norm_name_parts.append(t)
         k += 1
@@ -210,6 +225,7 @@ def fast_path_parse(
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
     is_hub_func = None,
+    enable_fuzzy: bool = True,
 ) -> Optional[StandardizedAddress]:
     """
     Tier 1 Fast-Path Matcher.
@@ -242,11 +258,20 @@ def fast_path_parse(
             norm_postal = f"{zip5}-{zip_clean[6:10]}" if len(zip_clean) >= 10 and zip_clean[5] == "-" and zip_clean[6:10].isdigit() else (
                 f"{zip5}-{zip_clean[5:9]}" if len(zip_clean) >= 9 and zip_clean[5:9].isdigit() else zip5
             )
+            if enable_fuzzy:
+                from address_standardizer.fuzzy import heal_postal_code_transposition
+                h_zip = heal_postal_code_transposition(zip5, state=state_code)
+                if h_zip and h_zip != zip5:
+                    if len(norm_postal) > 5 and norm_postal[:5] == zip5:
+                        norm_postal = f"{h_zip}{norm_postal[5:]}"
+                    else:
+                        norm_postal = h_zip
+                    zip5 = h_zip
         else:
             return None
 
         # Normalize street1 and secondary unit
-        parsed_st = _normalize_fast_street_phrase(s1_raw)
+        parsed_st = _normalize_fast_street_phrase(s1_raw, enable_fuzzy=enable_fuzzy)
         if not parsed_st:
             return None
         norm_s1, embedded_sec = parsed_st
@@ -262,6 +287,11 @@ def fast_path_parse(
             norm_s2 = embedded_sec
 
         norm_city = " ".join(city_raw.upper().replace(",", "").split())
+        if enable_fuzzy:
+            from address_standardizer.fuzzy import heal_city_token
+            h_city = heal_city_token(norm_city, state=state_code, zip3=zip5[:3])
+            if h_city:
+                norm_city = h_city
         raw_components = [v for v in [s1_raw, s2_raw, city_raw, state_raw, zip_raw, "USA"] if v]
         raw_street_address = ", ".join(raw_components)
 
@@ -304,7 +334,7 @@ def fast_path_parse(
 
             # Check street phrase
             full_st_phrase = f"{house_num} {street_part}"
-            parsed_st = _normalize_fast_street_phrase(full_st_phrase)
+            parsed_st = _normalize_fast_street_phrase(full_st_phrase, enable_fuzzy=enable_fuzzy)
             if not parsed_st:
                 return None
             norm_s1, embedded_sec = parsed_st
@@ -318,9 +348,22 @@ def fast_path_parse(
             if embedded_sec:
                 norm_s2 = f"{norm_s2} {embedded_sec}".strip() if norm_s2 else embedded_sec
 
-            norm_city = " ".join(city_part.upper().split())
             zip5 = zip_cand[:5]
             norm_postal = zip_cand
+            if enable_fuzzy:
+                from address_standardizer.fuzzy import heal_city_token, heal_postal_code_transposition
+                h_zip = heal_postal_code_transposition(zip5, state=state_cand)
+                if h_zip and h_zip != zip5:
+                    if len(norm_postal) > 5 and norm_postal[:5] == zip5:
+                        norm_postal = f"{h_zip}{norm_postal[5:]}"
+                    else:
+                        norm_postal = h_zip
+                    zip5 = h_zip
+            norm_city = " ".join(city_part.upper().split())
+            if enable_fuzzy:
+                h_city = heal_city_token(norm_city, state=state_cand, zip3=zip5[:3])
+                if h_city:
+                    norm_city = h_city
 
             raw_street_address = s1_raw
             key = f"{norm_s1}|{norm_s2}|{norm_city}|{state_cand}|{zip5}|USA"

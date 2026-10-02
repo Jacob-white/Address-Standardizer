@@ -282,6 +282,9 @@ class TestCacheGlobalControls:
         k_default = make_cache_key()
         assert k_default == "|||||USA"
 
+        k_nofuzzy = make_cache_key(" 100 Main St ", enable_fuzzy=False)
+        assert k_nofuzzy == "100 MAIN ST|||||USA|NO_FUZZY"
+
     def test_global_cache_configuration(self):
         def_cache = get_default_cache()
         assert isinstance(def_cache, MultiTierCache)

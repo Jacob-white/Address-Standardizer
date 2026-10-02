@@ -65,8 +65,9 @@ class VerificationCascade:
     Orchestrates the 4-stage verification and geocoding fallback cascade.
     """
 
-    def __init__(self):
+    def __init__(self, offline_index: Optional[Any] = None):
         self._local_rooftop_registry: Dict[str, Tuple[float, float]] = {}
+        self._offline_index = offline_index
 
     def register_rooftop(self, address_key: str, lat: float, lon: float):
         """Registers a known rooftop/DPV delivery point in the local Stage 1 reference table."""
@@ -83,6 +84,7 @@ class VerificationCascade:
         country: Optional[str] = None,
         normalized_address_key: Optional[str] = None,
         census_geocoder: Optional[Any] = None,
+        offline_index: Optional[Any] = None,
     ) -> Optional[CascadeResult]:
         """
         Cascades through Stages 1 -> 4 to resolve coordinates.
@@ -132,6 +134,22 @@ class VerificationCascade:
                     source="LOCAL_ROOFTOP_REGISTRY",
                     stage=1,
                 )
+
+        # Stage 1b: Offline Rooftop Reference Index
+        active_offline = offline_index if offline_index is not None else self._offline_index
+        if active_offline is not None:
+            for k in keys_to_check:
+                off_rec = active_offline.resolve_coordinates(k)
+                if off_rec is not None:
+                    return CascadeResult(
+                        latitude=off_rec.latitude,
+                        longitude=off_rec.longitude,
+                        precision=CascadePrecision.CONFIRMED_ROOFTOP,
+                        accuracy_radius_meters=off_rec.accuracy_radius_meters,
+                        source="OFFLINE_ROOFTOP_INDEX",
+                        stage=1,
+                        census_tract=off_rec.parcel_id,
+                    )
 
         # Stage 2: Census TIGER Centerline / Batch Geocoder
         if census_geocoder and street1:
@@ -214,6 +232,7 @@ def resolve_verification_cascade(
     country: Optional[str] = None,
     normalized_address_key: Optional[str] = None,
     census_geocoder: Optional[Any] = None,
+    offline_index: Optional[Any] = None,
 ) -> Optional[CascadeResult]:
     """Convenience helper to resolve coordinates through the 4-stage cascade."""
     return _DEFAULT_CASCADE.resolve(
@@ -225,4 +244,5 @@ def resolve_verification_cascade(
         country=country,
         normalized_address_key=normalized_address_key,
         census_geocoder=census_geocoder,
+        offline_index=offline_index,
     )

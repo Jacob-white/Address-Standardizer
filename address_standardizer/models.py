@@ -33,6 +33,18 @@ class StandardizedAddress:
             self._audit_record: Optional[Any] = None
         if not hasattr(self, "_cascade_result"):
             self._cascade_result: Optional[Any] = None
+        if not hasattr(self, "_rdi"):
+            self._rdi: str = "Unknown"
+        if not hasattr(self, "_cmra"):
+            self._cmra: bool = False
+        if not hasattr(self, "_vacant"):
+            self._vacant: bool = False
+        if not hasattr(self, "_dpv_footnotes"):
+            self._dpv_footnotes: Optional[List[str]] = None
+        if not hasattr(self, "_corporate_risk_score"):
+            self._corporate_risk_score: float = 0.0
+        if not hasattr(self, "_corporate_risk_flags"):
+            self._corporate_risk_flags: Optional[List[str]] = None
 
     @property
     def confidence_score(self) -> Optional[float]:
@@ -75,6 +87,72 @@ class StandardizedAddress:
     def cascade_result(self, value: Optional[Any]):
         self._cascade_result = value
 
+    @property
+    def rdi(self) -> str:
+        return getattr(self, "_rdi", "Unknown")
+
+    @rdi.setter
+    def rdi(self, value: str):
+        self._rdi = value
+
+    @property
+    def cmra(self) -> bool:
+        return getattr(self, "_cmra", False)
+
+    @cmra.setter
+    def cmra(self, value: bool):
+        self._cmra = bool(value)
+
+    @property
+    def is_cmra(self) -> bool:
+        return self.cmra
+
+    @is_cmra.setter
+    def is_cmra(self, value: bool):
+        self.cmra = value
+
+    @property
+    def vacant(self) -> bool:
+        return getattr(self, "_vacant", False)
+
+    @vacant.setter
+    def vacant(self, value: bool):
+        self._vacant = bool(value)
+
+    @property
+    def is_vacant(self) -> bool:
+        return self.vacant
+
+    @is_vacant.setter
+    def is_vacant(self, value: bool):
+        self.vacant = value
+
+    @property
+    def dpv_footnotes(self) -> List[str]:
+        val = getattr(self, "_dpv_footnotes", None)
+        return list(val) if val is not None else []
+
+    @dpv_footnotes.setter
+    def dpv_footnotes(self, value: List[str]):
+        self._dpv_footnotes = list(value)
+
+    @property
+    def corporate_risk_score(self) -> float:
+        return getattr(self, "_corporate_risk_score", 0.0)
+
+    @corporate_risk_score.setter
+    def corporate_risk_score(self, value: float):
+        self._corporate_risk_score = float(value)
+
+    @property
+    def corporate_risk_flags(self) -> List[str]:
+        val = getattr(self, "_corporate_risk_flags", None)
+        return list(val) if val is not None else []
+
+    @corporate_risk_flags.setter
+    def corporate_risk_flags(self, value: List[str]):
+        self._corporate_risk_flags = list(value)
+
     def as_dict(self, include_metadata: bool = False) -> Dict[str, Any]:
         d = {
             "street1": self.street1,
@@ -96,6 +174,14 @@ class StandardizedAddress:
             d["confidence_score"] = self.confidence_score
             d["routing_tier"] = self.routing_tier
             d["failure_reason_codes"] = self.failure_reason_codes
+            d["rdi"] = self.rdi
+            d["cmra"] = self.cmra
+            d["is_cmra"] = self.is_cmra
+            d["vacant"] = self.vacant
+            d["is_vacant"] = self.is_vacant
+            d["dpv_footnotes"] = self.dpv_footnotes
+            d["corporate_risk_score"] = self.corporate_risk_score
+            d["corporate_risk_flags"] = self.corporate_risk_flags
             if self.audit_record is not None:
                 d["audit_id"] = getattr(self.audit_record, "audit_id", None)
             if self.cascade_result is not None:

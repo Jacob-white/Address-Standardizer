@@ -40,6 +40,9 @@ WARN_CRA_HUB_DETECTED = "WARN_CRA_HUB_DETECTED"
 WARN_PMB_DISGUISED = "WARN_PMB_DISGUISED"
 WARN_RESIDENTIAL_COMM = "WARN_RESIDENTIAL_COMM"
 WARN_TYPO_HEALED = "WARN_TYPO_HEALED"
+WARN_CMRA_DETECTED = "WARN_CMRA_DETECTED"
+WARN_MISSING_SECONDARY_UNIT = "WARN_MISSING_SECONDARY_UNIT"
+WARN_VACANT_DELIVERY_POINT = "WARN_VACANT_DELIVERY_POINT"
 ERR_PARSE_FAILED = "ERR_PARSE_FAILED"
 ERR_EMPTY_ADDRESS = "ERR_EMPTY_ADDRESS"
 
@@ -292,6 +295,15 @@ class ConfidenceScorer:
             reason_codes.append(WARN_CRA_HUB_DETECTED)
         if std_address.is_private_residence:
             reason_codes.append(WARN_RESIDENTIAL_COMM)
+        if getattr(std_address, "is_cmra", False):
+            if WARN_CMRA_DETECTED not in reason_codes:
+                reason_codes.append(WARN_CMRA_DETECTED)
+        if getattr(std_address, "is_vacant", False):
+            if WARN_VACANT_DELIVERY_POINT not in reason_codes:
+                reason_codes.append(WARN_VACANT_DELIVERY_POINT)
+        if "N1" in getattr(std_address, "dpv_footnotes", []):
+            if WARN_MISSING_SECONDARY_UNIT not in reason_codes:
+                reason_codes.append(WARN_MISSING_SECONDARY_UNIT)
 
         # Disguised PMB check
         raw_has_pmb = "PMB" in raw_combined or "PRIVATE MAILBOX" in raw_combined

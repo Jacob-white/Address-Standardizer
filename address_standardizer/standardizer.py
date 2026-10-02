@@ -62,7 +62,9 @@ from address_standardizer._patterns import (
     RE_MILITARY_UNIT_BOX,
     RE_RURAL_ROUTE,
     RE_HIGHWAY_CONTRACT,
-    RE_ATTACHED_SUFFIX_UNIT,
+    RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
+    RE_ATTACHED_SUFFIX_BARE_UNIT,
+    RE_SAINT_HYPHEN,
     RE_PRIVATE_MAILBOX,
     RE_HYPHENATED_UNIT,
     RE_COMMA_DOT,
@@ -195,34 +197,16 @@ def is_registered_agent_hub_address(
     raw_street: str = ""
 ) -> bool:
     """Detects whether an address corresponds to a known corporate service or formation hub."""
-    combined = f"{street1} {street2} {city} {state} {postal_code} {raw_street}".upper()
-
-    # Cayman / Offshore Legal Hubs
-    if country in ("CYM", "CAYMAN ISLANDS") or "CAYMAN" in combined:
-        if any(h in combined for h in ["UGLAND HOUSE", "PO BOX 309", "190 ELGIN", "CLIFTON HOUSE", "75 FORT ST"]):
-            return True
-
-    # US Delaware / Corporate Service Hubs
-    if ("1209 N ORANGE" in combined or "1209 NORTH ORANGE" in combined) and ("WILMINGTON" in combined or "19801" in combined or "DE" in combined):
-        return True  # Corporation Trust Center, Wilmington DE
-    if "160 GREENTREE" in combined and ("DOVER" in combined or "19904" in combined or "DE" in combined):
-        return True  # National Registered Agents, Dover DE
-    if ("251 LITTLE FALLS" in combined or "2711 CENTERVILLE" in combined) and ("WILMINGTON" in combined or "19808" in combined or "DE" in combined):
-        return True  # CSC, Wilmington DE
-    if "850 NEW BURTON" in combined and ("DOVER" in combined or "19904" in combined or "DE" in combined):
-        return True  # Cogency Global, Dover DE
-    if "820 BEAR TAVERN" in combined and ("TRENTON" in combined or "08628" in combined or "NJ" in combined):
-        return True  # Corporation Trust Company, NJ
-    if "16192 COASTAL" in combined and ("LEWES" in combined or "19958" in combined or "DE" in combined):
-        return True  # Harvard Business Services, DE
-    if "30 N GOULD" in combined and ("SHERIDAN" in combined or "82801" in combined or "WY" in combined):
-        return True  # Registered Agents Inc, WY
-    if "3500 S DUPONT" in combined and ("DOVER" in combined or "19901" in combined or "DE" in combined):
-        return True  # Registered Agents Inc, DE
-    if "3773 HOWARD HUGHES" in combined and ("LAS VEGAS" in combined or "89169" in combined or "NV" in combined):
-        return True  # Incorp Services, NV
-
-    return False
+    from address_standardizer.registry import is_registered_agent_hub_address as _reg_is_hub
+    return _reg_is_hub(
+        street1=street1,
+        street2=street2,
+        city=city,
+        state=state,
+        postal_code=postal_code,
+        country=country,
+        raw_street=raw_street,
+    )
 
 
 def _pre_normalize_address_string(text: str) -> str:
@@ -231,8 +215,11 @@ def _pre_normalize_address_string(text: str) -> str:
     text = RE_GLUED_HASH.sub(" # ", text)
     # Split glued unit prefixes: 'Apt.4B' -> 'Apt 4B'
     text = RE_GLUED_UNIT.sub(r"\1 ", text)
-    # Suffix-attached unit: 'Main St-4B' -> 'Main St APT 4B'
-    text = RE_ATTACHED_SUFFIX_UNIT.sub(r"\1 APT \2", text)
+    # Normalize Saint hyphenation e.g. 'St-Charles' -> 'St Charles', 'Saint-Gaudens' -> 'Saint Gaudens'
+    text = RE_SAINT_HYPHEN.sub(r"\1 \2", text)
+    # Suffix-attached unit: 'Main St-Ste 200' -> 'Main St STE 200', 'Main St-4B' -> 'Main St APT 4B'
+    text = RE_ATTACHED_SUFFIX_EXPLICIT_UNIT.sub(r"\1 \2 \3", text)
+    text = RE_ATTACHED_SUFFIX_BARE_UNIT.sub(r"\1 APT \2", text)
     # Normalize Private Mailbox to PMB
     text = RE_PRIVATE_MAILBOX.sub("PMB", text)
     # Normalize STE-400 -> STE 400
@@ -240,7 +227,7 @@ def _pre_normalize_address_string(text: str) -> str:
     return text
 
 
-def _rule_based_us_street_parse(address_str: str) -> Tuple[str, str, bool]:
+def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> Tuple[str, str, bool]:
     """
     Tier 2 Deterministic Rule Matrix:
     Standardizes US streets according to USPS Pub 28 using positional grammar,
@@ -396,8 +383,8 @@ def _rule_based_us_street_parse(address_str: str) -> Tuple[str, str, bool]:
             )
             is_dir_pos = (j == 0 and len(rem_tokens) > 2) or (j == len(rem_tokens) - 1)
 
-            f_suf = get_fuzzy_suffix(t) if is_suffix_pos else None
-            f_dir = get_fuzzy_directional(t) if is_dir_pos else None
+            f_suf = (get_fuzzy_suffix(t) if is_suffix_pos else None) if enable_fuzzy else None
+            f_dir = (get_fuzzy_directional(t) if is_dir_pos else None) if enable_fuzzy else None
 
             if m_ord:
                 norm_tokens.append(num_to_ordinal(int(m_ord.group(1))))
@@ -405,6 +392,10 @@ def _rule_based_us_street_parse(address_str: str) -> Tuple[str, str, bool]:
                 norm_tokens.append(f_suf)
             elif f_dir:
                 norm_tokens.append(f_dir)
+            elif enable_fuzzy:
+                from address_standardizer.fuzzy import heal_street_name
+                h_name = heal_street_name(t)
+                norm_tokens.append(h_name if h_name else t)
             else:
                 norm_tokens.append(t)
         j += 1
@@ -413,7 +404,7 @@ def _rule_based_us_street_parse(address_str: str) -> Tuple[str, str, bool]:
     return st1, sec_unit, bool(st1)
 
 
-def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str, str]:
+def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tuple[str, str, bool, str, str, str]:
     """Parse address string using usaddress with rule-based fallback and USPS Pub 28 mapping."""
     clean_input = _pre_normalize_address_string(address_str)
 
@@ -549,7 +540,7 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
                 if not split_found:
                     st_input = before_sz.strip()
 
-        rb_st1, rb_st2, ok = _rule_based_us_street_parse(st_input)
+        rb_st1, rb_st2, ok = _rule_based_us_street_parse(st_input, enable_fuzzy=enable_fuzzy)
         if urb_prefix:
             rb_st1 = f"{urb_prefix} {rb_st1}".strip()
         return rb_st1, rb_st2, ok, p_city, p_st, p_zp
@@ -619,8 +610,8 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
                     street_parts.append(clean)
             else:
                 # Check for typo in directional or suffix
-                f_dir = get_fuzzy_directional(clean)
-                f_suf = get_fuzzy_suffix(clean)
+                f_dir = get_fuzzy_directional(clean) if enable_fuzzy else None
+                f_suf = get_fuzzy_suffix(clean) if enable_fuzzy else None
                 m_ord = RE_NUMBERED_STREET.match(clean)
                 if m_ord:
                     street_parts.append(num_to_ordinal(int(m_ord.group(1))))
@@ -628,6 +619,10 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
                     street_parts.append(f_dir)
                 elif f_suf and len(street_parts) >= 2 and (i == len(parsed) - 1 or (i == len(parsed) - 2 and parsed[i+1][1] in ("StateName", "ZipCode"))):
                     street_parts.append(f_suf)
+                elif enable_fuzzy:
+                    from address_standardizer.fuzzy import heal_street_name
+                    h_name = heal_street_name(clean)
+                    street_parts.append(h_name if h_name else clean)
                 else:
                     street_parts.append(clean)
         elif label == "OccupancyType":
@@ -714,13 +709,13 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
 
     # Fallback to rule-based parser if empty
     if not st1 and not st2 and not (p_city or p_state or p_zip):
-        rb_st1, rb_st2, ok = _rule_based_us_street_parse(address_str)
+        rb_st1, rb_st2, ok = _rule_based_us_street_parse(address_str, enable_fuzzy=enable_fuzzy)
         return rb_st1, rb_st2, ok, p_city, p_state, p_zip
 
     return st1, st2, True, p_city, p_state, p_zip
 
 
-def _parse_us_address_components(street1_raw: str, street2_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
+def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True) -> Tuple[str, str, bool, str, str, str]:
     """Parses US address lines and returns (st1, st2, ok, p_city, p_state, p_zip)."""
     s1_clean = (street1_raw or "").strip()
     s2_clean = (street2_raw or "").strip()
@@ -731,7 +726,7 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "") -> Tup
 
     if m_s2_po and not m_s1_po:
         # Street1 has physical street, Street2 has PO Box
-        st1, st2, ok, p_city, p_state, p_zip = _parse_us_street_tokens(s1_clean)
+        st1, st2, ok, p_city, p_state, p_zip = _parse_us_street_tokens(s1_clean, enable_fuzzy=enable_fuzzy)
         po_box_str = f"PO BOX {m_s2_po.group(1).upper()}"
         combined_st2 = f"{st2} {po_box_str}".strip() if st2 else po_box_str
         return st1, combined_st2, True, p_city, p_state, p_zip
@@ -747,7 +742,7 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "") -> Tup
         remaining = combined[:po_box_match.start()] + combined[po_box_match.end():]
         remaining = remaining.strip(" ,.-")
         if remaining:
-            st1, st2, _, p_city, p_state, p_zip = _parse_us_street_tokens(remaining)
+            st1, st2, _, p_city, p_state, p_zip = _parse_us_street_tokens(remaining, enable_fuzzy=enable_fuzzy)
             if st1:
                 combined_st2 = f"{st2} PO BOX {po_box_num}".strip() if st2 else f"PO BOX {po_box_num}"
                 return st1, combined_st2, True, p_city, p_state, p_zip
@@ -755,12 +750,12 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "") -> Tup
                 return f"PO BOX {po_box_num}", st2, True, p_city, p_state, p_zip
         return f"PO BOX {po_box_num}", "", True, "", "", ""
 
-    return _parse_us_street_tokens(combined)
+    return _parse_us_street_tokens(combined, enable_fuzzy=enable_fuzzy)
 
 
-def _parse_us_street_lines(street1_raw: str, street2_raw: str = "") -> Tuple[str, str, bool]:
+def _parse_us_street_lines(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True) -> Tuple[str, str, bool]:
     """Parses and standardizes US street1 and street2 into USPS Pub 28 format."""
-    st1, st2, ok, _, _, _ = _parse_us_address_components(street1_raw, street2_raw)
+    st1, st2, ok, _, _, _ = _parse_us_address_components(street1_raw, street2_raw, enable_fuzzy=enable_fuzzy)
     return st1, st2, ok
 
 
@@ -858,6 +853,25 @@ def _finalize_standardized_address(
     raw_input: Optional[Dict[str, Any]] = None,
     cache_key: Optional[str] = None,
 ) -> StandardizedAddress:
+    from address_standardizer.delivery import evaluate_delivery_intelligence
+    from address_standardizer.registry import evaluate_corporate_risk
+
+    # 1. Delivery Intelligence & DPV Footnotes
+    vac_override = raw_input.get("is_vacant") if raw_input and raw_input.get("is_vacant") is not None else None
+    deliv = evaluate_delivery_intelligence(std, raw_input=raw_input, is_vacant_override=vac_override)
+    std.rdi = deliv.rdi
+    std.cmra = deliv.cmra
+    std.is_cmra = deliv.is_cmra
+    std.vacant = deliv.vacant
+    std.is_vacant = deliv.is_vacant
+    std.dpv_footnotes = deliv.dpv_footnotes
+
+    # 2. Corporate Risk & BOI Transparency Flags
+    corp_score, corp_flags = evaluate_corporate_risk(std, raw_input=raw_input)
+    std.corporate_risk_score = corp_score
+    std.corporate_risk_flags = corp_flags
+
+    # 3. Composite Confidence Scoring
     conf = compute_confidence_score(std, raw_input=raw_input)
     std.confidence_score = conf.composite_score
     std.routing_tier = conf.routing_tier
@@ -885,6 +899,9 @@ def standardize_address(
     state: Optional[str] = None,
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
+    is_vacant: Optional[bool] = None,
+    enable_fuzzy: bool = True,
+    **kwargs: Any,
 ) -> StandardizedAddress:
     """
     Standardize an address to USPS Pub 28 (for US) or International ISO standard.
@@ -898,12 +915,14 @@ def standardize_address(
         "state": state,
         "postal_code": postal_code,
         "country": country,
+        "is_vacant": is_vacant if is_vacant is not None else kwargs.get("vacant"),
+        "enable_fuzzy": enable_fuzzy,
     }
 
     cache = get_default_cache()
     cache_key = None
     if cache.is_enabled():
-        cache_key = make_cache_key(street1, street2, city, state, postal_code, country)
+        cache_key = make_cache_key(street1, street2, city, state, postal_code, country, enable_fuzzy=enable_fuzzy)
         cached = cache.get(cache_key)
         if cached is not None:
             return copy.copy(cached)
@@ -970,6 +989,7 @@ def standardize_address(
             postal_code=postal_raw,
             country=country_raw or "USA",
             is_hub_func=is_registered_agent_hub_address,
+            enable_fuzzy=enable_fuzzy,
         )
         if fast_res is not None:
             return _finalize_standardized_address(fast_res, raw_dict, cache_key)
@@ -977,7 +997,9 @@ def standardize_address(
     # Tier 2 & Tier 3: Deterministic Rule Matrix and Statistical CRF Fallback
     if is_us:
         # US Pipeline (USPS Pub 28)
-        norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(s1_raw, s2_raw)
+        norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
+            s1_raw, s2_raw, enable_fuzzy=enable_fuzzy
+        )
         if not city_raw and p_city:
             city_raw = p_city
         if not state_raw and p_state:
@@ -988,6 +1010,22 @@ def standardize_address(
         norm_city = RE_WHITESPACE.sub(" ", RE_NON_ALPHANUMERIC.sub("", city_raw).strip().upper())
         norm_postal, zip5 = normalize_us_postal_code(postal_raw)
         norm_state = normalize_us_state(state_raw, zip5)
+
+        if enable_fuzzy:
+            from address_standardizer.fuzzy import heal_city_token, heal_postal_code_transposition
+            if norm_city:
+                healed_city = heal_city_token(norm_city, state=norm_state, zip3=zip5[:3] if zip5 else None)
+                if healed_city:
+                    norm_city = healed_city
+
+            if norm_state and zip5:
+                healed_zip = heal_postal_code_transposition(zip5, state=norm_state)
+                if healed_zip and healed_zip != zip5:
+                    if len(norm_postal) > 5 and norm_postal[:5] == zip5:
+                        norm_postal = f"{healed_zip}{norm_postal[5:]}"
+                    else:
+                        norm_postal = healed_zip
+                    zip5 = healed_zip
 
         # Detect private residence indicators
         raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()

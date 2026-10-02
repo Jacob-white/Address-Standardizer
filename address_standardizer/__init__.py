@@ -60,8 +60,45 @@ from address_standardizer.cache import (
     get_cache_stats,
     make_cache_key,
 )
+from address_standardizer.delivery import (
+    DPVFootnote,
+    RDI,
+    DeliveryIntelligenceResult,
+    evaluate_delivery_intelligence,
+)
+from address_standardizer.fuzzy import (
+    damerau_levenshtein_distance,
+    heal_street_suffix,
+    heal_city_token,
+    heal_street_name,
+    heal_postal_code_transposition,
+    heal_street_number_transposition,
+    PROTECTED_STREET_WORDS,
+)
+from address_standardizer.registry import (
+    RegistryCategory,
+    CorporateRiskFlag,
+    CorporateRegistryEntry,
+    CURATED_CORPORATE_REGISTRY,
+    lookup_corporate_registry,
+    can_safely_merge_corporate_entities,
+    evaluate_corporate_risk,
+)
+from address_standardizer.autocomplete import (
+    AutocompleteSuggestion,
+    AutocompleteEngine,
+    autocomplete_address,
+)
+from address_standardizer.offline_index import (
+    RooftopRecord,
+    ParcelValidationResult,
+    OfflineReferenceIndex,
+    get_default_offline_index,
+    resolve_offline_coordinates,
+    validate_parcel_offline,
+)
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 __all__ = [
     "StandardizedAddress",
@@ -109,5 +146,37 @@ __all__ = [
     "CascadeResult",
     "VerificationCascade",
     "resolve_verification_cascade",
+    # Phase 1: Delivery Intelligence
+    "DPVFootnote",
+    "RDI",
+    "DeliveryIntelligenceResult",
+    "evaluate_delivery_intelligence",
+    # Phase 2: Typo Recovery & Fuzzy Correction
+    "damerau_levenshtein_distance",
+    "heal_street_suffix",
+    "heal_city_token",
+    "heal_street_name",
+    "heal_postal_code_transposition",
+    "heal_street_number_transposition",
+    "PROTECTED_STREET_WORDS",
+    # Phase 3: Corporate Registry & Transparency
+    "RegistryCategory",
+    "CorporateRiskFlag",
+    "CorporateRegistryEntry",
+    "CURATED_CORPORATE_REGISTRY",
+    "lookup_corporate_registry",
+    "can_safely_merge_corporate_entities",
+    "evaluate_corporate_risk",
+    # Phase 4: Autocomplete Engine
+    "AutocompleteSuggestion",
+    "AutocompleteEngine",
+    "autocomplete_address",
+    # Phase 5: Offline Rooftop Reference Index
+    "RooftopRecord",
+    "ParcelValidationResult",
+    "OfflineReferenceIndex",
+    "get_default_offline_index",
+    "resolve_offline_coordinates",
+    "validate_parcel_offline",
     "__version__",
 ]

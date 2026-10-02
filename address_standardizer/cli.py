@@ -27,7 +27,7 @@ def main():
     if (
         len(sys.argv) > 1
         and not sys.argv[1].startswith("-")
-        and sys.argv[1] not in ("parse", "batch", "audit", "cache")
+        and sys.argv[1] not in ("parse", "batch", "audit", "cache", "autocomplete")
     ):
         raw_addr = " ".join(sys.argv[1:])
         res = standardize_address(street1=raw_addr)
@@ -83,6 +83,13 @@ def main():
     cache_parser = subparsers.add_parser("cache", help="Inspect and manage multi-tier reference cache")
     cache_parser.add_argument("--stats", action="store_true", help="Display L1 and L2 cache statistics")
     cache_parser.add_argument("--clear", action="store_true", help="Clear L1 and L2 cache entries")
+
+    # Command: autocomplete typeahead
+    auto_parser = subparsers.add_parser("autocomplete", help="Real-time address typeahead and secondary unit prompt")
+    auto_parser.add_argument("query", help="Prefix or address query to autocomplete")
+    auto_parser.add_argument("--limit", type=int, default=5, help="Maximum suggestions (default: 5)")
+    auto_parser.add_argument("--state", help="Filter suggestions by state code")
+    auto_parser.add_argument("--format", choices=["json", "text"], default="text", help="Output format (default: text)")
 
     args = parser.parse_args()
 
@@ -208,6 +215,22 @@ def main():
         else:
             stats = get_cache_stats()
             print(json.dumps(stats, indent=2))
+
+    elif args.command == "autocomplete":
+        from address_standardizer.autocomplete import autocomplete_address
+        suggestions = autocomplete_address(
+            query=args.query,
+            max_results=args.limit,
+            state_filter=args.state,
+        )
+        if args.format == "json":
+            print(json.dumps([s.as_dict() for s in suggestions], indent=2))
+        else:
+            if not suggestions:
+                print("No suggestions found.")
+            for i, s in enumerate(suggestions, 1):
+                sec_notice = f" [Secondary Unit Required: {', '.join(s.suggested_secondary_units)}]" if s.secondary_prompt_required else ""
+                print(f"{i}. {s.text}{sec_notice}")
 
 
 if __name__ == "__main__":

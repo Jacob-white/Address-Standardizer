@@ -435,3 +435,20 @@ class TestConfidenceScorer:
         )
         res = self.scorer.score(addr, raw_input={"postal_code": "90210"})
         assert res.s_cross_field == 0.50
+
+    def test_vacant_delivery_point_warning(self):
+        addr = StandardizedAddress(
+            street1="100 MAIN ST",
+            street2="",
+            city="DALLAS",
+            state="TX",
+            postal_code="75201",
+            country="USA",
+            normalized_address_key="100 MAIN ST||DALLAS|TX|75201|USA",
+            address_status="standardized",
+            raw_street_address="100 Main St",
+            is_us=True,
+        )
+        addr.is_vacant = True
+        res = self.scorer.score(addr)
+        assert "WARN_VACANT_DELIVERY_POINT" in res.failure_reason_codes

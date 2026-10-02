@@ -23,6 +23,7 @@ def make_cache_key(
     state: Optional[str] = None,
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
+    enable_fuzzy: bool = True,
 ) -> str:
     """Computes a normalized cache key from input address components."""
     parts = [
@@ -33,6 +34,8 @@ def make_cache_key(
         (postal_code or "").strip().upper(),
         (country or "USA").strip().upper(),
     ]
+    if not enable_fuzzy:
+        parts.append("NO_FUZZY")
     return "|".join(parts)
 
 
@@ -174,6 +177,14 @@ class SQLiteCache:
                         std.confidence_score = data.get("confidence_score")
                         std.routing_tier = data.get("routing_tier")
                         std.failure_reason_codes = data.get("failure_reason_codes") or []
+                        std.rdi = data.get("rdi", "Unknown")
+                        std.cmra = data.get("cmra", False)
+                        std.is_cmra = data.get("is_cmra", False)
+                        std.vacant = data.get("vacant", False)
+                        std.is_vacant = data.get("is_vacant", False)
+                        std.dpv_footnotes = data.get("dpv_footnotes") or []
+                        std.corporate_risk_score = data.get("corporate_risk_score", 0.0)
+                        std.corporate_risk_flags = data.get("corporate_risk_flags") or []
 
                         if data.get("audit_record_payload"):
                             from address_standardizer.audit import StewardshipAuditRecord

@@ -1,0 +1,224 @@
+"""
+Delivery Intelligence, USPS Diagnostic Footnotes & CMRA/RDI Engine.
+===================================================================
+Implements USPS Delivery Point Validation (DPV) diagnostic footnotes,
+Residential Delivery Indicator (RDI), Commercial Mail Receiving Agency (CMRA)
+identification, and vacancy detection.
+"""
+
+import re
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+
+from address_standardizer.registry import (
+    lookup_corporate_registry,
+    RegistryCategory,
+)
+from address_standardizer.tables import ZIP3_TO_STATE, US_STATES
+
+
+class DPVFootnote:
+    """Standard USPS DPV Diagnostic Footnote Codes."""
+    AA = "AA"  # Input address matched to the ZIP+4 file
+    A1 = "A1"  # Input address not matched to the ZIP+4 file
+    BB = "BB"  # Entire address (number and street) matched to DPV (active delivery point)
+    CC = "CC"  # Secondary number confirmed
+    N1 = "N1"  # High-rise address missing secondary information
+    M1 = "M1"  # Primary number missing
+    M3 = "M3"  # Primary number invalid
+    P1 = "P1"  # PO, RR, or HC Box number missing
+    PB = "PB"  # PO Box street address
+    RR = "RR"  # Rural Route address
+    F1 = "F1"  # Military / diplomatic address
+    G1 = "G1"  # General delivery address
+    U1 = "U1"  # Unique ZIP code
+
+
+class RDI:
+    """Residential Delivery Indicator values."""
+    RESIDENTIAL = "Residential"
+    COMMERCIAL = "Commercial"
+    UNKNOWN = "Unknown"
+
+
+CMRA_KEYWORDS = frozenset({
+    "THE UPS STORE", "UPS STORE", "POSTALANNEX", "POSTAL ANNEX",
+    "MAIL BOXES ETC", "MAIL BOXES ETC.", "PAK MAIL", "POSTNET",
+    "DAVINCI", "REGUS", "INTELLIGENT OFFICE", "OFFICE EVOLUTION"
+})
+
+COMMERCIAL_SEC_UNITS = frozenset({
+    "STE", "SUITE", "OFC", "OFFICE", "FL", "FLOOR", "BLDG", "BUILDING", "DEPT", "DEPARTMENT", "RM", "ROOM"
+})
+
+RESIDENTIAL_SEC_UNITS = frozenset({
+    "APT", "APARTMENT", "UNIT", "LOT", "SPC", "SPACE", "TRLR", "TRAILER"
+})
+
+
+@dataclass
+class DeliveryIntelligenceResult:
+    """Structured delivery intelligence metadata."""
+    rdi: str  # "Residential", "Commercial", "Unknown"
+    cmra: bool
+    vacant: bool
+    dpv_footnotes: List[str] = field(default_factory=list)
+
+    @property
+    def is_cmra(self) -> bool:
+        return self.cmra
+
+    @property
+    def is_vacant(self) -> bool:
+        return self.vacant
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "rdi": self.rdi,
+            "cmra": self.cmra,
+            "is_cmra": self.cmra,
+            "vacant": self.vacant,
+            "is_vacant": self.vacant,
+            "dpv_footnotes": list(self.dpv_footnotes),
+        }
+
+
+def evaluate_delivery_intelligence(
+    std_address: Any,
+    raw_input: Optional[Dict[str, Any]] = None,
+    is_vacant_override: Optional[bool] = None,
+) -> DeliveryIntelligenceResult:
+    """
+    Evaluates delivery intelligence for a standardized address, computing
+    RDI, CMRA status, vacancy flag, and USPS DPV diagnostic footnote codes.
+    """
+    # 1. International short-circuit
+    if not getattr(std_address, "is_us", True):
+        return DeliveryIntelligenceResult(
+            rdi=RDI.UNKNOWN,
+            cmra=False,
+            vacant=False,
+            dpv_footnotes=[],
+        )
+
+    raw = raw_input or {}
+    raw_combined = f"{raw.get('street1', '')} {raw.get('street2', '')} {getattr(std_address, 'raw_street_address', '')}".upper()
+    st1 = (getattr(std_address, "street1", "") or "").strip().upper()
+    st2 = (getattr(std_address, "street2", "") or "").strip().upper()
+    city = (getattr(std_address, "city", "") or "").strip().upper()
+    state = (getattr(std_address, "state", "") or "").strip().upper()
+    postal_code = (getattr(std_address, "postal_code", "") or "").strip()
+    status = getattr(std_address, "address_status", "standardized")
+
+    # 2. CMRA Evaluation
+    is_cmra = False
+    if "PMB" in st1 or "PMB" in st2 or "PRIVATE MAILBOX" in raw_combined or "PMB" in raw_combined:
+        is_cmra = True
+    elif any(kw in raw_combined or kw in st1 for kw in CMRA_KEYWORDS):
+        is_cmra = True
+    else:
+        reg_entry = lookup_corporate_registry(
+            street1=st1,
+            street2=st2,
+            city=city,
+            state=state,
+            postal_code=postal_code,
+            country="USA",
+            raw_street=raw_combined,
+        )
+        if reg_entry is not None and reg_entry.category in (
+            RegistryCategory.MAIL_DROP_CMRA,
+            RegistryCategory.VIRTUAL_OFFICE,
+        ):
+            is_cmra = True
+
+    # 3. Vacancy Evaluation
+    is_vacant = bool(is_vacant_override) if is_vacant_override is not None else False
+    if "VACANT" in raw_combined or raw.get("vacant") is True or raw.get("is_vacant") is True:
+        is_vacant = True
+
+    # 4. RDI (Residential Delivery Indicator) Evaluation
+    is_priv = getattr(std_address, "is_private_residence", False)
+    is_hub = getattr(std_address, "is_registered_agent_hub", False)
+    st2_unit_type = st2.split()[0] if st2 else ""
+
+    if is_hub or is_cmra or st2_unit_type in COMMERCIAL_SEC_UNITS:
+        rdi = RDI.COMMERCIAL
+    elif is_priv or st2_unit_type in RESIDENTIAL_SEC_UNITS:
+        rdi = RDI.RESIDENTIAL
+    elif st1.startswith("PO BOX"):
+        rdi = RDI.UNKNOWN
+    else:
+        # Default based on secondary unit or leave Unknown
+        rdi = RDI.UNKNOWN
+
+    # 5. USPS DPV Diagnostic Footnotes
+    footnotes: List[str] = []
+
+    # AA / A1: Postal code concordance
+    norm_st = US_STATES.get(state, state)
+    zip_digits = re.sub(r"[^\d]", "", postal_code)
+    z3 = zip_digits[:3] if len(zip_digits) >= 3 else ""
+
+    valid_zip_state = bool(
+        status != "parse_failed"
+        and len(zip_digits) in (5, 9)
+        and z3 in ZIP3_TO_STATE
+        and (not norm_st or ZIP3_TO_STATE[z3] == norm_st)
+    )
+
+    if valid_zip_state:
+        footnotes.append(DPVFootnote.AA)
+    else:
+        footnotes.append(DPVFootnote.A1)
+
+    # Street level deliverability
+    if status == "parse_failed" or not st1:
+        footnotes.append(DPVFootnote.M1)
+    elif st1.startswith("PO BOX"):
+        footnotes.append(DPVFootnote.BB)
+        footnotes.append(DPVFootnote.PB)
+    elif st1.startswith("RR ") or st1.startswith("HC "):
+        footnotes.append(DPVFootnote.BB)
+        footnotes.append(DPVFootnote.RR)
+    elif city in ("APO", "FPO", "DPO") or state in ("AE", "AP", "AA"):
+        footnotes.append(DPVFootnote.BB)
+        footnotes.append(DPVFootnote.F1)
+    else:
+        tokens = st1.split()
+        first_tok = tokens[0] if tokens else ""
+        first_digits = re.sub(r"[^\d]", "", first_tok)
+        is_all_zero = bool(first_digits and all(c == "0" for c in first_digits))
+        has_num = not is_all_zero and (any(ch.isdigit() for ch in first_tok) or first_tok in {
+            "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN"
+        })
+
+        if is_all_zero:
+            footnotes.append(DPVFootnote.M3)
+        elif has_num:
+            footnotes.append(DPVFootnote.BB)
+            # Check secondary unit presence vs necessity
+            reg_entry = lookup_corporate_registry(
+                street1=st1,
+                street2=st2,
+                city=city,
+                state=state,
+                postal_code=postal_code,
+                country="USA",
+                raw_street=raw_combined,
+            )
+            is_multi_unit_hub = is_hub or (reg_entry is not None)
+
+            if st2:
+                footnotes.append(DPVFootnote.CC)
+            elif is_multi_unit_hub:
+                footnotes.append(DPVFootnote.N1)
+        else:
+            footnotes.append(DPVFootnote.M1)
+
+    return DeliveryIntelligenceResult(
+        rdi=rdi,
+        cmra=is_cmra,
+        vacant=is_vacant,
+        dpv_footnotes=footnotes,
+    )

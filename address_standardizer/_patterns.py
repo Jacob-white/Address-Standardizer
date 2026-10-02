@@ -87,10 +87,16 @@ RE_HIGHWAY_CONTRACT = re.compile(r"\b(HC|HIGHWAY\s+CONTRACT)\s*#?\s*(\d+)\b(?:\s
 
 # Additional Pre-Compiled Utility Patterns
 RE_CLEAN_ALPHA = re.compile(r"[^A-Z]")
-RE_ATTACHED_SUFFIX_UNIT = re.compile(
-    r"\b(ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|CIR|CIRCLE|PKWY|PARKWAY)-([A-Z0-9]+)\b",
-    re.IGNORECASE
+RE_SAINT_HYPHEN = re.compile(r"\b(ST|SAINT)-([A-Za-z]{2,})\b", re.IGNORECASE)
+RE_ATTACHED_SUFFIX_EXPLICIT_UNIT = re.compile(
+    r"\b(ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|CIR|CIRCLE|PKWY|PARKWAY)-(STE|SUITE|APT|APARTMENT|UNIT|FL|FLOOR|RM|ROOM)\s*#?\s*([A-Z0-9\-]+)\b",
+    re.IGNORECASE,
 )
+RE_ATTACHED_SUFFIX_BARE_UNIT = re.compile(
+    r"\b(ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|CIR|CIRCLE|PKWY|PARKWAY)-(\d+[A-Z0-9\-]*|[A-Z])\b",
+    re.IGNORECASE,
+)
+RE_ATTACHED_SUFFIX_UNIT = RE_ATTACHED_SUFFIX_BARE_UNIT
 RE_PRIVATE_MAILBOX = re.compile(r"\bPRIVATE\s+MAILBOX\b", re.IGNORECASE)
 RE_HYPHENATED_UNIT = re.compile(r"\b(STE|SUITE|APT|UNIT|FL)-(\d+)", re.IGNORECASE)
 RE_COMMA_DOT = re.compile(r"[,\.]+")
@@ -199,6 +205,8 @@ def get_fuzzy_suffix(token: str) -> Optional[str]:
     Fuzzy distance check only applies to word tokens of length >= 4 to avoid abbreviation collisions.
     Excludes keywords like STATE and COUNTY to prevent route prefix misidentification.
     """
+    if not token or re.search(r"[\d\-]", token):
+        return None
     tok_clean = RE_CLEAN_ALPHA.sub("", token.upper())
     if not tok_clean:
         return None
@@ -207,15 +215,8 @@ def get_fuzzy_suffix(token: str) -> Optional[str]:
     if tok_clean in STREET_SUFFIXES:
         return STREET_SUFFIXES[tok_clean]
 
-    if len(tok_clean) < 3:
-        return None
-
-    t_len = len(tok_clean)
-    for canonical, abbr in STREET_SUFFIXES.items():
-        if len(canonical) >= 4 and abs(len(canonical) - t_len) <= 1:
-            if is_edit_distance_leq1(tok_clean, canonical):
-                return abbr
-    return None
+    from address_standardizer.fuzzy import heal_street_suffix
+    return heal_street_suffix(tok_clean, max_distance=2)
 
 
 def get_fuzzy_directional(token: str) -> Optional[str]:

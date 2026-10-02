@@ -394,3 +394,34 @@ class TestCLI:
         captured_clear = capsys.readouterr()
         assert "Cache cleared." in captured_clear.out
 
+    def test_cli_autocomplete_subcommand(self, capsys):
+        # 1. Text format output with secondary unit prompt
+        with patch.object(sys, "argv", ["address-standardizer", "autocomplete", "100 Wall"]):
+            main()
+        captured = capsys.readouterr()
+        assert "100 WALL ST" in captured.out
+        assert "Secondary Unit Required" in captured.out
+
+        # 2. JSON format output
+        with patch.object(sys, "argv", ["address-standardizer", "autocomplete", "100 Wall", "--format", "json", "--limit", "2"]):
+            main()
+        captured_json = capsys.readouterr()
+        sugs = json.loads(captured_json.out)
+        assert len(sugs) <= 2
+        assert sugs[0]["street1"] == "100 WALL ST"
+        assert sugs[0]["secondary_prompt_required"] is True
+
+        # 3. State filter
+        with patch.object(sys, "argv", ["address-standardizer", "autocomplete", "1209", "--state", "DE", "--format", "json"]):
+            main()
+        captured_state = capsys.readouterr()
+        sugs_de = json.loads(captured_state.out)
+        assert len(sugs_de) >= 1
+        assert sugs_de[0]["state"] == "DE"
+
+        # 4. No suggestions found
+        with patch.object(sys, "argv", ["address-standardizer", "autocomplete", "Nonexistent12345"]):
+            main()
+        captured_empty = capsys.readouterr()
+        assert "No suggestions found." in captured_empty.out
+
