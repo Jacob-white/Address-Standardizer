@@ -38,6 +38,8 @@ from address_standardizer.phonetics import (
 
 logger = logging.getLogger(__name__)
 
+STANDALONE_SEC_UNITS = set(SECONDARY_UNITS.keys()) - {"KEY"}
+
 
 def num_to_ordinal(n: int) -> str:
     """Converts integer into ordinal representation (1 -> 1ST, 2 -> 2ND, 3 -> 3RD, 4 -> 4TH)."""
@@ -172,7 +174,14 @@ def _rule_based_us_street_parse(address_str: str) -> Tuple[str, str, bool]:
 
     # Secondary unit extraction
     sec_unit = ""
-    sec_pat = r"\b(SUITE|STE|UNIT|APT|APARTMENT|FLOOR|FL|ROOM|RM|BLDG|BUILDING|DEPT|DEPARTMENT|LOT|SPC|SPACE|LEVEL|LVL)\b\.?\s*#?\s*([A-Z0-9\-]+)|\b#\s*([A-Z0-9\-]+)"
+    sec_pat = (
+        r"\b(SUITE|STE|SUIT|UNIT|UNT|APT|APARTMENT|APPT|FLOOR|FL|FLR|ROOM|RM|BLDG|BUILDING|BLD|"
+        r"DEPT|DEPARTMENT|LOT|SPC|SPACE|LEVEL|LVL|PH|PENTHOUSE|BSMT|BASEMENT|OFC|OFFICE|"
+        r"HNGR|HANGAR|LBBY|LOBBY|LOWR|LOWER|MEZZ|MEZZANINE|PIER|REAR|SIDE|SLIP|STP|STOP|"
+        r"TRLR|TRAILER|UPPR|UPPER|FRNT|FRONT|KEY)\b\.?\s*#?\s*([A-Z0-9\-]+)|"
+        r"(?:^|\s)#\s*([A-Z0-9\-]+)|"
+        r"\b(BSMT|BASEMENT|FRNT|FRONT|LBBY|LOBBY|LOWR|LOWER|MEZZ|MEZZANINE|OFC|OFFICE|PH|PENTHOUSE|REAR|SIDE|UPPR|UPPER)\b$"
+    )
     m_sec = re.search(sec_pat, clean_addr)
     if m_sec:
         if m_sec.group(1):
@@ -181,6 +190,8 @@ def _rule_based_us_street_parse(address_str: str) -> Tuple[str, str, bool]:
             sec_unit = f"{sec_type} {sec_val}"
         elif m_sec.group(3):
             sec_unit = f"STE {m_sec.group(3)}"
+        elif m_sec.group(4):
+            sec_unit = SECONDARY_UNITS.get(m_sec.group(4), m_sec.group(4))
         clean_addr = clean_addr[:m_sec.start()] + clean_addr[m_sec.end():]
         clean_addr = re.sub(r"\s+", " ", clean_addr).strip()
 
@@ -234,11 +245,24 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
         parsed = None
 
     if parsed is None:
-        rb_st1, rb_st2, ok = _rule_based_us_street_parse(address_str)
+        st_input = address_str
+        p_city = ""
         m_sz = re.search(r"\b([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b", address_str.upper())
         p_st = m_sz.group(1) if m_sz else ""
         p_zp = m_sz.group(2) if m_sz else ""
-        return rb_st1, rb_st2, ok, "", p_st, p_zp
+        if m_sz:
+            before_sz = address_str[:m_sz.start()].rstrip(" ,")
+            if "," in before_sz:
+                st_part, city_cand = before_sz.rsplit(",", 1)
+                st_input = st_part.strip()
+                p_city = city_cand.strip()
+            elif not re.search(r"\d", before_sz):
+                st_input = ""
+                p_city = before_sz.strip()
+            else:
+                st_input = before_sz.strip()
+        rb_st1, rb_st2, ok = _rule_based_us_street_parse(st_input)
+        return rb_st1, rb_st2, ok, p_city, p_st, p_zp
 
     street_parts: List[str] = []
     sec_parts: List[str] = []
@@ -247,9 +271,12 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
     state_parts: List[str] = []
     zip_parts: List[str] = []
 
-    for token, label in parsed:
+    i = 0
+    while i < len(parsed):
+        token, label = parsed[i]
         clean = _clean_token(token).upper()
         if not clean:
+            i += 1
             continue
 
         if label in ("AddressNumber", "AddressNumberPrefix", "AddressNumberSuffix"):
@@ -259,6 +286,14 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
         elif label in ("StreetNamePostType", "StreetNamePreType"):
             street_parts.append(STREET_SUFFIXES.get(clean, clean))
         elif label == "StreetName":
+            # Check for 2-token compound ordinal (e.g. Twenty First -> 21ST)
+            if i + 1 < len(parsed):
+                next_tok, next_lbl = parsed[i + 1]
+                next_clean = _clean_token(next_tok).upper()
+                if next_lbl == "StreetName" and f"{clean} {next_clean}" in COMPOUND_ORDINALS:
+                    street_parts.append(COMPOUND_ORDINALS[f"{clean} {next_clean}"])
+                    i += 2
+                    continue
             if clean in COMPOUND_ORDINALS:
                 street_parts.append(COMPOUND_ORDINALS[clean])
             elif clean in WORD_ORDINALS:
@@ -276,9 +311,12 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
         elif label in ("OccupancyIdentifier", "SubaddressIdentifier"):
             clean_id = clean.lstrip("#").strip()
             if clean_id:
-                if not sec_parts:
-                    sec_parts.append("STE")
-                sec_parts.append(clean_id)
+                if clean_id in SECONDARY_UNITS:
+                    sec_parts.append(SECONDARY_UNITS[clean_id])
+                else:
+                    if not sec_parts:
+                        sec_parts.append("STE")
+                    sec_parts.append(clean_id)
         elif label == "SubaddressType":
             sec_parts.append(SECONDARY_UNITS.get(clean, clean))
         elif label == "BuildingName":
@@ -286,15 +324,34 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
         elif label in ("USPSBoxType", "USPSBoxID", "USPSBoxGroupType", "USPSBoxGroupID"):
             sec_parts.append(clean)
         elif label == "PlaceName":
-            city_parts.append(clean)
+            if clean in STANDALONE_SEC_UNITS:
+                sec_type = SECONDARY_UNITS.get(clean, clean)
+                if i + 1 < len(parsed):
+                    next_tok, next_lbl = parsed[i + 1]
+                    next_clean = _clean_token(next_tok).upper()
+                    if next_lbl in ("ZipCode", "PlaceName", "OccupancyIdentifier", "SubaddressIdentifier") and (len(next_clean) <= 4 or next_clean.isalnum()):
+                        sec_parts.append(f"{sec_type} {next_clean}")
+                        i += 2
+                        continue
+                sec_parts.append(sec_type)
+            else:
+                city_parts.append(clean)
         elif label == "StateName":
             state_parts.append(clean)
         elif label == "ZipCode":
             zip_parts.append(clean)
         elif label in ("CountryName", "Recipient", "NotAddress"):
+            i += 1
             continue
         else:
             street_parts.append(clean)
+        i += 1
+
+    clean_st = " ".join(state_parts)
+    if clean_st not in US_STATES and len(state_parts) > 1:
+        if state_parts[-1] in US_STATES.values():
+            city_parts = state_parts[:-1] + city_parts
+            state_parts = [state_parts[-1]]
 
     st1 = " ".join(street_parts).strip()
     st2 = " ".join(sec_parts).strip()
@@ -310,8 +367,8 @@ def _parse_us_street_tokens(address_str: str) -> Tuple[str, str, bool, str, str,
         b_name = " ".join(building_parts).strip()
         st2 = f"{b_name} {st2}".strip() if st2 else b_name
 
-    # Fallback to rule-based parser if both empty
-    if not st1 and not st2:
+    # Fallback to rule-based parser if both empty and no city/state/zip was parsed
+    if not st1 and not st2 and not (p_city or p_state or p_zip):
         rb_st1, rb_st2, ok = _rule_based_us_street_parse(address_str)
         return rb_st1, rb_st2, ok, p_city, p_state, p_zip
 
@@ -354,8 +411,8 @@ def _parse_us_street_lines(street1_raw: str, street2_raw: str = "") -> Tuple[str
 
 def _split_international_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
     """Helper to detect and split secondary unit in international street string, and normalize suffixes."""
-    st1 = street1
-    st2 = street2
+    st1 = (street1 or "").upper()
+    st2 = (street2 or "").upper()
     if not st2:
         pattern = r"\b(SUITE|STE|UNIT|APT|FLOOR|FL|LEVEL|LVL|PO BOX)\s*#?\s*([A-Z0-9\-]+)\b"
         m = re.search(pattern, st1, re.IGNORECASE)

@@ -48,33 +48,47 @@ def generate_phonetic_address_key(street1: str, postal_or_zip: str = "", city: s
     """
     if not street1:
         return None
-    st_clean = street1.strip().upper()
-    m_pob = re.match(r"^PO BOX\s+([A-Z0-9\-]+)", st_clean)
+    st_raw = street1.strip().upper()
+    m_pob = re.match(r"^(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+([A-Z0-9\-]+)", st_raw)
     if m_pob:
-        loc = postal_or_zip[:5] if postal_or_zip else city
-        return f"POB {m_pob.group(1)}|{loc}"
+        loc = (
+            postal_or_zip.strip()[:5]
+            if postal_or_zip and len(postal_or_zip.strip()) >= 5
+            else (postal_or_zip.strip() if postal_or_zip else city.strip())
+        )
+        return f"POB {m_pob.group(1)}|{loc}".strip("|")
 
+    st_clean = re.sub(r"[,\.;:#]+", " ", st_raw).strip()
+    st_clean = re.sub(r"\s+", " ", st_clean)
     parts = st_clean.split()
     if not parts:
         return None
 
-    # House number is first token if it has digits
     if re.search(r"\d", parts[0]):
         house_num = parts[0]
-        name_tokens = [
-            p for p in parts[1:]
-            if p not in STREET_SUFFIXES.values() and p not in DIRECTIONALS.values()
-        ]
-        street_word = name_tokens[0] if name_tokens else (parts[1] if len(parts) > 1 else "")
+        words = parts[1:]
     else:
         house_num = ""
-        name_tokens = [
-            p for p in parts
-            if p not in STREET_SUFFIXES.values() and p not in DIRECTIONALS.values()
-        ]
-        street_word = name_tokens[0] if name_tokens else parts[0]
+        words = parts[:]
 
+    # Strip pre-directional
+    if len(words) > 1 and (words[0] in DIRECTIONALS or words[0] in DIRECTIONALS.values()):
+        words = words[1:]
+
+    # Strip post-directional
+    if len(words) > 1 and (words[-1] in DIRECTIONALS or words[-1] in DIRECTIONALS.values()):
+        words = words[:-1]
+
+    # Strip street suffix at end
+    if len(words) > 1 and (words[-1] in STREET_SUFFIXES or words[-1] in STREET_SUFFIXES.values()):
+        words = words[:-1]
+
+    street_word = words[0] if words else (parts[1] if len(parts) > 1 else parts[0])
     snd = compute_soundex(street_word)
-    loc = postal_or_zip[:5] if (postal_or_zip and len(postal_or_zip) >= 5) else city
+    loc = (
+        postal_or_zip.strip()[:5]
+        if (postal_or_zip and len(postal_or_zip.strip()) >= 5)
+        else city.strip()
+    )
     res = f"{house_num}|{snd}|{loc}".strip("|")
     return res or None

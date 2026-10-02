@@ -220,7 +220,6 @@ STREET_SUFFIXES: Dict[str, str] = {
     "VILLE": "VL", "VL": "VL",
     "VISTA": "VIS", "VIS": "VIS", "VIST": "VIS", "VST": "VIS", "VSTA": "VIS",
     "WALK": "WALK", "WALKS": "WALK",
-    "WALL": "WALL",
     "WAY": "WAY", "WAYS": "WAYS",
     "WELL": "WL", "WL": "WL",
     "WELLS": "WLS", "WLS": "WLS",

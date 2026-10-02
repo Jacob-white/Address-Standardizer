@@ -17,7 +17,7 @@ from address_standardizer.geocoder import CensusGeocoder
 
 def main():
     # Direct shorthand invocation: address-standardizer "100 Wall St, New York, NY 10005"
-    if len(sys.argv) > 1 and sys.argv[1] not in ("parse", "batch", "-h", "--help"):
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-") and sys.argv[1] not in ("parse", "batch"):
         raw_addr = " ".join(sys.argv[1:])
         res = standardize_address(street1=raw_addr)
         print(json.dumps(res.as_dict(), indent=2))
@@ -45,6 +45,7 @@ def main():
     batch_parser.add_argument("input_csv", help="Path to input CSV file")
     batch_parser.add_argument("output_csv", help="Path to write standardized CSV output")
     batch_parser.add_argument("--street-col", default="street1", help="Column name for street (default: street1)")
+    batch_parser.add_argument("--street2-col", default="street2", help="Column name for street line 2 (default: street2)")
     batch_parser.add_argument("--city-col", default="city", help="Column name for city (default: city)")
     batch_parser.add_argument("--state-col", default="state", help="Column name for state (default: state)")
     batch_parser.add_argument("--zip-col", default="postal_code", help="Column name for zip (default: postal_code)")
@@ -54,12 +55,6 @@ def main():
     args = parser.parse_args()
 
     if not args.command:
-        # If user passed address directly without subcommand
-        if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-            raw_addr = " ".join(sys.argv[1:])
-            res = standardize_address(street1=raw_addr)
-            print(json.dumps(res.as_dict(), indent=2))
-            return
         parser.print_help()
         sys.exit(1)
 
@@ -100,6 +95,7 @@ def main():
             for row in reader:
                 st = standardize_address(
                     street1=row.get(args.street_col, ""),
+                    street2=row.get(args.street2_col, ""),
                     city=row.get(args.city_col, ""),
                     state=row.get(args.state_col, ""),
                     postal_code=row.get(args.zip_col, ""),
