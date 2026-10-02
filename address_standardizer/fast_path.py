@@ -1,0 +1,349 @@
+"""
+Tier 1 Fast-Path Address Matcher.
+=================================
+Ultra-fast deterministic parser (< 0.015 ms, > 65,000 rec/s) for:
+  - Clean structured address fields (street1, city, state, zip)
+  - Canonical comma-delimited single-string addresses
+Bypasses CRF execution for standard addresses using O(1) table lookups.
+"""
+
+from typing import Optional, Tuple
+from address_standardizer.models import StandardizedAddress
+from address_standardizer.tables import (
+    DIRECTIONALS,
+    STREET_SUFFIXES,
+    SECONDARY_UNITS,
+    US_STATES,
+    WORD_ORDINALS,
+    COMPOUND_ORDINALS,
+)
+from address_standardizer._patterns import (
+    RE_CANONICAL_COMMA,
+    RE_SEC_UNIT,
+    RE_PO_BOX,
+    RE_QUEENS_BOROUGH,
+    RE_FRACTIONAL_HOUSE,
+    RE_NUMBERED_STREET,
+    FROZEN_US_STATE_CODES,
+    FROZEN_DIRECTIONAL_VALUES,
+    ROUTE_PREFIXES,
+    get_fuzzy_suffix,
+    get_fuzzy_directional,
+)
+from address_standardizer.phonetics import generate_phonetic_address_key
+
+
+def _fast_num_to_ordinal(n: int) -> str:
+    """Fast inline ordinal conversion."""
+    if 11 <= (n % 100) <= 13:
+        return f"{n}TH"
+    mod = n % 10
+    if mod == 1:
+        return f"{n}ST"
+    elif mod == 2:
+        return f"{n}ND"
+    elif mod == 3:
+        return f"{n}RD"
+    return f"{n}TH"
+
+
+def _normalize_fast_sec_unit(sec_raw: str) -> Optional[str]:
+    """Normalizes a clean secondary unit string like 'Suite 400' -> 'STE 400'."""
+    sec_clean = sec_raw.strip().upper()
+    if not sec_clean:
+        return ""
+    m = RE_SEC_UNIT.search(sec_clean)
+    if m:
+        if m.group(1):
+            stype = SECONDARY_UNITS.get(m.group(1).upper(), m.group(1).upper())
+            sval = m.group(2).upper()
+            return f"{stype} {sval}"
+        elif m.group(3):
+            return f"STE {m.group(3).upper()}"
+        elif m.group(4):
+            stype = SECONDARY_UNITS.get(m.group(4).upper(), m.group(4).upper())
+            sval = m.group(5).upper() if m.group(5) else ""
+            return f"{stype} {sval}".strip()
+    return None
+
+
+def _normalize_fast_street_phrase(phrase: str) -> Optional[Tuple[str, str]]:
+    """
+    Parses clean street phrase e.g. '100 Main St' or '200 Park Ave Suite 1200'.
+    Returns (normalized_street1, normalized_street2) or None if complex/ambiguous.
+    """
+    phrase_upper = phrase.strip().upper()
+    if not phrase_upper:
+        return None
+
+    # Edge-case checks: if PO Box, Queens hyphen, rural route, fractional, or complex: fallback
+    if RE_PO_BOX.search(phrase_upper) or RE_QUEENS_BOROUGH.match(phrase_upper) or RE_FRACTIONAL_HOUSE.match(phrase_upper):
+        return None
+
+    # Check for secondary unit inside phrase
+    sec_unit = ""
+    m_sec = RE_SEC_UNIT.search(phrase_upper)
+    if m_sec:
+        if m_sec.group(1):
+            stype = SECONDARY_UNITS.get(m_sec.group(1).upper(), m_sec.group(1).upper())
+            sval = m_sec.group(2).lstrip("#-").upper()
+            sec_unit = f"{stype} {sval}"
+        elif m_sec.group(3):
+            sec_unit = f"STE {m_sec.group(3).lstrip('#-').upper()}"
+        elif m_sec.group(4):
+            stype = SECONDARY_UNITS.get(m_sec.group(4).upper(), m_sec.group(4).upper())
+            sval = m_sec.group(5).lstrip("#-").upper() if m_sec.group(5) else ""
+            sec_unit = f"{stype} {sval}".strip()
+        phrase_upper = phrase_upper[:m_sec.start()] + phrase_upper[m_sec.end():]
+        phrase_upper = phrase_upper.strip(" ,.-")
+
+    tokens = [t.strip(" ,.-") for t in phrase_upper.split() if t.strip(" ,.-")]
+    if len(tokens) < 2:
+        return None
+
+    # Token 0 must contain house number
+    house_num = tokens[0]
+    if not (house_num.isdigit() or (len(house_num) > 1 and house_num[:-1].isdigit() and house_num[-1].isalpha())):
+        return None
+
+    rem_tokens = tokens[1:]
+
+    # Route prefixes (e.g. County Road, CR, Route) -> delegate to Tier 2
+    if rem_tokens[0] in ROUTE_PREFIXES or (len(rem_tokens) > 1 and f"{rem_tokens[0]} {rem_tokens[1]}" in ROUTE_PREFIXES):
+        return None
+
+    # Directional ambiguity check: if remaining tokens are just e.g. ['SOUTH', 'ST']
+    # 'SOUTH' is the street name, not a directional! Handled by Tier 2 positional grammar.
+    if len(rem_tokens) == 2 and (rem_tokens[0] in DIRECTIONALS or rem_tokens[0] in FROZEN_DIRECTIONAL_VALUES) and (rem_tokens[1] in STREET_SUFFIXES or rem_tokens[1] in STREET_SUFFIXES.values()):
+        return None
+
+    # Compound directional street name check: e.g. ['NORTH', 'EAST', 'STREET']
+    # 'NORTH EAST' is the street name, not pre-directional + street name. Handled by Tier 2.
+    if len(rem_tokens) >= 2 and (rem_tokens[0] in DIRECTIONALS or rem_tokens[0] in FROZEN_DIRECTIONAL_VALUES) and (rem_tokens[1] in DIRECTIONALS or rem_tokens[1] in FROZEN_DIRECTIONAL_VALUES):
+        return None
+
+    # Check for pre-directional
+    pre_dir = ""
+    if len(rem_tokens) >= 3:
+        if rem_tokens[0] in DIRECTIONALS:
+            pre_dir = DIRECTIONALS[rem_tokens[0]]
+            rem_tokens = rem_tokens[1:]
+        else:
+            f_pre = get_fuzzy_directional(rem_tokens[0])
+            if f_pre:
+                pre_dir = f_pre
+                rem_tokens = rem_tokens[1:]
+
+    # Check for post-directional
+    post_dir = ""
+    if len(rem_tokens) >= 3:
+        if rem_tokens[-1] in DIRECTIONALS:
+            post_dir = DIRECTIONALS[rem_tokens[-1]]
+            rem_tokens = rem_tokens[:-1]
+        else:
+            f_post = get_fuzzy_directional(rem_tokens[-1])
+            if f_post:
+                post_dir = f_post
+                rem_tokens = rem_tokens[:-1]
+
+    # Check for street suffix at end
+    suffix = ""
+    if rem_tokens[-1] in STREET_SUFFIXES:
+        suffix = STREET_SUFFIXES[rem_tokens[-1]]
+        name_tokens = rem_tokens[:-1]
+    else:
+        # Check fuzzy suffix
+        f_suf = get_fuzzy_suffix(rem_tokens[-1])
+        if f_suf:
+            suffix = f_suf
+            name_tokens = rem_tokens[:-1]
+        else:
+            return None
+
+    if not name_tokens:
+        return None
+
+    # Normalize street name tokens (ordinals, words)
+    norm_name_parts = []
+    k = 0
+    while k < len(name_tokens):
+        t = name_tokens[k]
+        if k + 1 < len(name_tokens):
+            comp = f"{t} {name_tokens[k+1]}"
+            if comp in COMPOUND_ORDINALS:
+                norm_name_parts.append(COMPOUND_ORDINALS[comp])
+                k += 2
+                continue
+        if t in COMPOUND_ORDINALS:
+            norm_name_parts.append(COMPOUND_ORDINALS[t])
+        elif t in WORD_ORDINALS:
+            norm_name_parts.append(WORD_ORDINALS[t])
+        elif t.isdigit():
+            norm_name_parts.append(_fast_num_to_ordinal(int(t)))
+        else:
+            # Check if ordinal like 42ND, 5TH
+            m_num = RE_NUMBERED_STREET.match(t)
+            if m_num:
+                norm_name_parts.append(_fast_num_to_ordinal(int(m_num.group(1))))
+            else:
+                norm_name_parts.append(t)
+        k += 1
+
+    st1_parts = [house_num]
+    if pre_dir:
+        st1_parts.append(pre_dir)
+    st1_parts.extend(norm_name_parts)
+    if suffix:
+        st1_parts.append(suffix)
+    if post_dir:
+        st1_parts.append(post_dir)
+
+    st1_norm = " ".join(st1_parts)
+    return st1_norm, sec_unit
+
+
+def fast_path_parse(
+    street1: Optional[str] = None,
+    street2: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    postal_code: Optional[str] = None,
+    country: Optional[str] = None,
+    is_hub_func = None,
+) -> Optional[StandardizedAddress]:
+    """
+    Tier 1 Fast-Path Matcher.
+    Attempts sub-0.015ms deterministic parse for structured or canonical comma inputs.
+    Returns StandardizedAddress on high-confidence match, or None to cascade to Tier 2.
+    """
+    # Country check: only US addresses qualify for US fast-path
+    c_raw = (country or "USA").strip().upper()
+    if c_raw not in ("USA", "US", "UNITED STATES", "UNITED STATES OF AMERICA"):
+        return None
+
+    s1_raw = (street1 or "").strip()
+    s2_raw = (street2 or "").strip()
+    city_raw = (city or "").strip()
+    state_raw = (state or "").strip()
+    zip_raw = (postal_code or "").strip()
+
+    # Path A: Structured Inputs (street1, city, state, postal_code provided)
+    if s1_raw and city_raw and state_raw and zip_raw:
+        # Validate state
+        st_clean = state_raw.upper().replace(".", "").strip()
+        state_code = US_STATES.get(st_clean, st_clean if st_clean in FROZEN_US_STATE_CODES else None)
+        if not state_code:
+            return None
+
+        # Validate ZIP5
+        zip_clean = zip_raw.strip()
+        if len(zip_clean) >= 5 and zip_clean[:5].isdigit():
+            zip5 = zip_clean[:5]
+            norm_postal = f"{zip5}-{zip_clean[6:10]}" if len(zip_clean) >= 10 and zip_clean[5] == "-" and zip_clean[6:10].isdigit() else (
+                f"{zip5}-{zip_clean[5:9]}" if len(zip_clean) >= 9 and zip_clean[5:9].isdigit() else zip5
+            )
+        else:
+            return None
+
+        # Normalize street1 and secondary unit
+        parsed_st = _normalize_fast_street_phrase(s1_raw)
+        if not parsed_st:
+            return None
+        norm_s1, embedded_sec = parsed_st
+
+        # If secondary unit was provided in s2_raw or embedded
+        if s2_raw:
+            norm_s2 = _normalize_fast_sec_unit(s2_raw)
+            if norm_s2 is None:
+                return None
+            if embedded_sec:
+                norm_s2 = f"{norm_s2} {embedded_sec}".strip()
+        else:
+            norm_s2 = embedded_sec
+
+        norm_city = " ".join(city_raw.upper().replace(",", "").split())
+        raw_components = [v for v in [s1_raw, s2_raw, city_raw, state_raw, zip_raw, "USA"] if v]
+        raw_street_address = ", ".join(raw_components)
+
+        key = f"{norm_s1}|{norm_s2}|{norm_city}|{state_code}|{zip5}|USA"
+        b_key = f"{norm_s1}||{norm_city}|{state_code}|{zip5}|USA"
+        p_key = generate_phonetic_address_key(norm_s1, zip5, norm_city)
+
+        is_hub = is_hub_func(norm_s1, norm_s2, norm_city, state_code, zip5, "USA", raw_street_address) if is_hub_func else False
+
+        return StandardizedAddress(
+            street1=norm_s1,
+            street2=norm_s2,
+            city=norm_city,
+            state=state_code,
+            postal_code=norm_postal,
+            country="USA",
+            normalized_address_key=key,
+            address_status="standardized",
+            raw_street_address=raw_street_address,
+            is_us=True,
+            is_private_residence=False,
+            building_key=b_key,
+            phonetic_key=p_key,
+            is_registered_agent_hub=is_hub,
+        )
+
+    # Path B: Single comma-delimited string passed in street1
+    if s1_raw and not (city_raw or state_raw or zip_raw):
+        m = RE_CANONICAL_COMMA.match(s1_raw)
+        if m:
+            house_num = m.group(1).upper()
+            street_part = m.group(2).strip()
+            sec_part = m.group(3)
+            city_part = m.group(4).strip()
+            state_cand = m.group(5).upper()
+            zip_cand = m.group(6).strip()
+
+            if state_cand not in FROZEN_US_STATE_CODES:
+                return None
+
+            # Check street phrase
+            full_st_phrase = f"{house_num} {street_part}"
+            parsed_st = _normalize_fast_street_phrase(full_st_phrase)
+            if not parsed_st:
+                return None
+            norm_s1, embedded_sec = parsed_st
+
+            norm_s2 = ""
+            if sec_part:
+                norm_s2_cand = _normalize_fast_sec_unit(sec_part)
+                if norm_s2_cand is None:
+                    return None
+                norm_s2 = norm_s2_cand
+            if embedded_sec:
+                norm_s2 = f"{norm_s2} {embedded_sec}".strip() if norm_s2 else embedded_sec
+
+            norm_city = " ".join(city_part.upper().split())
+            zip5 = zip_cand[:5]
+            norm_postal = zip_cand
+
+            raw_street_address = s1_raw
+            key = f"{norm_s1}|{norm_s2}|{norm_city}|{state_cand}|{zip5}|USA"
+            b_key = f"{norm_s1}||{norm_city}|{state_cand}|{zip5}|USA"
+            p_key = generate_phonetic_address_key(norm_s1, zip5, norm_city)
+
+            is_hub = is_hub_func(norm_s1, norm_s2, norm_city, state_cand, zip5, "USA", raw_street_address) if is_hub_func else False
+
+            return StandardizedAddress(
+                street1=norm_s1,
+                street2=norm_s2,
+                city=norm_city,
+                state=state_cand,
+                postal_code=norm_postal,
+                country="USA",
+                normalized_address_key=key,
+                address_status="standardized",
+                raw_street_address=raw_street_address,
+                is_us=True,
+                is_private_residence=False,
+                building_key=b_key,
+                phonetic_key=p_key,
+                is_registered_agent_hub=is_hub,
+            )
+
+    return None

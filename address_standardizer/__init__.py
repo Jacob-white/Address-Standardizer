@@ -27,6 +27,11 @@ from address_standardizer.geocoder import (
     CensusGeocoder,
     get_fallback_centroid,
 )
+from address_standardizer.batch import (
+    chunk_generator,
+    process_chunk,
+    stream_standardize_csv,
+)
 
 __version__ = "1.0.0"
 
@@ -47,5 +52,8 @@ __all__ = [
     "_split_international_secondary_unit",
     "CensusGeocoder",
     "get_fallback_centroid",
+    "chunk_generator",
+    "process_chunk",
+    "stream_standardize_csv",
     "__version__",
 ]

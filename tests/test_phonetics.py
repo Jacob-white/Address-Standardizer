@@ -3,7 +3,6 @@ Tests for Soundex and Phonetic Blocking Keys.
 =============================================
 """
 
-import pytest
 from address_standardizer.phonetics import (
     compute_soundex,
     generate_phonetic_address_key,

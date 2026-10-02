@@ -1,18 +1,29 @@
 """
 Phonetic Matching & Fuzzy Blocking Keys.
 =========================================
-Implements American Soundex and phonetic compound key generation to enable
-typo-tolerant entity resolution and address deduplication without third-party C dependencies.
+Implements American Soundex, collision-free hybrid numbered street blocking,
+and compound key generation to enable typo-tolerant entity resolution
+without third-party C dependencies.
 """
 
-import re
 from typing import Optional
 from address_standardizer.tables import STREET_SUFFIXES, DIRECTIONALS
+from address_standardizer._patterns import (
+    RE_CLEAN_ALPHA,
+    RE_PO_BOX_KEY,
+    RE_US_ZIP5_OR_9,
+    RE_PUNCTUATION_SPLIT,
+    RE_WHITESPACE,
+    RE_DIGITS,
+    RE_NUMBERED_STREET_KEY,
+    FROZEN_DIRECTIONAL_VALUES,
+    FROZEN_STREET_SUFFIX_VALUES,
+)
 
 
 def compute_soundex(token: str) -> str:
     """Computes standard American Soundex code for a word token."""
-    clean = re.sub(r"[^A-Z]", "", token.upper())
+    clean = RE_CLEAN_ALPHA.sub("", token.upper())
     if not clean:
         return ""
     mapping = {
@@ -39,17 +50,25 @@ def compute_soundex(token: str) -> str:
     return (soundex_code + "0000")[:4]
 
 
-def generate_phonetic_address_key(street1: str, postal_or_zip: str = "", city: str = "") -> Optional[str]:
+def generate_phonetic_address_key(street1: Optional[str], postal_or_zip: str = "", city: str = "") -> Optional[str]:
     """
     Generates a fuzzy blocking key for deduplication and typo detection:
-    Format: {STREET_NUM}|{SOUNDEX_OF_STREET_NAME}|{ZIP5_OR_CITY}
-    Example: '555 MONTGOMERY ST', '94111' -> '555|M532|94111'
-             '555 MONTGOMERI ST', '94111' -> '555|M532|94111'
+    Format: {STREET_NUM}|{SOUNDEX_OR_NUMBERED_STREET}|{ZIP5_OR_CITY}
+    Examples:
+      '555 MONTGOMERY ST', '94111' -> '555|M532|94111'
+      '100 42ND ST', '10036'       -> '100|#42|10036'
+      '123-45 82ND AVE', '11415'   -> '123-45|#82|11415'
+      'RR 2 BOX 152', '62428'      -> 'RR 2|B200|62428'
+      'PO BOX 1234', '90210'       -> 'POB 1234|90210'
     """
     if not street1:
         return None
     st_raw = street1.strip().upper()
-    m_pob = re.match(r"^(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+([A-Z0-9\-]+)", st_raw)
+    if not st_raw:
+        return None
+
+    # PO Box handling
+    m_pob = RE_PO_BOX_KEY.match(st_raw)
     if m_pob:
         loc = (
             postal_or_zip.strip()[:5]
@@ -58,37 +77,95 @@ def generate_phonetic_address_key(street1: str, postal_or_zip: str = "", city: s
         )
         return f"POB {m_pob.group(1)}|{loc}".strip("|")
 
-    st_clean = re.sub(r"[,\.;:#]+", " ", st_raw).strip()
-    st_clean = re.sub(r"\s+", " ", st_clean)
+    p_clean = postal_or_zip.strip()
+    if RE_US_ZIP5_OR_9.match(p_clean):
+        loc = p_clean[:5]
+    elif any(c.isalpha() for c in p_clean):
+        loc = p_clean
+    else:
+        loc = (
+            p_clean[:5]
+            if (p_clean and len(p_clean) >= 5)
+            else (city.strip() if city else (p_clean if p_clean else ""))
+        )
+
+    st_clean = RE_PUNCTUATION_SPLIT.sub(" ", st_raw).strip()
+    st_clean = RE_WHITESPACE.sub(" ", st_clean)
     parts = st_clean.split()
     if not parts:
         return None
 
-    if re.search(r"\d", parts[0]):
-        house_num = parts[0]
-        words = parts[1:]
+    # Rural Route & Highway Contract handling (e.g. RR 2 BOX 152)
+    if len(parts) >= 2 and parts[0] in ("RR", "HC") and parts[1].isdigit():
+        rr_prefix = f"{parts[0]} {parts[1]}"
+        rem = parts[2:]
+        if rem and rem[0] == "BOX":
+            snd = compute_soundex("BOX")
+        elif rem:
+            snd = compute_soundex(rem[0])
+        else:
+            snd = compute_soundex(parts[0])
+        return f"{rr_prefix}|{snd}|{loc}".strip("|")
+
+    # Military Unit Box handling (e.g. UNIT 1234 BOX 5678)
+    if len(parts) >= 4 and parts[0] == "UNIT" and parts[1].isdigit():
+        unit_num = parts[1]
+        snd = compute_soundex(parts[2]) if parts[2] else "B200"
+        return f"{unit_num}|{snd}|{loc}".strip("|")
+
+    # Puerto Rico Urbanization handling (e.g. URB LAS GLADIOLAS 123 CALLE FLAMBOYAN)
+    if parts[0] in ("URB", "URBANIZACION"):
+        # Find first token with digits as house number
+        h_idx = -1
+        for idx, p in enumerate(parts[1:], 1):
+            if RE_DIGITS.search(p):
+                h_idx = idx
+                break
+        if h_idx != -1:
+            house_num = parts[h_idx]
+            rem_words = parts[h_idx + 1:]
+            street_word = rem_words[0] if rem_words else parts[1]
+            snd = compute_soundex(street_word)
+            return f"{house_num}|{snd}|{loc}".strip("|")
+
+    # Extract house number (including fractional like '100 1/2' and Queens like '123-45')
+    if RE_DIGITS.search(parts[0]):
+        if len(parts) > 1 and parts[1] in ("1/2", "1/4", "3/4"):
+            house_num = f"{parts[0]} {parts[1]}"
+            words = parts[2:]
+        else:
+            house_num = parts[0]
+            words = parts[1:]
     else:
         house_num = ""
         words = parts[:]
 
-    # Strip pre-directional
-    if len(words) > 1 and (words[0] in DIRECTIONALS or words[0] in DIRECTIONALS.values()):
-        words = words[1:]
+    # Strip pre-directional (only if multiple words remain)
+    if len(words) > 1 and (words[0] in DIRECTIONALS or words[0] in FROZEN_DIRECTIONAL_VALUES):
+        # If words is just ['SOUTH', 'ST'], SOUTH is the street name, do NOT strip!
+        if len(words) == 2 and (words[1] in STREET_SUFFIXES or words[1] in FROZEN_STREET_SUFFIX_VALUES):
+            pass
+        elif len(words) == 3 and f"{words[0]} {words[1]}" in ("NORTH EAST", "NORTH WEST", "SOUTH EAST", "SOUTH WEST", "N E", "N W", "S E", "S W") and (words[2] in STREET_SUFFIXES or words[2] in FROZEN_STREET_SUFFIX_VALUES):
+            pass
+        else:
+            words = words[1:]
 
     # Strip post-directional
-    if len(words) > 1 and (words[-1] in DIRECTIONALS or words[-1] in DIRECTIONALS.values()):
+    if len(words) > 1 and (words[-1] in DIRECTIONALS or words[-1] in FROZEN_DIRECTIONAL_VALUES):
         words = words[:-1]
 
     # Strip street suffix at end
-    if len(words) > 1 and (words[-1] in STREET_SUFFIXES or words[-1] in STREET_SUFFIXES.values()):
+    if len(words) > 1 and (words[-1] in STREET_SUFFIXES or words[-1] in FROZEN_STREET_SUFFIX_VALUES):
         words = words[:-1]
 
     street_word = words[0] if words else (parts[1] if len(parts) > 1 else parts[0])
-    snd = compute_soundex(street_word)
-    loc = (
-        postal_or_zip.strip()[:5]
-        if (postal_or_zip and len(postal_or_zip.strip()) >= 5)
-        else city.strip()
-    )
+
+    # Hybrid numbered street resolution: prevent Soundex collisions (42nd vs 2nd, etc.)
+    m_num = RE_NUMBERED_STREET_KEY.match(street_word)
+    if m_num:
+        snd = f"#{m_num.group(1)}"
+    else:
+        snd = compute_soundex(street_word)
+
     res = f"{house_num}|{snd}|{loc}".strip("|")
     return res or None

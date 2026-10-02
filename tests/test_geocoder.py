@@ -3,9 +3,7 @@ Tests for Census Batch Geocoder and Fallback Centroid Service.
 ==============================================================
 """
 
-import io
 import urllib.error
-import pytest
 from unittest.mock import patch, MagicMock
 from address_standardizer.geocoder import (
     CensusGeocoder,

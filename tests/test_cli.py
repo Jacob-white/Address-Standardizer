@@ -7,7 +7,7 @@ import sys
 import json
 import csv
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from address_standardizer.cli import main
 
 

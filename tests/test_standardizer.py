@@ -3,22 +3,16 @@ Unit & Integration Tests for Address Standardization Engine (USPS Pub 28 & ISO S
 ===========================================================================================
 """
 
-import pytest
 from unittest.mock import patch
 
 from address_standardizer import (
     standardize_address,
     generate_normalized_address_key,
     generate_building_key,
-    generate_phonetic_address_key,
-    is_registered_agent_hub_address,
-    normalize_country,
     normalize_country_code,
-    normalize_us_state,
     normalize_us_postal_code,
     get_state_from_zip3,
     num_to_ordinal,
-    StandardizedAddress,
     _split_international_secondary_unit,
 )
 from address_standardizer.standardizer import (
@@ -729,6 +723,100 @@ class TestRuleBasedFallbackAndEdgeCases:
         assert ok_dir is True
         assert st1_dir == "100 N MAIN ST"
 
+        # Rural route variations
+        st1_rr, _, ok_rr = _rule_based_us_street_parse("RR 2 Box 152")
+        assert ok_rr is True
+        assert st1_rr == "RR 2 BOX 152"
+        st1_rr2, _, ok_rr2 = _rule_based_us_street_parse("RR 2")
+        assert ok_rr2 is True
+        assert st1_rr2 == "RR 2"
+
+        # Highway contract variations
+        st1_hc, _, ok_hc = _rule_based_us_street_parse("HC 64 Box 23")
+        assert ok_hc is True
+        assert st1_hc == "HC 64 BOX 23"
+        st1_hc2, _, ok_hc2 = _rule_based_us_street_parse("HC 64")
+        assert ok_hc2 is True
+        assert st1_hc2 == "HC 64"
+
+        # Military Unit Box
+        st1_mil, _, ok_mil = _rule_based_us_street_parse("Unit 1234 Box 5678")
+        assert ok_mil is True
+        assert st1_mil == "UNIT 1234 BOX 5678"
+
+        # Private Mailbox (PMB)
+        st1_pmb, st2_pmb, ok_pmb = _rule_based_us_street_parse("100 Main St PMB 456")
+        assert ok_pmb is True
+        assert st1_pmb == "100 MAIN ST"
+        assert st2_pmb == "PMB 456"
+
+        # Suffix-attached unit
+        st1_att, st2_att, ok_att = _rule_based_us_street_parse("100 Main St-4B")
+        assert ok_att is True
+        assert st1_att == "100 MAIN ST"
+        assert st2_att == "APT 4B"
+
+        # Empty token string after stripping
+        st1_empty, st2_empty, ok_empty = _rule_based_us_street_parse(",,,")
+        assert ok_empty is False
+        assert st1_empty == ""
+
+        # Fractional house number
+        st1_frac, _, ok_frac = _rule_based_us_street_parse("100 1/2 Main St")
+        assert ok_frac is True
+        assert st1_frac == "100 1/2 MAIN ST"
+
+        # Queens hyphenation and address range
+        st1_q, _, ok_q = _rule_based_us_street_parse("123-45 82nd Ave")
+        assert ok_q is True
+        assert st1_q == "123-45 82ND AVE"
+        st1_rng, _, ok_rng = _rule_based_us_street_parse("100-102 Main St")
+        assert ok_rng is True
+        assert st1_rng == "100-102 MAIN ST"
+
+        # Positional grammar: named directional
+        st1_named, _, ok_named = _rule_based_us_street_parse("500 South St")
+        assert ok_named is True
+        assert st1_named == "500 SOUTH ST"
+
+        # Positional grammar: compound directional
+        st1_comp, _, ok_comp = _rule_based_us_street_parse("100 North East St")
+        assert ok_comp is True
+        assert st1_comp == "100 NORTH EAST ST"
+
+        # Two-token compound ordinal
+        st1_nord, _, ok_nord = _rule_based_us_street_parse("100 Twenty First Ave")
+        assert ok_nord is True
+        assert st1_nord == "100 21ST AVE"
+
+        # Single-token word ordinal
+        st1_word, _, ok_word = _rule_based_us_street_parse("100 First St")
+        assert ok_word is True
+        assert st1_word == "100 1ST ST"
+
+        # Numbered street and ordinal conversion
+        st1_ord_conv, _, ok_ord_conv = _rule_based_us_street_parse("100 42 St")
+        assert ok_ord_conv is True
+        assert st1_ord_conv == "100 42ND ST"
+
+        st1_num_st, _, ok_num_st = _rule_based_us_street_parse("100 42nd St")
+        assert ok_num_st is True
+        assert st1_num_st == "100 42ND ST"
+
+        # Route prefix keeps cardinal
+        st1_cr, _, ok_cr = _rule_based_us_street_parse("County Road 500 N")
+        assert ok_cr is True
+        assert "500TH" not in st1_cr
+
+        # Fuzzy suffix and directional
+        st1_fsuf, _, ok_fsuf = _rule_based_us_street_parse("100 Main Strteet")
+        assert ok_fsuf is True
+        assert st1_fsuf == "100 MAIN ST"
+
+        st1_fdir, _, ok_fdir = _rule_based_us_street_parse("100 Nort Main St")
+        assert ok_fdir is True
+        assert st1_fdir == "100 N MAIN ST"
+
     def test_rule_based_no_comma_before_state_zip(self):
         """Verify rule-based mode handles address without comma before state and zip."""
         with patch("address_standardizer.standardizer.usaddress", None):
@@ -1005,5 +1093,204 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert city_pob == "New York"
             assert state_pob == "NY"
             assert zip_pob == "10001"
+
+    def test_import_without_usaddress_coverage(self):
+        """Verify module import behavior when usaddress is not installed."""
+        import sys
+        import importlib
+        import address_standardizer.standardizer as std_mod
+        orig = sys.modules.get("usaddress")
+        try:
+            sys.modules["usaddress"] = None
+            importlib.reload(std_mod)
+            assert std_mod.usaddress is None
+            # Standardize an address with usaddress = None
+            res = std_mod.standardize_address("100 Main St, New York, NY 10001")
+            assert res.street1 == "100 MAIN ST"
+        finally:
+            sys.modules["usaddress"] = orig
+            importlib.reload(std_mod)
+
+    def test_international_flat_prefix_and_two_part_comma(self):
+        """Verify international flat prefix splitting and two-part comma addresses."""
+        st1, st2 = _split_international_secondary_unit("Flat 4 150 High Street", "")
+        assert st1 == "150 HIGH ST" or "150 HIGH" in st1
+        assert "APT 4" in st2
+
+        # Two-part comma address
+        res_intl = standardize_address("100 Oxford St, London", country="GBR")
+        assert res_intl.country == "GBR"
+        assert res_intl.city == "LONDON"
+
+    def test_usaddress_exception_and_reverse_anchor_branches(self):
+        """Verify usaddress exception handler and reverse anchor branches."""
+        from address_standardizer.standardizer import _parse_us_street_tokens
+        # usaddress exception triggers lines 522-523
+        with patch("address_standardizer.standardizer.usaddress.parse", side_effect=Exception("CRF failure")):
+            st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("100 Main St, New York, NY 10001")
+            assert st1 == "100 MAIN ST"
+            assert city == "New York"
+
+        # Reverse anchor with usaddress = None
+        with patch("address_standardizer.standardizer.usaddress", None):
+            # Comma in before_sz
+            st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("100 Main St, Austin TX 78701")
+            assert st1 == "100 MAIN ST"
+            assert city == "Austin"
+
+            # Multi-word city in before_sz without commas
+            st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("100 Wall St New York NY 10005")
+            assert st1 == "100 WALL ST"
+            assert city == "New York"
+
+            # PO Box in before_sz
+            st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("PO Box 123 Austin TX 78701")
+            assert "PO BOX 123" in st1
+            assert city == "Austin"
+
+            # Post-directional in before_sz
+            st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("100 Main St NW Austin TX 78701")
+            assert "NW" in st1
+            assert city == "Austin"
+
+            # Secondary unit in before_sz
+            st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("100 Main St Suite 200 Austin TX 78701")
+            assert "STE 200" in st2
+            assert city == "Austin"
+
+            # Post-directional AND Secondary unit in before_sz
+            st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("100 Main St NW Suite 200 Austin TX 78701")
+            assert "NW" in st1
+            assert "STE 200" in st2
+            assert city == "Austin"
+
+            # Urbanization prefix in fallback mode
+            st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("Urb Las Gladiolas 123 Calle Flamboyan, San Juan, PR 00926")
+            assert "URB LAS GLADIOLAS" in st1
+
+    def test_crf_tag_processing_deep_branches(self):
+        """Test specific CRF tag sequences in _parse_us_street_tokens."""
+        from address_standardizer.standardizer import _parse_us_street_tokens
+
+        # Directional without StreetName (line 620)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("500", "AddressNumber"),
+                ("South", "StreetNamePreDirectional"),
+                ("St", "StreetNamePostType"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("500 South St")
+            assert "SOUTH" in st1
+
+        # Two-token compound ordinal in CRF (lines 644-646)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Twenty", "StreetName"),
+                ("First", "StreetName"),
+                ("Ave", "StreetNamePostType"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("100 Twenty First Ave")
+            assert "21ST" in st1
+
+        # Single-token compound ordinal in CRF (line 648)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Twenty-First", "StreetName"),
+                ("Ave", "StreetNamePostType"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("100 Twenty-First Ave")
+            assert "21ST" in st1
+
+        # Route prefix keeps cardinal in CRF, non-route gets ordinal (line 655)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("42", "StreetName"),
+                ("St", "StreetNamePostType"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("100 42 St")
+            assert "42ND" in st1
+
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("County", "StreetName"),
+                ("Road", "StreetName"),
+                ("500", "StreetName"),
+                ("N", "StreetNamePostDirectional"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("County Road 500 N")
+            assert "500TH" not in st1
+
+        # Fuzzy suffix in CRF (line 668)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Main", "StreetName"),
+                ("Strteet", "StreetName"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("100 Main Strteet")
+            assert "ST" in st1
+
+        # OccupancyIdentifier in SECONDARY_UNITS (line 679)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Main", "StreetName"),
+                ("St", "StreetNamePostType"),
+                ("Suite", "OccupancyIdentifier"),
+                ("200", "OccupancyIdentifier"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("100 Main St Suite 200")
+            assert "STE" in st2
+
+        # OccupancyIdentifier without preceding OccupancyType defaults to STE (line 682)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Main", "StreetName"),
+                ("St", "StreetNamePostType"),
+                ("400", "OccupancyIdentifier"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("100 Main St 400")
+            assert "STE 400" in st2
+
+        # USPSBoxGroup without physical street (lines 689, 692, 721)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("Route", "USPSBoxGroupType"),
+                ("A", "USPSBoxGroupID"),
+                ("Box", "USPSBoxType"),
+                ("152", "USPSBoxID"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("Route A Box 152")
+            assert "ROUTE A BOX 152" in st1
+
+        # USPSBoxGroup with physical street (line 723)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Main", "StreetName"),
+                ("St", "StreetNamePostType"),
+                ("RR", "USPSBoxGroupType"),
+                ("2", "USPSBoxGroupID"),
+            ]
+            st1, st2, ok, _, _, _ = _parse_us_street_tokens("100 Main St RR 2")
+            assert "RR 2" in st2
+
+        # Multi-word StateName with terminal state code (lines 727-729)
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Main", "StreetName"),
+                ("St", "StreetNamePostType"),
+                ("New", "StateName"),
+                ("York", "StateName"),
+                ("NY", "StateName"),
+            ]
+            st1, st2, ok, p_city, p_state, _ = _parse_us_street_tokens("100 Main St New York NY")
+            assert p_state == "NY"
+            assert "NEW YORK" in p_city
 
 

@@ -3,7 +3,6 @@ Tests for Data Models (StandardizedAddress).
 ============================================
 """
 
-import pytest
 from address_standardizer.models import StandardizedAddress
 
 

@@ -7,12 +7,11 @@ and Census geocoding enrichment.
 
 import sys
 import json
-import csv
 import argparse
-from typing import List
 
 from address_standardizer.standardizer import standardize_address
 from address_standardizer.geocoder import CensusGeocoder
+from address_standardizer.batch import stream_standardize_csv
 
 
 def main():
@@ -50,6 +49,8 @@ def main():
     batch_parser.add_argument("--state-col", default="state", help="Column name for state (default: state)")
     batch_parser.add_argument("--zip-col", default="postal_code", help="Column name for zip (default: postal_code)")
     batch_parser.add_argument("--country-col", default="country", help="Column name for country (default: country)")
+    batch_parser.add_argument("--chunk-size", type=int, default=5000, help="Streaming chunk size (default: 5000)")
+    batch_parser.add_argument("--workers", type=int, default=2, help="Multiprocessing workers, max 2 (default: 2)")
     batch_parser.add_argument("--geocode", action="store_true", help="Batch geocode US addresses with Census API")
 
     args = parser.parse_args()
@@ -81,64 +82,22 @@ def main():
         print(json.dumps(data, indent=2))
 
     elif args.command == "batch":
-        with open(args.input_csv, "r", encoding="utf-8", errors="replace") as f_in:
-            reader = csv.DictReader(f_in)
-            fieldnames = (reader.fieldnames or []) + [
-                "std_street1", "std_street2", "std_city", "std_state", "std_postal_code",
-                "std_country", "normalized_address_key", "building_key", "phonetic_key",
-                "is_registered_agent_hub", "is_private_residence", "address_status"
-            ]
-            if args.geocode:
-                fieldnames.extend(["latitude", "longitude", "geocode_precision"])
-
-            rows: List[dict] = []
-            for row in reader:
-                st = standardize_address(
-                    street1=row.get(args.street_col, ""),
-                    street2=row.get(args.street2_col, ""),
-                    city=row.get(args.city_col, ""),
-                    state=row.get(args.state_col, ""),
-                    postal_code=row.get(args.zip_col, ""),
-                    country=row.get(args.country_col, "USA"),
-                )
-                row["std_street1"] = st.street1
-                row["std_street2"] = st.street2
-                row["std_city"] = st.city
-                row["std_state"] = st.state
-                row["std_postal_code"] = st.postal_code
-                row["std_country"] = st.country
-                row["normalized_address_key"] = st.normalized_address_key or ""
-                row["building_key"] = st.building_key or ""
-                row["phonetic_key"] = st.phonetic_key or ""
-                row["is_registered_agent_hub"] = str(st.is_registered_agent_hub)
-                row["is_private_residence"] = str(st.is_private_residence)
-                row["address_status"] = st.address_status
-                rows.append(row)
-
-        if args.geocode:
-            geocoder = CensusGeocoder()
-            geo_batch = []
-            for idx, r in enumerate(rows):
-                if r.get("std_country") == "USA" and r.get("std_street1"):
-                    geo_batch.append((str(idx), r["std_street1"], r["std_city"], r["std_state"], r["std_postal_code"]))
-            
-            geo_results = geocoder.geocode_batch(geo_batch)
-            for idx, r in enumerate(rows):
-                idx_str = str(idx)
-                if idx_str in geo_results:
-                    r["latitude"] = geo_results[idx_str]["latitude"]
-                    r["longitude"] = geo_results[idx_str]["longitude"]
-                    r["geocode_precision"] = geo_results[idx_str]["precision"]
-                else:
-                    r["latitude"] = ""
-                    r["longitude"] = ""
-                    r["geocode_precision"] = ""
-
-        with open(args.output_csv, "w", encoding="utf-8", newline="") as f_out:
-            writer = csv.DictWriter(f_out, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(rows)
-        print(f"Standardized {len(rows)} record(s) -> {args.output_csv}")
+        geocoder = CensusGeocoder() if args.geocode else None
+        total = stream_standardize_csv(
+            input_path=args.input_csv,
+            output_path=args.output_csv,
+            chunk_size=args.chunk_size,
+            max_workers=args.workers,
+            street_col=args.street_col,
+            street2_col=args.street2_col,
+            city_col=args.city_col,
+            state_col=args.state_col,
+            zip_col=args.zip_col,
+            country_col=args.country_col,
+            geocode=args.geocode,
+            geocoder=geocoder,
+        )
+        print(f"Standardized {total} record(s) -> {args.output_csv}")
 
 
 if __name__ == "__main__":
