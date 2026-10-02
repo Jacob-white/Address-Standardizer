@@ -5,6 +5,7 @@ Wraps the US Census Bureau public Batch Geocoding API with automatic fallback
 to regional ZIP3 / State centroids to ensure coordinates are never empty for valid US locations.
 """
 
+import re
 import io
 import csv
 import logging
@@ -16,6 +17,7 @@ from address_standardizer.tables import (
     ZIP3_TO_STATE,
     STATE_CENTROIDS,
     METRO_ZIP3_CENTROIDS,
+    US_STATES,
 )
 
 logger = logging.getLogger(__name__)
@@ -25,15 +27,22 @@ CENSUS_ONELINE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelin
 
 def get_fallback_centroid(zip5: Optional[str] = None, state: Optional[str] = None) -> Optional[Tuple[float, float]]:
     """Returns fallback (latitude, longitude) based on ZIP3 or State when rooftop geocoding fails."""
-    if zip5 and len(zip5) >= 3:
-        z3 = zip5[:3]
-        if z3 in METRO_ZIP3_CENTROIDS:
-            return METRO_ZIP3_CENTROIDS[z3]
-        st = ZIP3_TO_STATE.get(z3)
-        if st and st in STATE_CENTROIDS:
-            return STATE_CENTROIDS[st]
-    if state and state.upper() in STATE_CENTROIDS:
-        return STATE_CENTROIDS[state.upper()]
+    if zip5:
+        z_digits = re.sub(r"[^\d]", "", zip5.strip())
+        if len(z_digits) == 4:
+            z_digits = f"0{z_digits}"
+        if len(z_digits) >= 3:
+            z3 = z_digits[:3]
+            if z3 in METRO_ZIP3_CENTROIDS:
+                return METRO_ZIP3_CENTROIDS[z3]
+            st = ZIP3_TO_STATE.get(z3)
+            if st and st in STATE_CENTROIDS:
+                return STATE_CENTROIDS[st]
+    if state:
+        s_clean = re.sub(r"[^\w\s]", "", state.strip().upper())
+        st_code = US_STATES.get(s_clean, s_clean[:2] if len(s_clean) == 2 else s_clean)
+        if st_code in STATE_CENTROIDS:
+            return STATE_CENTROIDS[st_code]
     return None
 
 
@@ -135,3 +144,18 @@ class CensusGeocoder:
                         }
 
         return output
+
+    def geocode_address(
+        self,
+        street: str,
+        city: str = "",
+        state: str = "",
+        zip_code: str = "",
+        fallback_to_centroids: bool = True,
+    ) -> Optional[Dict[str, Any]]:
+        """Geocodes a single address record."""
+        res = self.geocode_batch(
+            [("1", street, city, state, zip_code)],
+            fallback_to_centroids=fallback_to_centroids,
+        )
+        return res.get("1")
