@@ -1,0 +1,137 @@
+"""
+Census Batch Geocoder Client & Fallback Centroid Service.
+=========================================================
+Wraps the US Census Bureau public Batch Geocoding API with automatic fallback
+to regional ZIP3 / State centroids to ensure coordinates are never empty for valid US locations.
+"""
+
+import io
+import csv
+import logging
+import urllib.request
+import urllib.parse
+from typing import Dict, Tuple, Optional, List, Any
+
+from address_standardizer.tables import (
+    ZIP3_TO_STATE,
+    STATE_CENTROIDS,
+    METRO_ZIP3_CENTROIDS,
+)
+
+logger = logging.getLogger(__name__)
+CENSUS_BATCH_URL = "https://geocoding.geo.census.gov/geocoder/locations/addressbatch"
+CENSUS_ONELINE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
+
+
+def get_fallback_centroid(zip5: Optional[str] = None, state: Optional[str] = None) -> Optional[Tuple[float, float]]:
+    """Returns fallback (latitude, longitude) based on ZIP3 or State when rooftop geocoding fails."""
+    if zip5 and len(zip5) >= 3:
+        z3 = zip5[:3]
+        if z3 in METRO_ZIP3_CENTROIDS:
+            return METRO_ZIP3_CENTROIDS[z3]
+        st = ZIP3_TO_STATE.get(z3)
+        if st and st in STATE_CENTROIDS:
+            return STATE_CENTROIDS[st]
+    if state and state.upper() in STATE_CENTROIDS:
+        return STATE_CENTROIDS[state.upper()]
+    return None
+
+
+def parse_census_geocoder_response(response_text: str) -> Dict[str, Tuple[float, float, str]]:
+    """
+    Parses CSV output from the US Census Bureau Batch Geocoding API.
+    Returns mapping: { id_str: (latitude, longitude, census_tract) }
+    """
+    results = {}
+    reader = csv.reader(io.StringIO(response_text))
+    for row in reader:
+        if len(row) >= 6:
+            rec_id = row[0].strip()
+            match_status = row[2].strip() if len(row) > 2 else ""
+            coords = row[5].strip() if len(row) > 5 else ""
+            tract = row[6].strip() if len(row) > 6 else ""
+
+            if match_status.upper() == "MATCH" and coords and "," in coords:
+                try:
+                    lon_str, lat_str = coords.split(",")
+                    results[rec_id] = (float(lat_str.strip()), float(lon_str.strip()), tract)
+                except Exception:
+                    continue
+    return results
+
+
+class CensusGeocoder:
+    """Client for US Census Bureau Batch and Single Geocoding API."""
+
+    def __init__(self, timeout_seconds: int = 45):
+        self.timeout = timeout_seconds
+
+    def geocode_batch(
+        self,
+        records: List[Tuple[str, str, str, str, str]],
+        fallback_to_centroids: bool = True
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Geocodes a batch of records: [(id_str, street, city, state, zip_code), ...]
+        Returns dict: { id_str: {'latitude': float, 'longitude': float, 'precision': 'rooftop'|'zip_centroid'} }
+        """
+        if not records:
+            return {}
+
+        csv_lines = []
+        for rec_id, st1, city, state, zip_c in records:
+            clean_st1 = (st1 or "").replace('"', '""')
+            clean_city = (city or "").replace('"', '""')
+            clean_state = (state or "").replace('"', '""')
+            clean_zip = (zip_c or "").replace('"', '""')
+            csv_lines.append(f'"{rec_id}","{clean_st1}","{clean_city}","{clean_state}","{clean_zip}"')
+
+        csv_data = "\n".join(csv_lines).encode("utf-8")
+        boundary = "---------------------------CensusBatchBoundary987654321"
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="benchmark"\r\n\r\nPublic_AR_Current\r\n'
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="addressFile"; filename="batch.csv"\r\n'
+            f"Content-Type: text/csv\r\n\r\n"
+        ).encode("utf-8") + csv_data + f"\r\n--{boundary}--\r\n".encode("utf-8")
+
+        headers = {
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+            "User-Agent": "AddressStandardizer/1.0 (Census Geocoder)"
+        }
+
+        output: Dict[str, Dict[str, Any]] = {}
+        matched_ids = set()
+
+        try:
+            req = urllib.request.Request(CENSUS_BATCH_URL, data=body, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # nosec B310
+                resp_text = resp.read().decode("utf-8", errors="replace")
+                results = parse_census_geocoder_response(resp_text)
+                for rec_id, (lat, lon, tract) in results.items():
+                    output[rec_id] = {
+                        "latitude": lat,
+                        "longitude": lon,
+                        "census_tract": tract,
+                        "precision": "rooftop",
+                    }
+                    matched_ids.add(rec_id)
+        except Exception as ex:
+            logger.warning(f"US Census batch geocoding error: {ex}")
+
+        # Fallback to centroid for records not matched by Census
+        if fallback_to_centroids:
+            for rec_id, st1, city, state, zip_c in records:
+                rec_id_str = str(rec_id)
+                if rec_id_str not in matched_ids:
+                    coords = get_fallback_centroid(zip5=zip_c, state=state)
+                    if coords:
+                        output[rec_id_str] = {
+                            "latitude": coords[0],
+                            "longitude": coords[1],
+                            "census_tract": None,
+                            "precision": "zip_centroid",
+                        }
+
+        return output
