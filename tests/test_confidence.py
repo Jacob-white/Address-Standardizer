@@ -79,6 +79,44 @@ class TestConfidenceScorer:
         assert res.routing_tier == RoutingTier.MANUAL_STEWARDSHIP
         assert ERR_PARSE_FAILED in res.failure_reason_codes
 
+    def test_raw_street_whitespace_only(self):
+        addr = StandardizedAddress(
+            street1="100 WALL ST",
+            street2="",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+            country="USA",
+            normalized_address_key="100 WALL ST||NEW YORK|NY|10005|USA",
+            address_status="standardized",
+            raw_street_address="",
+            is_us=True,
+        )
+        res = self.scorer.score(addr, raw_input={"street1": "   "})
+        assert res.composite_score == 0.0
+        assert res.routing_tier == RoutingTier.MANUAL_STEWARDSHIP
+        assert "ERR_EMPTY_STREET" in res.failure_reason_codes
+
+    def test_parse_failed_status_with_street(self):
+        addr = StandardizedAddress(
+            street1="100 WALL ST",
+            street2="",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+            country="USA",
+            normalized_address_key="100 WALL ST||NEW YORK|NY|10005|USA",
+            address_status="parse_failed",
+            raw_street_address="100 Wall St",
+            is_us=True,
+        )
+        res = self.scorer.score(addr, raw_input={"street1": "100 Wall St"})
+        assert res.composite_score == 0.0
+        assert res.routing_tier == RoutingTier.MANUAL_STEWARDSHIP
+        assert "ERR_EMPTY_STREET" not in res.failure_reason_codes
+        assert "ERR_PARSE_FAILED" in res.failure_reason_codes
+
+
     def test_clean_us_standard_auto_pass(self):
         addr = StandardizedAddress(
             street1="100 WALL ST",

@@ -15,6 +15,7 @@ Standardizes US and International addresses to USPS Publication 28 and ISO stand
 import copy
 import unicodedata
 import logging
+import re
 from typing import Optional, Tuple, List, Dict, Any
 
 try:
@@ -176,11 +177,37 @@ def normalize_country_code(
             return "GBR"
         if RE_CAN_POSTCODE.search(st_clean) or st_clean.endswith(", CANADA") or st_clean.endswith(" CANADA"):
             return "CAN"
+        m_sz = RE_STATE_ZIP.search(st_clean)
+        if m_sz and m_sz.group(1) in FROZEN_US_STATE_CODES:
+            return "USA"
+
+        # Check country map in raw street FIRST
+        for part in raw_street.split(","):
+            p_clean = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()
+            p_clean = " ".join(p_clean.split())
+            p_alphanumeric = RE_NON_ALPHANUMERIC.sub("", part).strip().upper()
+            if p_clean in COUNTRY_MAP and COUNTRY_MAP[p_clean] != "USA":
+                return COUNTRY_MAP[p_clean]
+            if p_alphanumeric in COUNTRY_MAP and COUNTRY_MAP[p_alphanumeric] != "USA":
+                return COUNTRY_MAP[p_alphanumeric]
+
+        raw_words = RE_NON_ALPHANUMERIC.sub(" ", raw_street).strip().upper().split()
+        if len(raw_words) >= 2:
+            two_w = f"{raw_words[-2]} {raw_words[-1]}"
+            if two_w in COUNTRY_MAP and COUNTRY_MAP[two_w] != "USA":
+                return COUNTRY_MAP[two_w]
+        if raw_words and raw_words[-1] in COUNTRY_MAP and COUNTRY_MAP[raw_words[-1]] != "USA":
+            return COUNTRY_MAP[raw_words[-1]]
+
+        # Check global metros in raw street SECOND
         for part in raw_street.split(","):
             p_clean = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()
             p_clean = " ".join(p_clean.split())
             if p_clean in GLOBAL_METRO_TO_COUNTRY:
                 return GLOBAL_METRO_TO_COUNTRY[p_clean]
+            c_unaccent = unicodedata.normalize("NFKD", p_clean).encode("ASCII", "ignore").decode("utf-8")
+            if c_unaccent in GLOBAL_METRO_TO_COUNTRY:
+                return GLOBAL_METRO_TO_COUNTRY[c_unaccent]
 
     return "USA"
 
@@ -254,6 +281,84 @@ def _pre_normalize_address_string(text: str) -> str:
     # Normalize STE-400 -> STE 400
     text = RE_HYPHENATED_UNIT.sub(r"\1 \2", text)
     return text
+
+
+def _standardize_secondary_unit(sec: str) -> str:
+    """Standardizes secondary units according to USPS Pub 28, deduplicates repeated tokens, and enforces FL <num>."""
+    if not sec:
+        return ""
+    # Strip any leading STE or SUITE if followed by other unit types (FL, APT, UNIT, DEPT, PH, SUITE, STE)
+    s = re.sub(
+        r"^(?:STE|SUITE)\s+(FL|FLOOR|FLR|APT|APARTMENT|UNIT|DEPT|DEPARTMENT|PH|PENTHOUSE|SUITE|STE)\b",
+        r"\1",
+        sec.strip().upper(),
+        flags=re.IGNORECASE,
+    )
+    # Clean separator punctuation between tokens, preserving hyphens in unit identifiers like 4-B or PH-A
+    s = re.sub(r"[,;]+", " ", s)
+    s = re.sub(r"\s+[\-–—\/]\s+", " ", s)
+    raw_tokens = s.split()
+    if not raw_tokens:
+        return ""
+
+    tokens = []
+    for t in raw_tokens:
+        if t in ("SUITE", "SUIT"):
+            tokens.append("STE")
+        elif t in ("FLOOR", "FLR"):
+            tokens.append("FL")
+        else:
+            tokens.append(t)
+
+    # Token-level repeat deduplication
+    for rlen in range(1, len(tokens) // 2 + 1):
+        if len(tokens) % rlen == 0:
+            chunk = tokens[:rlen]
+            if chunk * (len(tokens) // rlen) == tokens:
+                tokens = chunk
+                break
+
+    # Floor normalization: Pub 28 strict format FL <num>
+    if len(tokens) == 2 and tokens[1] in ("FL", "FLOOR", "FLR"):
+        m = re.match(r"^(\d+)(?:ST|ND|RD|TH)?$", tokens[0])
+        if m:
+            tokens = ["FL", m.group(1)]
+    elif len(tokens) == 2 and tokens[0] in ("FL", "FLOOR", "FLR"):
+        m = re.match(r"^(\d+)(?:ST|ND|RD|TH)?$", tokens[1])
+        if m:
+            tokens = ["FL", m.group(1)]
+    else:
+        new_toks = []
+        i = 0
+        while i < len(tokens):
+            if i + 1 < len(tokens) and tokens[i+1] in ("FL", "FLOOR", "FLR"):
+                m = re.match(r"^(\d+)(?:ST|ND|RD|TH)?$", tokens[i])
+                if m:
+                    new_toks.extend(["FL", m.group(1)])
+                    i += 2
+                    continue
+            if tokens[i] in ("FL", "FLOOR", "FLR") and i + 1 < len(tokens):
+                m = re.match(r"^(\d+)(?:ST|ND|RD|TH)?$", tokens[i+1])
+                if m:
+                    new_toks.extend(["FL", m.group(1)])
+                    i += 2
+                    continue
+            new_toks.append(tokens[i])
+            i += 1
+        tokens = new_toks
+
+    # Final repeat check after normalization
+    for rlen in range(1, len(tokens) // 2 + 1):
+        if len(tokens) % rlen == 0:
+            chunk = tokens[:rlen]
+            if chunk * (len(tokens) // rlen) == tokens:
+                tokens = chunk
+                break
+
+    res = " ".join(tokens)
+    # Strip any STE or SUITE prepended to FL, APT, UNIT, DEPT, PH
+    res = re.sub(r"^(?:STE|SUITE)\s+(FL|APT|UNIT|DEPT|PH)\b", r"\1", res)
+    return res
 
 
 def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> Tuple[str, str, bool]:
@@ -397,6 +502,8 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
             norm_tokens.append(DIRECTIONALS[t])
         elif t in STREET_SUFFIXES:
             norm_tokens.append(STREET_SUFFIXES[t])
+        elif norm_tokens and norm_tokens[-1] in ("&", "AND", "/", "-", "TO"):
+            norm_tokens.append(t)
         elif t.isdigit() and 1 <= int(t) <= 999:
             # Check route prefix exclusion
             prev = norm_tokens[-1] if norm_tokens else ""
@@ -430,10 +537,12 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
         j += 1
 
     st1 = " ".join(norm_tokens).strip()
+    st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
+    sec_unit = _standardize_secondary_unit(sec_unit)
     return st1, sec_unit, bool(st1)
 
 
-def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tuple[str, str, bool, str, str, str]:
+def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
     """Parse address string using usaddress with rule-based fallback and USPS Pub 28 mapping."""
     clean_input = _pre_normalize_address_string(address_str)
 
@@ -572,6 +681,8 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tupl
         rb_st1, rb_st2, ok = _rule_based_us_street_parse(st_input, enable_fuzzy=enable_fuzzy)
         if urb_prefix:
             rb_st1 = f"{urb_prefix} {rb_st1}".strip()
+        rb_st1 = re.sub(r"[\s,.\-#;:]+$", "", rb_st1).strip()
+        rb_st2 = _standardize_secondary_unit(rb_st2)
         return rb_st1, rb_st2, ok, p_city, p_st, p_zp
 
     # Process CRF tags
@@ -630,6 +741,8 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tupl
                 street_parts.append(COMPOUND_ORDINALS[clean])
             elif clean in WORD_ORDINALS:
                 street_parts.append(WORD_ORDINALS[clean])
+            elif street_parts and street_parts[-1] in ("&", "AND", "/", "-", "TO"):
+                street_parts.append(clean)
             elif clean.isdigit() and 1 <= int(clean) <= 999:
                 prev = street_parts[-1] if street_parts else ""
                 prev2 = f"{street_parts[-2]} {prev}" if len(street_parts) >= 2 else ""
@@ -662,7 +775,11 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tupl
                 if clean_id in SECONDARY_UNITS:
                     sec_parts.append(SECONDARY_UNITS[clean_id])
                 else:
-                    if not sec_parts:
+                    starts_with_unit_prefix = any(
+                        clean_id == u or clean_id.startswith(f"{u} ") or clean_id.startswith(f"{u}-")
+                        for u in ("FL", "APT", "UNIT", "DEPT", "PH", "SUITE", "STE")
+                    )
+                    if not sec_parts and not starts_with_unit_prefix:
                         sec_parts.append("STE")
                     sec_parts.append(clean_id)
         elif label == "SubaddressType":
@@ -677,7 +794,9 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tupl
             else:
                 sec_parts.append(clean)
         elif label == "PlaceName":
-            if clean in STANDALONE_SEC_UNITS:
+            if re.match(r"^PH-[A-Z0-9]+$", clean):
+                sec_parts.append(clean)
+            elif clean in STANDALONE_SEC_UNITS:
                 sec_type = SECONDARY_UNITS.get(clean, clean)
                 if i + 1 < len(parsed):
                     next_tok, next_lbl = parsed[i + 1]
@@ -687,6 +806,20 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tupl
                         i += 2
                         continue
                 sec_parts.append(sec_type)
+            elif clean in ("ST", "SAINT") and i + 1 < len(parsed):
+                next_tok, next_lbl = parsed[i + 1]
+                next_clean = _clean_token(next_tok).upper()
+                norm_c_raw = RE_NON_ALPHANUMERIC.sub("", city_raw).upper() if city_raw else ""
+                if (
+                    (city_raw and not norm_c_raw.startswith("ST") and not norm_c_raw.startswith("SAINT"))
+                    or (not has_street_name and len(street_parts) <= 2)
+                ):
+                    street_parts.append(clean)
+                    street_parts.append(next_clean)
+                    i += 2
+                    continue
+                else:
+                    city_parts.append(clean)
             else:
                 city_parts.append(clean)
         elif label == "StateName":
@@ -707,13 +840,18 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tupl
         sec_parts = rr_parts + sec_parts
 
     clean_st = " ".join(state_parts)
-    if clean_st not in US_STATES and len(state_parts) > 1:
-        if state_parts[-1] in FROZEN_US_STATE_CODES:
-            city_parts = state_parts[:-1] + city_parts
-            state_parts = [state_parts[-1]]
+    if clean_st not in US_STATES:
+        if len(state_parts) == 1 and state_parts[0] in STREET_SUFFIXES and state_parts[0] not in FROZEN_US_STATE_CODES:
+            street_parts.append(STREET_SUFFIXES[state_parts[0]])
+            state_parts = []
+        elif len(state_parts) > 1:
+            if state_parts[-1] in FROZEN_US_STATE_CODES:
+                city_parts = state_parts[:-1] + city_parts
+                state_parts = [state_parts[-1]]
 
     st1 = " ".join(street_parts).strip()
-    st2 = " ".join(sec_parts).strip()
+    st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
+    st2 = _standardize_secondary_unit(" ".join(sec_parts).strip())
     if not p_city or not p_city.strip():
         p_city = " ".join(city_parts).strip()
     if not p_st or not p_st.strip():
@@ -736,6 +874,9 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tupl
         b_name = " ".join(building_parts).strip()
         st2 = f"{b_name} {st2}".strip() if st2 else b_name
 
+    st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
+    st2 = _standardize_secondary_unit(st2)
+
     # Fallback to rule-based parser if empty
     if not st1 and not st2 and not (p_city or p_state or p_zip):
         rb_st1, rb_st2, ok = _rule_based_us_street_parse(address_str, enable_fuzzy=enable_fuzzy)
@@ -744,7 +885,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True) -> Tupl
     return st1, st2, True, p_city, p_state, p_zip
 
 
-def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True) -> Tuple[str, str, bool, str, str, str]:
+def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
     """Parses US address lines and returns (st1, st2, ok, p_city, p_state, p_zip)."""
     s1_clean = (street1_raw or "").strip()
     s2_clean = (street2_raw or "").strip()
@@ -755,9 +896,11 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
 
     if m_s2_po and not m_s1_po:
         # Street1 has physical street, Street2 has PO Box
-        st1, st2, ok, p_city, p_state, p_zip = _parse_us_street_tokens(s1_clean, enable_fuzzy=enable_fuzzy)
+        st1, st2, ok, p_city, p_state, p_zip = _parse_us_street_tokens(s1_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
         po_box_str = f"PO BOX {m_s2_po.group(1).upper()}"
         combined_st2 = f"{st2} {po_box_str}".strip() if st2 else po_box_str
+        combined_st2 = _standardize_secondary_unit(combined_st2)
+        st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
         return st1, combined_st2, True, p_city, p_state, p_zip
 
     combined = " ".join(filter(None, [s1_clean, s2_clean]))
@@ -771,20 +914,26 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
         remaining = combined[:po_box_match.start()] + combined[po_box_match.end():]
         remaining = remaining.strip(" ,.-")
         if remaining:
-            st1, st2, _, p_city, p_state, p_zip = _parse_us_street_tokens(remaining, enable_fuzzy=enable_fuzzy)
+            st1, st2, _, p_city, p_state, p_zip = _parse_us_street_tokens(remaining, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
             if st1:
                 combined_st2 = f"{st2} PO BOX {po_box_num}".strip() if st2 else f"PO BOX {po_box_num}"
+                combined_st2 = _standardize_secondary_unit(combined_st2)
+                st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
                 return st1, combined_st2, True, p_city, p_state, p_zip
             else:
-                return f"PO BOX {po_box_num}", st2, True, p_city, p_state, p_zip
+                combined_st2 = _standardize_secondary_unit(st2)
+                return f"PO BOX {po_box_num}", combined_st2, True, p_city, p_state, p_zip
         return f"PO BOX {po_box_num}", "", True, "", "", ""
 
-    return _parse_us_street_tokens(combined, enable_fuzzy=enable_fuzzy)
+    st1, st2, ok, p_city, p_state, p_zip = _parse_us_street_tokens(combined, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+    st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
+    st2 = _standardize_secondary_unit(st2)
+    return st1, st2, ok, p_city, p_state, p_zip
 
 
-def _parse_us_street_lines(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True) -> Tuple[str, str, bool]:
+def _parse_us_street_lines(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool]:
     """Parses and standardizes US street1 and street2 into USPS Pub 28 format."""
-    st1, st2, ok, _, _, _ = _parse_us_address_components(street1_raw, street2_raw, enable_fuzzy=enable_fuzzy)
+    st1, st2, ok, _, _, _ = _parse_us_address_components(street1_raw, street2_raw, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
     return st1, st2, ok
 
 
@@ -1033,7 +1182,7 @@ def standardize_address(
     if is_us:
         # US Pipeline (USPS Pub 28)
         norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
-            s1_raw, s2_raw, enable_fuzzy=enable_fuzzy
+            s1_raw, s2_raw, enable_fuzzy=enable_fuzzy, city_raw=city_raw
         )
         if not city_raw and p_city:
             city_raw = p_city
@@ -1053,14 +1202,16 @@ def standardize_address(
                 if healed_city:
                     norm_city = healed_city
 
-            if norm_state and zip5:
-                healed_zip = heal_postal_code_transposition(zip5, state=norm_state)
-                if healed_zip and healed_zip != zip5:
-                    if len(norm_postal) > 5 and norm_postal[:5] == zip5:
-                        norm_postal = f"{healed_zip}{norm_postal[5:]}"
-                    else:
-                        norm_postal = healed_zip
-                    zip5 = healed_zip
+            # Guarded postal code healing: only when norm_s1 is valid and non-empty, and city/state are valid
+            if norm_s1 and norm_s1 != "PRIVATE RESIDENCE" and norm_city and norm_state in FROZEN_US_STATE_CODES:
+                if zip5:
+                    healed_zip = heal_postal_code_transposition(zip5, state=norm_state)
+                    if healed_zip and healed_zip != zip5:
+                        if len(norm_postal) > 5 and norm_postal[:5] == zip5:
+                            norm_postal = f"{healed_zip}{norm_postal[5:]}"
+                        else:
+                            norm_postal = healed_zip
+                        zip5 = healed_zip
 
         # Detect private residence indicators
         raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
@@ -1071,16 +1222,17 @@ def standardize_address(
             norm_s1 = "PRIVATE RESIDENCE"
             norm_s2 = ""
 
-        # Minimum viable check: requires valid street line OR valid (city + state/zip)
-        if not norm_s1 and not (norm_city and (norm_state or zip5)):
+        if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
+            norm_s1 = ""
+
+        # Minimum viable check: requires valid non-empty street line
+        if not norm_s1:
             status = "parse_failed"
             key = None
             b_key = None
             p_key = None
         else:
             status = "standardized"
-            if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
-                norm_s1 = ""
             key = f"{norm_s1}|{norm_s2}|{norm_city}|{norm_state}|{zip5}|{country_iso}"
             b_key = f"{norm_s1}||{norm_city}|{norm_state}|{zip5}|{country_iso}"
             p_key = generate_phonetic_address_key(norm_s1, zip5, norm_city)
@@ -1114,6 +1266,8 @@ def standardize_address(
         return _finalize_standardized_address(std_us, raw_dict, cache_key)
     else:
         # International Pipeline
+        norm_s1 = ""
+        norm_s2 = ""
         raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
         is_priv = any(p in raw_combined_upper for p in [
             "PRIVATE RESIDENCE", "RESIDENTIAL", "PRIVATE ADDRESS", "CONFIDENTIAL", "RESIDENCE ONLY", "PERSONAL RESIDENCE"
@@ -1165,10 +1319,32 @@ def standardize_address(
                             else:
                                 postal_raw = rem_loc
                 elif len(parts_comma) == 2:
-                    norm_s1_base, norm_s2_base = _split_international_secondary_unit(parts_comma[0], "")
-                    norm_s1 = norm_s1_base
-                    norm_s2 = norm_s2_base
-                    city_raw = parts_comma[1]
+                    m_can = RE_CAN_PROV_POSTAL.match(parts_comma[1].upper())
+                    m_can_post = RE_CAN_POSTCODE.match(parts_comma[1].upper())
+                    m_uk_post = RE_UK_POSTCODE.match(parts_comma[1].upper())
+                    if m_can:
+                        city_raw = parts_comma[0]
+                        state_raw = m_can.group(1)
+                        postal_raw = m_can.group(2)
+                        norm_s1 = ""
+                    elif m_can_post or m_uk_post:
+                        city_raw = parts_comma[0]
+                        postal_raw = parts_comma[1]
+                        norm_s1 = ""
+                    else:
+                        norm_s1_base, norm_s2_base = _split_international_secondary_unit(parts_comma[0], "")
+                        norm_s1 = norm_s1_base
+                        norm_s2 = norm_s2_base
+                        city_raw = parts_comma[1]
+                elif len(parts_comma) == 1:
+                    p0 = parts_comma[0].strip().upper()
+                    if p0 in GLOBAL_METRO_TO_COUNTRY or p0 in ("LONDON", "PARIS", "TORONTO", "MONTREAL", "VANCOUVER", "SYDNEY", "MELBOURNE"):
+                        city_raw = parts_comma[0]
+                        norm_s1 = ""
+                    else:
+                        norm_s1_base, norm_s2_base = _split_international_secondary_unit(parts_comma[0], "")
+                        norm_s1 = norm_s1_base
+                        norm_s2 = norm_s2_base
             else:
                 norm_s1_base = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", s1_raw).strip().upper())
                 norm_s2_base = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", s2_raw).strip().upper())
@@ -1180,16 +1356,17 @@ def standardize_address(
             norm_state = CANADIAN_PROVINCES[norm_state]
         norm_postal = RE_WHITESPACE.sub(" ", postal_raw.strip().upper())
 
-        # Minimum viable check: requires street OR city/postal
-        if not norm_s1 and not (norm_city or norm_postal):
+        if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
+            norm_s1 = ""
+
+        # Minimum viable check: requires valid non-empty street line
+        if not norm_s1:
             status = "parse_failed"
             key = None
             b_key = None
             p_key = None
         else:
             status = "standardized"
-            if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
-                norm_s1 = ""
             key = f"{norm_s1}|{norm_s2}|{norm_city}|{norm_state}|{norm_postal}|{country_iso}"
             b_key = f"{norm_s1}||{norm_city}|{norm_state}|{norm_postal}|{country_iso}"
             p_key = generate_phonetic_address_key(norm_s1, norm_postal, norm_city)

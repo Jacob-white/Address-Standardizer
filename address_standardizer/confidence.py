@@ -45,6 +45,7 @@ WARN_MISSING_SECONDARY_UNIT = "WARN_MISSING_SECONDARY_UNIT"
 WARN_VACANT_DELIVERY_POINT = "WARN_VACANT_DELIVERY_POINT"
 ERR_PARSE_FAILED = "ERR_PARSE_FAILED"
 ERR_EMPTY_ADDRESS = "ERR_EMPTY_ADDRESS"
+ERR_EMPTY_STREET = "ERR_EMPTY_STREET"
 
 
 @dataclass
@@ -119,9 +120,23 @@ class ConfidenceScorer:
 
         reason_codes: List[str] = []
 
-        # 0. Check for empty or parse_failed addresses
-        if std_address.address_status == "parse_failed" or (not std_address.street1 and not std_address.city):
-            if not raw_s1 and not raw.get("city") and not raw.get("state") and not raw.get("postal_code"):
+        # 0. Check for empty street or empty/parse_failed addresses
+        raw_s1_val = raw.get("street1")
+        is_empty_street = False
+        if not (std_address.street1 or "").strip():
+            is_empty_street = True
+        elif raw_s1_val is not None and not raw_s1_val.strip():
+            is_empty_street = True
+
+        if is_empty_street or std_address.address_status == "parse_failed":
+            if is_empty_street:
+                reason_codes.append(ERR_EMPTY_STREET)
+            if (
+                not (raw_s1_val and raw_s1_val.strip())
+                and not raw.get("city")
+                and not raw.get("state")
+                and not raw.get("postal_code")
+            ):
                 reason_codes.append(ERR_EMPTY_ADDRESS)
             else:
                 reason_codes.append(ERR_PARSE_FAILED)
@@ -176,8 +191,7 @@ class ConfidenceScorer:
                         reason_codes.append(WARN_TYPO_HEALED)
         else:
             # International parse
-            if not std_address.street1:
-                s_parse -= 0.20
+            pass
 
         s_parse = max(0.0, min(1.0, s_parse))
 

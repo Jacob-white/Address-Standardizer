@@ -275,3 +275,29 @@ class TestFastPathPrivacyPlaceholders:
         res_invalid_state = fast_path_parse(street1="Private Residence, Miami, ZZ 33131")
         assert res_invalid_state is None
 
+    def test_fast_path_secondary_and_compound_numbers(self):
+        from address_standardizer.fast_path import _normalize_fast_sec_unit
+        # Clean ordinal fallback in _normalize_fast_sec_unit
+        assert _normalize_fast_sec_unit("34th Fl") == "FL 34"
+
+        # Compound street number in fast_path_parse
+        res_compound = fast_path_parse(street1="1000 & 1200 Harbor Blvd", city="Anaheim", state="CA", postal_code="92801")
+        assert res_compound is not None
+        assert res_compound.street1 == "1000 & 1200 HARBOR BLVD"
+
+        # Large house number > 999 not following compound connector
+        res_large = fast_path_parse(street1="100 Ocean 1000 Blvd", city="Miami", state="FL", postal_code="33139")
+        assert res_large is not None
+        assert res_large.street1 == "100 OCEAN 1000 BLVD"
+
+        # Floor format normalization in canonical comma single string
+        res_fl = fast_path_parse(street1="100 Main St Floor 30th, New York, NY 10001")
+        assert res_fl is not None
+        assert res_fl.street2 == "FL 30"
+
+        # Trailing punctuation stripped in structured input
+        res_punct = fast_path_parse(street1="100 Main St-", city="Boston", state="MA", postal_code="02108")
+        assert res_punct is not None
+        assert res_punct.street1 == "100 MAIN ST"
+
+

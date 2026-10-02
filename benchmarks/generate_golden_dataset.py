@@ -728,13 +728,13 @@ def build_golden_dataset() -> List[Dict[str, Any]]:
             "raw": "1221 Brickell Ave, Miami, FL 33131",
             "s1": "1221 BRICKELL AVE", "s2": "",
             "city": "MIAMI", "st": "FL", "zip": "33131", "country": "USA", "is_us": True,
-            "hub": True, "pkey": "1221|B624|33131"
+            "hub": False, "pkey": "1221|B624|33131"
         },
         {
             "raw": "100 Park Ave, New York, NY 10017",
             "s1": "100 PARK AVE", "s2": "",
             "city": "NEW YORK", "st": "NY", "zip": "10017", "country": "USA", "is_us": True,
-            "hub": True, "pkey": "100|P620|10017"
+            "hub": False, "pkey": "100|P620|10017"
         },
         # Compliance Privacy Placeholders
         {

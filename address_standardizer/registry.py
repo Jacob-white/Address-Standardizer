@@ -18,6 +18,7 @@ from address_standardizer.tables import US_STATES
 
 class RegistryCategory:
     COMMERCIAL_REGISTERED_AGENT = "COMMERCIAL_REGISTERED_AGENT"
+    FORMATION_AGENT = "FORMATION_AGENT"
     VIRTUAL_OFFICE = "VIRTUAL_OFFICE"
     MAIL_DROP_CMRA = "MAIL_DROP_CMRA"
     OFFSHORE_SECRECY = "OFFSHORE_SECRECY"
@@ -47,6 +48,8 @@ class CorporateRegistryEntry:
     estimated_entities: int = 10000
     notes: str = ""
     aliases: List[str] = field(default_factory=list)
+    requires_secondary_match: bool = False
+    mandatory_unit_patterns: List[str] = field(default_factory=list)
 
     def as_dict(self) -> Dict[str, Any]:
         return {
@@ -61,6 +64,8 @@ class CorporateRegistryEntry:
             "estimated_entities": self.estimated_entities,
             "notes": self.notes,
             "aliases": list(self.aliases),
+            "requires_secondary_match": self.requires_secondary_match,
+            "mandatory_unit_patterns": list(self.mandatory_unit_patterns),
         }
 
 
@@ -253,6 +258,8 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.85,
         estimated_entities=60000,
         notes="Major commercial registered agent hub in Manhattan financial district.",
+        requires_secondary_match=True,
+        mandatory_unit_patterns=["FL 42", "STE 4200", "42ND FL", "42 FL", "FLOOR 42", "SUITE 4200", "#4200"],
     ),
     # 15. CT Corporation - Chicago IL
     CorporateRegistryEntry(
@@ -409,6 +416,8 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.70,
         estimated_entities=15000,
         notes="Commercial virtual office mail drop hosting thousands of shell businesses.",
+        requires_secondary_match=True,
+        mandatory_unit_patterns=["FL 39", "STE 3900", "39TH FL", "39 FL", "FLOOR 39", "SUITE 3900", "#3900"],
     ),
     # 27. Regus Virtual Office - 100 Park Ave NY
     CorporateRegistryEntry(
@@ -422,6 +431,8 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.70,
         estimated_entities=12000,
         notes="Commercial virtual office and corporate mail drop.",
+        requires_secondary_match=True,
+        mandatory_unit_patterns=["FL 16", "STE 1600", "16TH FL", "16 FL", "FLOOR 16", "SUITE 1600", "#1600"],
     ),
     # 28. Regus Virtual Office - 100 S Biscayne Blvd Miami FL
     CorporateRegistryEntry(
@@ -448,6 +459,8 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.70,
         estimated_entities=10000,
         notes="Financial district corporate virtual office.",
+        requires_secondary_match=True,
+        mandatory_unit_patterns=["FL 27", "STE 2700", "27TH FL", "27 FL", "FLOOR 27", "SUITE 2700", "#2700"],
     ),
     # 30. Regus Virtual Office - 200 S Wacker Dr Chicago IL
     CorporateRegistryEntry(
@@ -461,6 +474,8 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.70,
         estimated_entities=12000,
         notes="Chicago financial center virtual office.",
+        requires_secondary_match=True,
+        mandatory_unit_patterns=["FL 31", "STE 3100", "31ST FL", "31 FL", "FLOOR 31", "SUITE 3100", "#3100"],
     ),
     # 31. WeWork Corporate Mail Drop - 115 W 18th St NY
     CorporateRegistryEntry(
@@ -539,6 +554,8 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.75,
         estimated_entities=11000,
         notes="International virtual office and business address solution.",
+        requires_secondary_match=True,
+        mandatory_unit_patterns=["FL 9", "STE 900", "9TH FL", "9 FL", "FLOOR 9", "SUITE 900", "#900"],
     ),
     # 37. Nevada Corporate Headquarters - Las Vegas NV
     CorporateRegistryEntry(
@@ -712,6 +729,25 @@ def lookup_corporate_registry(
         if not matched_street:
             continue
 
+        # Match secondary unit if entry requires it
+        if entry.requires_secondary_match:
+            sec_candidates = f" {street2} {street1} {raw_street} ".upper()
+            sec_candidates_clean = re.sub(r"[,\.#;:]+", " ", sec_candidates)
+            matched_sec = False
+            for pat in entry.mandatory_unit_patterns:
+                pat_upper = pat.upper()
+                esc_pat = re.escape(pat_upper)
+                pattern_re = (
+                    r"(?:\b|#)" + esc_pat.lstrip("#") + r"\b"
+                    if pat_upper.startswith("#")
+                    else r"\b" + esc_pat + r"\b"
+                )
+                if re.search(pattern_re, sec_candidates) or re.search(pattern_re, sec_candidates_clean):
+                    matched_sec = True
+                    break
+            if not matched_sec:
+                continue
+
         # Match jurisdiction (state, city, or postal prefix)
         state_match = False
         if entry.state:
@@ -753,9 +789,10 @@ def is_registered_agent_hub_address(
 ) -> bool:
     """
     Detects whether an address corresponds to a known corporate service or formation hub.
-    100% backward compatible with original 11 hubs, while querying the expanded registry.
+    Only COMMERCIAL_REGISTERED_AGENT, FORMATION_AGENT, and OFFSHORE_SECRECY set is_registered_agent_hub=True.
+    Virtual offices and CMRA mail drops populate corporate_risk_score and flags, but do not set is_registered_agent_hub=True.
     """
-    return lookup_corporate_registry(
+    entry = lookup_corporate_registry(
         street1=street1,
         street2=street2,
         city=city,
@@ -763,7 +800,14 @@ def is_registered_agent_hub_address(
         postal_code=postal_code,
         country=country,
         raw_street=raw_street,
-    ) is not None
+    )
+    if entry is None:
+        return False
+    return entry.category in (
+        RegistryCategory.COMMERCIAL_REGISTERED_AGENT,
+        RegistryCategory.FORMATION_AGENT,
+        RegistryCategory.OFFSHORE_SECRECY,
+    )
 
 
 def can_safely_merge_corporate_entities(addr1: Any, addr2: Any) -> Tuple[bool, str]:
@@ -772,17 +816,42 @@ def can_safely_merge_corporate_entities(addr1: Any, addr2: Any) -> Tuple[bool, s
     If two business entities share an identical building_key, but the location is a
     commercial registered agent hub, MDM systems MUST NEVER automatically merge them.
     """
-    b1 = getattr(addr1, "building_key", None)
-    b2 = getattr(addr2, "building_key", None)
+    # 0. Empty street isolation check
+    s1_1 = addr1.get("street1") if isinstance(addr1, dict) else getattr(addr1, "street1", None)
+    s1_2 = addr2.get("street1") if isinstance(addr2, dict) else getattr(addr2, "street1", None)
+    if not s1_1 or not str(s1_1).strip() or not s1_2 or not str(s1_2).strip():
+        return False, "EMPTY_STREET_ISOLATION: Cannot safely merge entities when an address lacks a valid street line."
+
+    # 1. Private residence isolation check
+    is_priv1 = addr1.get("is_private_residence", False) if isinstance(addr1, dict) else getattr(addr1, "is_private_residence", False)
+    is_priv2 = addr2.get("is_private_residence", False) if isinstance(addr2, dict) else getattr(addr2, "is_private_residence", False)
+    b1 = (addr1.get("building_key") if isinstance(addr1, dict) else getattr(addr1, "building_key", "")) or ""
+    b2 = (addr2.get("building_key") if isinstance(addr2, dict) else getattr(addr2, "building_key", "")) or ""
+    k1 = (addr1.get("normalized_address_key") if isinstance(addr1, dict) else getattr(addr1, "normalized_address_key", "")) or ""
+    k2 = (addr2.get("normalized_address_key") if isinstance(addr2, dict) else getattr(addr2, "normalized_address_key", "")) or ""
+    if (
+        is_priv1
+        or is_priv2
+        or b1.startswith("PRIVATE RESIDENCE||")
+        or b2.startswith("PRIVATE RESIDENCE||")
+        or k1.startswith("PRIVATE RESIDENCE||")
+        or k2.startswith("PRIVATE RESIDENCE||")
+        or str(s1_1).strip().upper() == "PRIVATE RESIDENCE"
+        or str(s1_2).strip().upper() == "PRIVATE RESIDENCE"
+    ):
+        return (
+            False,
+            "PRIVATE_RESIDENCE_ISOLATION: Entity resolution prohibited at private residential locations.",
+        )
 
     if not b1 or not b2 or b1 != b2:
         return False, "DISTINCT_BUILDINGS: Addresses do not share an identical building_key."
 
     # Check for CRA hub
-    is_hub1 = getattr(addr1, "is_registered_agent_hub", False)
-    is_hub2 = getattr(addr2, "is_registered_agent_hub", False)
-    flags1 = getattr(addr1, "corporate_risk_flags", [])
-    flags2 = getattr(addr2, "corporate_risk_flags", [])
+    is_hub1 = addr1.get("is_registered_agent_hub", False) if isinstance(addr1, dict) else getattr(addr1, "is_registered_agent_hub", False)
+    is_hub2 = addr2.get("is_registered_agent_hub", False) if isinstance(addr2, dict) else getattr(addr2, "is_registered_agent_hub", False)
+    flags1 = addr1.get("corporate_risk_flags", []) if isinstance(addr1, dict) else getattr(addr1, "corporate_risk_flags", [])
+    flags2 = addr2.get("corporate_risk_flags", []) if isinstance(addr2, dict) else getattr(addr2, "corporate_risk_flags", [])
 
     if (
         is_hub1
@@ -862,7 +931,7 @@ def evaluate_corporate_risk(
 
     if entry is not None:
         base_score = max(base_score, entry.base_risk_score)
-        if entry.category == RegistryCategory.COMMERCIAL_REGISTERED_AGENT:
+        if entry.category in (RegistryCategory.COMMERCIAL_REGISTERED_AGENT, RegistryCategory.FORMATION_AGENT):
             _add_flag(CorporateRiskFlag.RISK_CRA_CO_LOCATION)
         elif entry.category == RegistryCategory.VIRTUAL_OFFICE:
             _add_flag(CorporateRiskFlag.RISK_VIRTUAL_OFFICE)

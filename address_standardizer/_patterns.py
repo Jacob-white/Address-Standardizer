@@ -19,7 +19,7 @@ from address_standardizer.tables import (
 # ---------------------------------------------------------------------------
 
 # Token cleaning & whitespace
-RE_CLEAN_TOKEN = re.compile(r"^[,\.#;:]+|[,\.#;:]+$")
+RE_CLEAN_TOKEN = re.compile(r"^[,\.#;:\-]+|[,\.#;:\-]+$")
 RE_WHITESPACE = re.compile(r"\s+")
 RE_NON_ALPHANUMERIC = re.compile(r"[^\w\s]")
 RE_NON_DIGITS = re.compile(r"[^\d]")

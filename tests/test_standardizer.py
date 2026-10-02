@@ -20,6 +20,7 @@ from address_standardizer.standardizer import (
     _parse_us_street_lines,
     _parse_us_street_tokens,
     _clean_token,
+    _standardize_secondary_unit,
 )
 
 
@@ -431,18 +432,23 @@ class TestAddressStandardizerUS:
             assert res.street1 == "PRIVATE RESIDENCE"
 
     def test_street1_equals_city_deduplication(self):
-        """Verify that when street1 equals city name, street1 is cleared to prevent redundancy."""
+        """Verify that when street1 equals city name, street1 is cleared and keys are nullified under P0.2."""
         res = standardize_address(street1="Chicago", city="Chicago", state="IL", postal_code="60601")
         assert res.street1 == ""
         assert res.city == "CHICAGO"
         assert res.state == "IL"
-        assert res.normalized_address_key == "||CHICAGO|IL|60601|USA"
+        assert res.address_status == "parse_failed"
+        assert res.normalized_address_key is None
+        assert res.building_key is None
 
         # In rule-based mode
         with patch("address_standardizer.standardizer.usaddress", None):
             res_rb = standardize_address(street1="Chicago", city="Chicago", state="IL", postal_code="60601")
             assert res_rb.street1 == ""
             assert res_rb.city == "CHICAGO"
+            assert res_rb.address_status == "parse_failed"
+            assert res_rb.normalized_address_key is None
+            assert res_rb.building_key is None
 
     def test_partial_us_address_components(self):
         """Test handling of partial address inputs."""
@@ -451,21 +457,19 @@ class TestAddressStandardizerUS:
         assert res_street_only.address_status == "standardized"
         assert res_street_only.street1 == "100 WALL ST"
 
-        # City, state, zip only
+        # City, state, zip only -> empty street line fails parsing under P0.2
         res_city_zip_only = standardize_address(city="Denver", state="CO", postal_code="80202")
-        assert res_city_zip_only.address_status == "standardized"
+        assert res_city_zip_only.address_status == "parse_failed"
         assert res_city_zip_only.street1 == ""
-        assert res_city_zip_only.city == "DENVER"
-        assert res_city_zip_only.state == "CO"
-        assert res_city_zip_only.postal_code == "80202"
+        assert res_city_zip_only.normalized_address_key is None
+        assert res_city_zip_only.building_key is None
 
-        # Single string city, state, zip
+        # Single string city, state, zip -> empty street line fails parsing under P0.2
         res_single_city = standardize_address("New York, NY 10001")
-        assert res_single_city.address_status == "standardized"
+        assert res_single_city.address_status == "parse_failed"
         assert res_single_city.street1 == ""
-        assert res_single_city.city == "NEW YORK"
-        assert res_single_city.state == "NY"
-        assert res_single_city.postal_code == "10001"
+        assert res_single_city.normalized_address_key is None
+        assert res_single_city.building_key is None
 
         # State only -> fails minimum viable check
         res_state_only = standardize_address(state="NY")
@@ -1349,5 +1353,149 @@ class TestRuleBasedFallbackAndEdgeCases:
             st1, st2, ok, p_city, p_state, _ = _parse_us_street_tokens("100 Main St New York NY")
             assert p_state == "NY"
             assert "NEW YORK" in p_city
+
+    def test_country_inference_edge_cases(self):
+        # Line 192: Metro unaccented matching
+        assert normalize_country_code(None, raw_street="Av Central 100, Panamá City") == "PAN"
+
+        # Line 199: Comma part clean country name
+        assert normalize_country_code(None, raw_street="100 Hauptstrasse, Austria") == "AUT"
+
+        # Line 201: Comma part alphanumeric country name (e.g. U.K.)
+        assert normalize_country_code(None, raw_street="100 High Street, U.K.") == "GBR"
+
+        # Line 207: Two-word country name at end of street without comma
+        assert normalize_country_code(None, raw_street="100 King Fahd Road Saudi Arabia") == "SAU"
+
+        # Line 209: Single-word country name at end of street without comma
+        assert normalize_country_code(None, raw_street="100 Olympic Way Greece") == "GRC"
+
+    def test_secondary_unit_edge_cases(self):
+        # Line 293: empty / whitespace string
+        assert _standardize_secondary_unit("") == ""
+        assert _standardize_secondary_unit("   ") == ""
+
+        # Line 300-301: Token repeat deduplication before floor normalization
+        assert _standardize_secondary_unit("STE 400 STE 400") == "STE 400"
+
+        # Line 305-307: 2-token floor ordinal normalization
+        assert _standardize_secondary_unit("34TH FL") == "FL 34"
+
+        # Line 317-321: Multi-token floor normalization (<num> FL)
+        assert _standardize_secondary_unit("34TH FL STE 400") == "FL 34 STE 400"
+
+        # Line 323-327: Multi-token floor normalization (FL <num>)
+        assert _standardize_secondary_unit("FLOOR 34TH STE 400") == "FL 34 STE 400"
+
+        # Line 337-338: Final repeat check after floor normalization
+        assert _standardize_secondary_unit("34TH FL 34TH FLOOR") == "FL 34"
+
+    def test_address_components_edge_cases(self):
+        # Line 488: Compound number preserve in rule-based parse
+        st1, _, ok = _rule_based_us_street_parse("1000 & 1200 Harbor Blvd")
+        assert ok is True
+        assert "1000 & 1200 HBR BLVD" in st1
+
+        # Line 727: Compound number in CRF parsing
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("1000", "AddressNumber"),
+                ("&", "StreetName"),
+                ("1200", "StreetName"),
+                ("Harbor", "StreetName"),
+                ("Blvd", "StreetNamePostType"),
+            ]
+            st1_crf, _, _, _, _, _ = _parse_us_street_tokens("1000 & 1200 Harbor Blvd")
+            assert st1_crf == "1000 & 1200 HARBOR BLVD"
+
+        # Line 780: Hyphenated penthouse in PlaceName
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Main", "StreetName"),
+                ("St", "StreetNamePostType"),
+                ("PH-A", "PlaceName"),
+            ]
+            st1_ph, sec_ph, _, _, _, _ = _parse_us_street_tokens("100 Main St PH-A")
+            assert st1_ph == "100 MAIN ST"
+            assert sec_ph == "PH-A"
+
+        # Lines 792-802: Saint street salvage when city does not start with ST/SAINT
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("350", "AddressNumber"),
+                ("N", "StreetNamePreDirectional"),
+                ("ST", "PlaceName"),
+                ("PAUL", "PlaceName"),
+            ]
+            st1_st, _, _, city_st, _, _ = _parse_us_street_tokens("350 N ST PAUL", city_raw="Dallas")
+            assert st1_st == "350 N ST PAUL"
+
+        # Lines 803-804: Saint city non-salvage when city starts with ST/SAINT
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("100", "AddressNumber"),
+                ("Main", "StreetName"),
+                ("St", "StreetNamePostType"),
+                ("ST", "PlaceName"),
+                ("LOUIS", "PlaceName"),
+            ]
+            st1_st_city, _, _, city_st_city, _, _ = _parse_us_street_tokens("100 Main St", city_raw="St Louis")
+            assert st1_st_city == "100 MAIN ST"
+            assert "ST LOUIS" in city_st_city
+
+        # Lines 845-846: Suffix salvage when usaddress tags street suffix as StateName
+        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+            mock_parse.return_value = [
+                ("350", "AddressNumber"),
+                ("N", "StreetNamePreDirectional"),
+                ("ST", "StreetName"),
+                ("PAUL", "StreetName"),
+                ("ST", "StateName"),
+            ]
+            st1_salvaged, _, _, _, _, _ = _parse_us_street_tokens("350 N ST PAUL ST")
+            assert st1_salvaged == "350 N ST PAUL ST"
+
+    def test_secondary_unit_additional_normalizations(self):
+        # SUITE -> STE normalization
+        assert _standardize_secondary_unit("SUITE 500") == "STE 500"
+        # SUITE with comma deduplication
+        assert _standardize_secondary_unit("Suite 400, Suite 400") == "STE 400"
+        # Mixed SUITE and STE
+        assert _standardize_secondary_unit("Suite 400, Ste 400") == "STE 400"
+        # Leading SUITE before FL
+        assert _standardize_secondary_unit("SUITE 30TH FL") == "FL 30"
+        # Comma repeated FL
+        assert _standardize_secondary_unit("34TH FL, 34TH FL") == "FL 34"
+        # Post-normalization repetition (34th Fl Fl 34 -> FL 34 FL 34 -> FL 34)
+        assert _standardize_secondary_unit("34th Fl Fl 34") == "FL 34"
+
+    def test_international_comma_parsing_edge_cases(self):
+        # 2-part Canadian address: city + prov/postal (no street)
+        res_can = standardize_address("Toronto, ON M5V 2T6, Canada")
+        assert res_can.street1 == ""
+        assert res_can.city == "TORONTO"
+        assert res_can.state == "ON"
+        assert res_can.postal_code == "M5V 2T6"
+        assert res_can.address_status == "parse_failed"
+
+        # 2-part UK address: city + postal (no street)
+        res_uk = standardize_address("London, EC1A 1BB, UK")
+        assert res_uk.street1 == ""
+        assert res_uk.city == "LONDON"
+        assert res_uk.postal_code == "EC1A 1BB"
+        assert res_uk.address_status == "parse_failed"
+
+        # 1-part remaining after country: city in global metros (no street)
+        res_paris = standardize_address("Paris, France")
+        assert res_paris.street1 == ""
+        assert res_paris.city == "PARIS"
+        assert res_paris.address_status == "parse_failed"
+
+        # 1-part remaining after country: street line without city
+        res_high_st = standardize_address("100 High St, UK")
+        assert res_high_st.street1 == "100 HIGH ST"
+        assert res_high_st.address_status == "standardized"
+
 
 

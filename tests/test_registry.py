@@ -70,10 +70,13 @@ class TestCorporateRegistry:
         assert "LegalZoom" in e6.provider_name
 
     def test_lookup_virtual_offices_and_shared_spaces(self):
-        # Regus 245 Park Ave NY
-        e_regus = lookup_corporate_registry(street1="245 Park Ave", city="New York", state="NY")
+        # Regus 245 Park Ave NY (tower requires secondary match FL 39 / STE 3900)
+        e_regus = lookup_corporate_registry(street1="245 Park Ave", street2="FL 39", city="New York", state="NY")
         assert e_regus is not None
         assert e_regus.category == RegistryCategory.VIRTUAL_OFFICE
+        # Non-matching floor returns None to protect legitimate tenants
+        assert lookup_corporate_registry(street1="245 Park Ave", street2="FL 12", city="New York", state="NY") is None
+        assert lookup_corporate_registry(street1="245 Park Ave", city="New York", state="NY") is None
 
         # WeWork 115 W 18th St NY
         e_wework = lookup_corporate_registry(street1="115 W 18th St", city="New York", state="NY")
@@ -326,7 +329,7 @@ class TestCorporateRegistry:
         # 2. Virtual office
         std_regus = standardize_address(
             street1="245 Park Ave",
-            street2="Suite 2400",
+            street2="FL 39",
             city="New York",
             state="NY",
             postal_code="10167",
@@ -334,6 +337,18 @@ class TestCorporateRegistry:
         score_v, flags_v = evaluate_corporate_risk(std_regus)
         assert score_v >= 0.70
         assert CorporateRiskFlag.RISK_VIRTUAL_OFFICE in flags_v
+
+        # Non-matching suite at multi-tenant tower has 0.0 risk score
+        std_non_regus = standardize_address(
+            street1="245 Park Ave",
+            street2="Suite 2400",
+            city="New York",
+            state="NY",
+            postal_code="10167",
+        )
+        score_nr, flags_nr = evaluate_corporate_risk(std_non_regus)
+        assert score_nr == 0.0
+        assert CorporateRiskFlag.RISK_VIRTUAL_OFFICE not in flags_nr
 
         # 3. Disguised PMB
         std_pmb = standardize_address(
@@ -574,5 +589,84 @@ class TestCorporateRegistry:
         entry = lookup_corporate_registry(street1="1209 N Orange St Wilmington DE 19801")
         assert entry is not None
         assert "CT Corporation" in entry.provider_name
+
+    def test_merge_corporate_entities_empty_street_isolation(self):
+        a1 = StandardizedAddress(
+            street1="",
+            street2="",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10001",
+            country="USA",
+            normalized_address_key=None,
+            address_status="parse_failed",
+            raw_street_address="",
+            is_us=True,
+            building_key=None,
+        )
+        a2 = StandardizedAddress(
+            street1="100 MAIN ST",
+            street2="",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10001",
+            country="USA",
+            normalized_address_key="100 MAIN ST||NEW YORK|NY|10001|USA",
+            address_status="standardized",
+            raw_street_address="100 Main St",
+            is_us=True,
+            building_key="100 MAIN ST||NEW YORK|NY|10001|USA",
+        )
+        can_merge, reason = can_safely_merge_corporate_entities(a1, a2)
+        assert can_merge is False
+        assert "EMPTY_STREET_ISOLATION" in reason
+
+    def test_merge_corporate_entities_private_residence_isolation(self):
+        a1 = StandardizedAddress(
+            street1="742 EVERGREEN TER",
+            street2="",
+            city="SPRINGFIELD",
+            state="OR",
+            postal_code="97477",
+            country="USA",
+            normalized_address_key="PRIVATE RESIDENCE||742 EVERGREEN TER||SPRINGFIELD|OR|97477|USA",
+            address_status="standardized",
+            raw_street_address="742 Evergreen Ter",
+            is_us=True,
+            building_key="PRIVATE RESIDENCE||742 EVERGREEN TER||SPRINGFIELD|OR|97477|USA",
+            is_private_residence=True,
+        )
+        a2 = StandardizedAddress(
+            street1="742 EVERGREEN TER",
+            street2="",
+            city="SPRINGFIELD",
+            state="OR",
+            postal_code="97477",
+            country="USA",
+            normalized_address_key="PRIVATE RESIDENCE||742 EVERGREEN TER||SPRINGFIELD|OR|97477|USA",
+            address_status="standardized",
+            raw_street_address="742 Evergreen Ter",
+            is_us=True,
+            building_key="PRIVATE RESIDENCE||742 EVERGREEN TER||SPRINGFIELD|OR|97477|USA",
+            is_private_residence=True,
+        )
+        can_merge, reason = can_safely_merge_corporate_entities(a1, a2)
+        assert can_merge is False
+        assert "PRIVATE_RESIDENCE_ISOLATION" in reason
+
+    def test_merge_corporate_entities_dict_inputs(self):
+        d1 = {"street1": "", "city": "NEW YORK"}
+        d2 = {"street1": "100 MAIN ST", "city": "NEW YORK"}
+        can_merge, reason = can_safely_merge_corporate_entities(d1, d2)
+        assert can_merge is False
+        assert "EMPTY_STREET_ISOLATION" in reason
+
+        d_priv1 = {"street1": "742 EVERGREEN TER", "is_private_residence": True, "building_key": "K1"}
+        d_priv2 = {"street1": "742 EVERGREEN TER", "is_private_residence": True, "building_key": "K1"}
+        can_merge_p, reason_p = can_safely_merge_corporate_entities(d_priv1, d_priv2)
+        assert can_merge_p is False
+        assert "PRIVATE_RESIDENCE_ISOLATION" in reason_p
+
+
 
 

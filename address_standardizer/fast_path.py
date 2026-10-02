@@ -68,18 +68,22 @@ def _normalize_fast_sec_unit(sec_raw: str) -> Optional[str]:
     sec_clean = sec_raw.strip().upper()
     if not sec_clean:
         return ""
+    from address_standardizer.standardizer import _standardize_secondary_unit
     m = RE_SEC_UNIT.search(sec_clean)
     if m:
         if m.group(1):
             stype = SECONDARY_UNITS.get(m.group(1).upper(), m.group(1).upper())
             sval = m.group(2).upper()
-            return f"{stype} {sval}"
+            return _standardize_secondary_unit(f"{stype} {sval}")
         elif m.group(3):
-            return f"STE {m.group(3).upper()}"
+            return _standardize_secondary_unit(f"STE {m.group(3).upper()}")
         elif m.group(4):
             stype = SECONDARY_UNITS.get(m.group(4).upper(), m.group(4).upper())
             sval = m.group(5).upper() if m.group(5) else ""
-            return f"{stype} {sval}".strip()
+            return _standardize_secondary_unit(f"{stype} {sval}".strip())
+    res = _standardize_secondary_unit(sec_clean)
+    if res and res != sec_clean:
+        return res
     return None
 
 
@@ -118,6 +122,8 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
             sec_unit = f"{stype} {sval}".strip()
         phrase_upper = phrase_upper[:m_sec.start()] + phrase_upper[m_sec.end():]
         phrase_upper = phrase_upper.strip(" ,.-")
+        from address_standardizer.standardizer import _standardize_secondary_unit
+        sec_unit = _standardize_secondary_unit(sec_unit)
 
     tokens = [t.strip(" ,.-") for t in phrase_upper.split() if t.strip(" ,.-")]
     if len(tokens) < 2:
@@ -202,8 +208,12 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
             norm_name_parts.append(COMPOUND_ORDINALS[t])
         elif t in WORD_ORDINALS:
             norm_name_parts.append(WORD_ORDINALS[t])
-        elif t.isdigit():
+        elif norm_name_parts and norm_name_parts[-1] in ("&", "AND", "/", "-", "TO"):
+            norm_name_parts.append(t)
+        elif t.isdigit() and 1 <= int(t) <= 999:
             norm_name_parts.append(_fast_num_to_ordinal(int(t)))
+        elif t.isdigit():
+            norm_name_parts.append(t)
         else:
             # Check if ordinal like 42ND, 5TH
             m_num = RE_NUMBERED_STREET.match(t)
@@ -226,7 +236,8 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
     if post_dir:
         st1_parts.append(post_dir)
 
-    st1_norm = " ".join(st1_parts)
+    st1_norm = " ".join(st1_parts).strip()
+    st1_norm = re.sub(r"[\s,.\-#;:]+$", "", st1_norm).strip()
     return st1_norm, sec_unit
 
 
@@ -306,6 +317,10 @@ def fast_path_parse(
                     norm_s2 = f"{norm_s2} {embedded_sec}".strip()
             else:
                 norm_s2 = embedded_sec
+
+            from address_standardizer.standardizer import _standardize_secondary_unit
+            norm_s2 = _standardize_secondary_unit(norm_s2)
+            norm_s1 = re.sub(r"[\s,.\-#;:]+$", "", norm_s1).strip()
 
         norm_city = " ".join(city_raw.upper().replace(",", "").split())
         if enable_fuzzy:
@@ -399,6 +414,10 @@ def fast_path_parse(
                 norm_s2 = norm_s2_cand
             if embedded_sec:
                 norm_s2 = f"{norm_s2} {embedded_sec}".strip() if norm_s2 else embedded_sec
+
+            from address_standardizer.standardizer import _standardize_secondary_unit
+            norm_s2 = _standardize_secondary_unit(norm_s2)
+            norm_s1 = re.sub(r"[\s,.\-#;:]+$", "", norm_s1).strip()
 
             zip5 = zip_cand[:5]
             norm_postal = zip_cand

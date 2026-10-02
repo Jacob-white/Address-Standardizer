@@ -24488,7 +24488,7 @@
       "phonetic_key": "1221|B624|33131",
       "address_status": "standardized",
       "is_us": true,
-      "is_registered_agent_hub": true
+      "is_registered_agent_hub": false
     }
   },
   {
@@ -24514,7 +24514,7 @@
       "phonetic_key": "100|P620|10017",
       "address_status": "standardized",
       "is_us": true,
-      "is_registered_agent_hub": true
+      "is_registered_agent_hub": false
     }
   },
   {
@@ -25138,7 +25138,7 @@
       "phonetic_key": "1221|B624|33131",
       "address_status": "standardized",
       "is_us": true,
-      "is_registered_agent_hub": true
+      "is_registered_agent_hub": false
     }
   },
   {
@@ -25164,7 +25164,7 @@
       "phonetic_key": "100|P620|10017",
       "address_status": "standardized",
       "is_us": true,
-      "is_registered_agent_hub": true
+      "is_registered_agent_hub": false
     }
   },
   {
@@ -25788,7 +25788,7 @@
       "phonetic_key": "1221|B624|33131",
       "address_status": "standardized",
       "is_us": true,
-      "is_registered_agent_hub": true
+      "is_registered_agent_hub": false
     }
   },
   {
@@ -25814,7 +25814,7 @@
       "phonetic_key": "100|P620|10017",
       "address_status": "standardized",
       "is_us": true,
-      "is_registered_agent_hub": true
+      "is_registered_agent_hub": false
     }
   },
   {
