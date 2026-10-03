@@ -183,6 +183,18 @@ class TestSQLiteCache:
         addr.audit_record = audit_rec
         addr.cascade_result = cascade_res
 
+        from address_standardizer.models import SpatialResolutionResult
+        spatial_res = SpatialResolutionResult(
+            latitude=37.7749,
+            longitude=-122.4194,
+            precision="CONFIRMED_ROOFTOP",
+            accuracy_radius_meters=3.0,
+            stage=1,
+            source="OPENADDRESSES",
+            h3_res10="8a226204db27fff",
+        )
+        addr.spatial_result = spatial_res
+
         cache.set("addr_full", addr)
 
         retrieved = cache.get("addr_full")
@@ -191,6 +203,9 @@ class TestSQLiteCache:
         assert retrieved.audit_record.record_id == "REC-TEST"
         assert retrieved.cascade_result is not None
         assert retrieved.cascade_result.latitude == 37.7749
+        assert retrieved.spatial_result is not None
+        assert retrieved.spatial_result.latitude == 37.7749
+        assert retrieved.country_iso3 == "USA"
 
         ledger = get_audit_ledger()
         stored_rec = ledger.record(audit_rec)
@@ -201,6 +216,9 @@ class TestSQLiteCache:
         d.pop("audit_record_payload", None)
         d["cascade"] = cascade_res.as_dict()
         d.pop("cascade_result_payload", None)
+        d["spatial_result"] = spatial_res.as_dict()
+        d.pop("spatial_result_payload", None)
+        d["country_iso3"] = "USA"
 
         cache._conn.execute(
             "INSERT OR REPLACE INTO l2_address_cache (cache_key, payload) VALUES (?, ?)",
@@ -213,6 +231,8 @@ class TestSQLiteCache:
         assert retrieved2.audit_record.audit_id == stored_rec.audit_id
         assert retrieved2.cascade_result is not None
         assert retrieved2.cascade_result.latitude == 37.7749
+        assert retrieved2.spatial_result is not None
+        assert retrieved2.spatial_result.latitude == 37.7749
 
 
 class TestMultiTierCache:

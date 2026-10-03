@@ -89,7 +89,7 @@ RE_HIGHWAY_CONTRACT = re.compile(r"\b(HC|HIGHWAY\s+CONTRACT)\s*#?\s*(\d+)\b(?:\s
 RE_CLEAN_ALPHA = re.compile(r"[^A-Z]")
 RE_SAINT_HYPHEN = re.compile(r"\b(ST|SAINT)-([A-Za-z]{2,})\b", re.IGNORECASE)
 RE_ATTACHED_SUFFIX_EXPLICIT_UNIT = re.compile(
-    r"\b(ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|CIR|CIRCLE|PKWY|PARKWAY)-(STE|SUITE|APT|APARTMENT|UNIT|FL|FLOOR|RM|ROOM)\s*#?\s*([A-Z0-9\-]+)\b",
+    r"\b(ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|CIR|CIRCLE|PKWY|PARKWAY)-(SUITE|STE|APARTMENT|APT|UNIT|FLOOR|FL|ROOM|RM)\b\s*#?\s*([A-Z0-9\-]+)\b",
     re.IGNORECASE,
 )
 RE_ATTACHED_SUFFIX_BARE_UNIT = re.compile(
@@ -104,9 +104,9 @@ RE_DIGITS = re.compile(r"\d")
 RE_PHYSICAL_STREET_INDICATOR = re.compile(r"\b\d+\s+[A-Za-z]+\s+(ST|AVE|RD|BLVD|DR|LN|WAY)\b", re.IGNORECASE)
 RE_OCCUPANCY_VAL_CLEAN = re.compile(r"[^\w\-]")
 RE_IDENTIFIER_TOKEN = re.compile(r"^(\d+[A-Z0-9\-]*|[A-Z]\d+|[A-Z])$")
-RE_INTL_FLAT = re.compile(r"^(?:FLAT|APT|UNIT)\s*#?\s*([A-Z0-9\-]+)\s+(.+)$", re.IGNORECASE)
-RE_INTL_SEC_INLINE = re.compile(r"\b(SUITE|STE|UNIT|APT|FLOOR|FL|LEVEL|LVL|PO BOX|FLAT)\s*#?\s*([A-Z0-9\-]+)\b", re.IGNORECASE)
-RE_INTL_SEC_START = re.compile(r"^(SUITE|STE|UNIT|APT|FLOOR|FL|LEVEL|LVL|PO BOX|FLAT)\s*#?\s*(.+)$", re.IGNORECASE)
+RE_INTL_FLAT = re.compile(r"^(?:FLAT|APT|UNIT)\s*#?\s*([A-Z0-9\-]+)[,\s]+(.+)$", re.IGNORECASE)
+RE_INTL_SEC_INLINE = re.compile(r"\b(SUITE|STE|UNIT|APT|FLOOR|LEVEL|LVL|PO BOX|FLAT|FL)\b\s*#?\s*([A-Z0-9\-]+)\b", re.IGNORECASE)
+RE_INTL_SEC_START = re.compile(r"^(SUITE|STE|UNIT|APT|FLOOR|LEVEL|LVL|PO BOX|FLAT|FL)\b\s*#?\s*(.+)$", re.IGNORECASE)
 RE_CAN_PROV_POSTAL = re.compile(r"^([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$")
 RE_NUMBER_HYPHEN_NUMBER = re.compile(r"^\d+-\d+$")
 RE_US_ZIP5_OR_9 = re.compile(r"^\d{5}(?:-\d{4})?$")

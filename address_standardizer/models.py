@@ -1,7 +1,37 @@
 """Data structures for standardized address representations."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
+
+
+@dataclass(slots=True)
+class SpatialResolutionResult:
+    """Standardized geographic coordinate resolution result conforming to Blueprint Section 3.4."""
+    latitude: float
+    longitude: float
+    precision: str  # CONFIRMED_ROOFTOP, RANGE_INTERPOLATED, POSTAL_CENTROID, MUNICIPAL_CENTROID, UNRESOLVED
+    accuracy_radius_meters: float
+    stage: int  # 1..4 (0 if UNRESOLVED)
+    source: str
+    h3_res10: str
+    parcel_id: Optional[str] = None
+    execution_time_ms: float = 0.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "precision": self.precision,
+            "accuracy_radius_meters": self.accuracy_radius_meters,
+            "stage": self.stage,
+            "source": self.source,
+            "h3_res10": self.h3_res10,
+            "parcel_id": self.parcel_id,
+            "execution_time_ms": self.execution_time_ms,
+            "metadata": dict(self.metadata),
+        }
+
 
 
 @dataclass
@@ -21,6 +51,8 @@ class StandardizedAddress:
     building_key: Optional[str] = None
     phonetic_key: Optional[str] = None
     is_registered_agent_hub: bool = False
+    dependent_locality: Optional[str] = None
+    building_name: Optional[str] = None
 
     def __post_init__(self):
         if not hasattr(self, "_confidence_score"):
@@ -45,6 +77,10 @@ class StandardizedAddress:
             self._corporate_risk_score: float = 0.0
         if not hasattr(self, "_corporate_risk_flags"):
             self._corporate_risk_flags: Optional[List[str]] = None
+        if not hasattr(self, "_spatial_result"):
+            self._spatial_result: Optional[SpatialResolutionResult] = None
+        if not hasattr(self, "_country_iso3"):
+            self._country_iso3: str = getattr(self, "country", "USA") or "USA"
 
     @property
     def confidence_score(self) -> Optional[float]:
@@ -153,6 +189,22 @@ class StandardizedAddress:
     def corporate_risk_flags(self, value: List[str]):
         self._corporate_risk_flags = list(value)
 
+    @property
+    def spatial_result(self) -> Optional[SpatialResolutionResult]:
+        return getattr(self, "_spatial_result", None)
+
+    @spatial_result.setter
+    def spatial_result(self, value: Optional[SpatialResolutionResult]):
+        self._spatial_result = value
+
+    @property
+    def country_iso3(self) -> str:
+        return getattr(self, "_country_iso3", getattr(self, "country", "USA") or "USA")
+
+    @country_iso3.setter
+    def country_iso3(self, value: str):
+        self._country_iso3 = value
+
     def as_dict(self, include_metadata: bool = False) -> Dict[str, Any]:
         d = {
             "street1": self.street1,
@@ -171,6 +223,8 @@ class StandardizedAddress:
             "is_registered_agent_hub": self.is_registered_agent_hub,
         }
         if include_metadata:
+            d["dependent_locality"] = self.dependent_locality
+            d["building_name"] = self.building_name
             d["confidence_score"] = self.confidence_score
             d["routing_tier"] = self.routing_tier
             d["failure_reason_codes"] = self.failure_reason_codes
@@ -190,6 +244,15 @@ class StandardizedAddress:
                     if hasattr(self.cascade_result, "as_dict")
                     else self.cascade_result
                 )
+            if self.spatial_result is not None:
+                d["spatial_result"] = (
+                    self.spatial_result.as_dict()
+                    if hasattr(self.spatial_result, "as_dict")
+                    else self.spatial_result
+                )
+            else:
+                d["spatial_result"] = None
+            d["country_iso3"] = self.country_iso3
         return d
 
     def as_extended_dict(self) -> Dict[str, Any]:

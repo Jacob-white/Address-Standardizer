@@ -22,6 +22,7 @@ class RegistryCategory:
     VIRTUAL_OFFICE = "VIRTUAL_OFFICE"
     MAIL_DROP_CMRA = "MAIL_DROP_CMRA"
     OFFSHORE_SECRECY = "OFFSHORE_SECRECY"
+    TRUST_FIDUCIARY_COMPANY = "TRUST_FIDUCIARY_COMPANY"
 
 
 class CorporateRiskFlag:
@@ -29,6 +30,7 @@ class CorporateRiskFlag:
     RISK_VIRTUAL_OFFICE = "RISK_VIRTUAL_OFFICE"
     RISK_CMRA_MAIL_DROP = "RISK_CMRA_MAIL_DROP"
     RISK_OFFSHORE_SECRECY_HUB = "RISK_OFFSHORE_SECRECY_HUB"
+    RISK_TRUST_FIDUCIARY = "RISK_TRUST_FIDUCIARY"
     RISK_MISSING_SECONDARY_AT_HUB = "RISK_MISSING_SECONDARY_AT_HUB"
     RISK_DISGUISED_PMB = "RISK_DISGUISED_PMB"
     RISK_RESIDENTIAL_COMMERCIAL = "RISK_RESIDENTIAL_COMMERCIAL"
@@ -572,7 +574,7 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
     ),
     # 38. Ugland House - Grand Cayman (World's Most Famous Offshore Secrecy Hub)
     CorporateRegistryEntry(
-        provider_name="Ugland House (Maples and Calder)",
+        provider_name="Ugland House (Maples Group)",
         category=RegistryCategory.OFFSHORE_SECRECY,
         street_patterns=["UGLAND HOUSE", "SOUTH CHURCH ST", "PO BOX 309"],
         city="GEORGE TOWN",
@@ -582,7 +584,7 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.98,
         estimated_entities=18000,
         notes="Ugland House: Premier Cayman offshore hedge fund and shell company hub.",
-        aliases=["MAPLES AND CALDER", "UGLAND"],
+        aliases=["MAPLES AND CALDER", "UGLAND", "MAPLES GROUP"],
     ),
     # 39. Clifton House - Grand Cayman
     CorporateRegistryEntry(
@@ -596,12 +598,13 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.95,
         estimated_entities=12000,
         notes="Appleby global offshore legal and corporate service hub.",
+        aliases=["APPLEBY"],
     ),
     # 40. 190 Elgin Ave - Grand Cayman (Walkers)
     CorporateRegistryEntry(
         provider_name="190 Elgin Avenue (Walkers)",
         category=RegistryCategory.OFFSHORE_SECRECY,
-        street_patterns=["190 ELGIN"],
+        street_patterns=["190 ELGIN", "PO BOX 9001"],
         city="GEORGE TOWN",
         state="",
         postal_code="KY1-9001",
@@ -609,6 +612,7 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.95,
         estimated_entities=15000,
         notes="Walkers law firm offshore fund and corporate secrecy center.",
+        aliases=["WALKERS"],
     ),
     # 41. Craigmuir Chambers - British Virgin Islands (Tortola)
     CorporateRegistryEntry(
@@ -616,16 +620,17 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         category=RegistryCategory.OFFSHORE_SECRECY,
         street_patterns=["CRAIGMUIR CHAMBERS", "PO BOX 71"],
         city="ROAD TOWN",
-        state="",
+        state="TORTOLA",
         postal_code="VG1110",
         country="VGB",
         base_risk_score=0.98,
         estimated_entities=25000,
         notes="BVI Harneys offshore formation hub hosting tens of thousands of IBCs.",
+        aliases=["HARNEYS"],
     ),
     # 42. Wickhams Cay - British Virgin Islands (Tortola)
     CorporateRegistryEntry(
-        provider_name="Wickhams Cay (Trident / Offshore Hub)",
+        provider_name="Wickhams Cay (Trident Chambers)",
         category=RegistryCategory.OFFSHORE_SECRECY,
         street_patterns=["WICKHAMS CAY", "TRIDENT CHAMBERS"],
         city="ROAD TOWN",
@@ -635,12 +640,27 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.98,
         estimated_entities=30000,
         notes="Major BVI commercial secrecy and registered agent hub.",
+        aliases=["TRIDENT TRUST", "TRIDENT CHAMBERS"],
     ),
-    # 43. Calle 50 / Mossack Fonseca - Panama City, Panama
+    # 43. Clarendon House - Bermuda (Conyers)
+    CorporateRegistryEntry(
+        provider_name="Clarendon House (Conyers)",
+        category=RegistryCategory.OFFSHORE_SECRECY,
+        street_patterns=["CLARENDON HOUSE", "2 CHURCH ST", "2 CHURCH STREET"],
+        city="HAMILTON",
+        state="",
+        postal_code="HM 11",
+        country="BMU",
+        base_risk_score=0.95,
+        estimated_entities=14000,
+        notes="Bermuda premier offshore legal and formation complex.",
+        aliases=["CONYERS", "CONYERS DILL & PEARMAN"],
+    ),
+    # 44. Calle 50 / Mossack Complex - Panama City, Panama
     CorporateRegistryEntry(
         provider_name="Calle 50 Corporate Financial Center (Panama)",
         category=RegistryCategory.OFFSHORE_SECRECY,
-        street_patterns=["CALLE 50", "EDIFICIO ARANGO ORILLAC"],
+        street_patterns=["CALLE 50", "EDIFICIO ARANGO ORILLAC", "EDIF. ARANGO ORILLAC", "ARANGO ORILLAC"],
         city="PANAMA CITY",
         state="",
         postal_code="",
@@ -648,6 +668,119 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
         base_risk_score=0.95,
         estimated_entities=20000,
         notes="Historic Panamanian secrecy and offshore corporate formation district.",
+        aliases=["MOSSACK FONSECA", "ARANGO ORILLAC"],
+    ),
+    # 45. Shelton Street Companies Hub - London, UK (Companies Made Simple)
+    CorporateRegistryEntry(
+        provider_name="Shelton Street Companies Hub",
+        category=RegistryCategory.FORMATION_AGENT,
+        street_patterns=["71-75 SHELTON", "71 - 75 SHELTON", "71/75 SHELTON", "71-75 SHELTON ST", "71-75 SHELTON STREET"],
+        city="LONDON",
+        state="",
+        postal_code="WC2H 9JQ",
+        country="GBR",
+        base_risk_score=0.92,
+        estimated_entities=95000,
+        notes="London premier company secretarial and formation mill (Companies Made Simple).",
+        aliases=["COMPANIES MADE SIMPLE", "MADE SIMPLE GROUP"],
+    ),
+    # 46. Wenlock Road Registered Hub - London, UK (1st Formations)
+    CorporateRegistryEntry(
+        provider_name="Wenlock Road Registered Hub",
+        category=RegistryCategory.FORMATION_AGENT,
+        street_patterns=["20-22 WENLOCK", "20 - 22 WENLOCK", "20/22 WENLOCK", "20-22 WENLOCK RD", "20-22 WENLOCK ROAD"],
+        city="LONDON",
+        state="",
+        postal_code="N1 7GU",
+        country="GBR",
+        base_risk_score=0.90,
+        estimated_entities=65000,
+        notes="Major London statutory corporate incorporation hub (1st Formations).",
+        aliases=["1ST FORMATIONS", "COMPLETE FORMATIONS"],
+    ),
+    # 47. Old Gloucester Street Mail Drop - London, UK (British Monomarks)
+    CorporateRegistryEntry(
+        provider_name="Old Gloucester Street Mail Drop",
+        category=RegistryCategory.MAIL_DROP_CMRA,
+        street_patterns=["27 OLD GLOUCESTER", "27 OLD GLOUCESTER ST", "27 OLD GLOUCESTER STREET"],
+        city="LONDON",
+        state="",
+        postal_code="WC1N 3AX",
+        country="GBR",
+        base_risk_score=0.90,
+        estimated_entities=45000,
+        notes="High-volume London commercial mail receiving agency and accommodation address.",
+        aliases=["BRITISH MONOMARKS", "HOLD THE MAIL"],
+    ),
+    # 48. Keizersgracht Trust District - Amsterdam, Netherlands
+    CorporateRegistryEntry(
+        provider_name="Keizersgracht Trust District",
+        category=RegistryCategory.TRUST_FIDUCIARY_COMPANY,
+        street_patterns=["KEIZERSGRACHT 421", "KEIZERSGRACHT 62", "421 KEIZERSGRACHT", "62 KEIZERSGRACHT"],
+        city="AMSTERDAM",
+        state="",
+        postal_code="1016 EK",
+        country="NLD",
+        base_risk_score=0.88,
+        estimated_entities=10000,
+        notes="Amsterdam historic canal trust office hub hosting corporate holdings and SPVs.",
+        aliases=["AMSTERDAM TRUST HUB"],
+    ),
+    # 49. Boulevard Royal Financial Hub - Luxembourg
+    CorporateRegistryEntry(
+        provider_name="Boulevard Royal Financial Hub",
+        category=RegistryCategory.TRUST_FIDUCIARY_COMPANY,
+        street_patterns=["25A BOULEVARD ROYAL", "25A BLVD ROYAL", "25 A BOULEVARD ROYAL", "25 A BLVD ROYAL", "25A BD ROYAL", "BOULEVARD ROYAL 25A", "BLVD ROYAL 25A"],
+        city="LUXEMBOURG",
+        state="",
+        postal_code="L-2449",
+        country="LUX",
+        base_risk_score=0.90,
+        estimated_entities=8000,
+        notes="Luxembourg premier fiduciary financial district and corporate domicile center.",
+        aliases=["LUXEMBOURG FIDUCIARY HUB"],
+    ),
+    # 50. Baarerstrasse "Crypto Valley" - Zug, Switzerland
+    CorporateRegistryEntry(
+        provider_name='Baarerstrasse "Crypto Valley"',
+        category=RegistryCategory.TRUST_FIDUCIARY_COMPANY,
+        street_patterns=["BAARERSTRASSE 82", "BAARERSTR. 82", "BAARER STRASSE 82", "BAARERSTR 82"],
+        city="ZUG",
+        state="",
+        postal_code="6300",
+        country="CHE",
+        base_risk_score=0.92,
+        estimated_entities=12000,
+        notes="Zug Crypto Valley corporate domicile and trust services cluster.",
+        aliases=["CRYPTO VALLEY ZUG", "REGSERVICES"],
+    ),
+    # 51. International Financial Services - Dublin, Ireland (IFSC)
+    CorporateRegistryEntry(
+        provider_name="International Financial Services (IFSC)",
+        category=RegistryCategory.TRUST_FIDUCIARY_COMPANY,
+        street_patterns=["1 IFC", "1 IFSC", "CUSTOM HOUSE DOCK", "ONE IFSC", "ONE IFC", "1 INTERNATIONAL FINANCIAL SERVICES CENTRE"],
+        city="DUBLIN",
+        state="",
+        postal_code="D01",
+        country="IRL",
+        base_risk_score=0.85,
+        estimated_entities=15000,
+        notes="Dublin International Financial Services Centre (IFSC) corporate SPV hub.",
+        aliases=["IFSC DUBLIN", "CUSTOM HOUSE DOCK"],
+    ),
+    # 52. Marina Bay / Raffles Virtual Hub - Singapore
+    CorporateRegistryEntry(
+        provider_name="Marina Bay / Raffles Virtual Hub",
+        category=RegistryCategory.VIRTUAL_OFFICE,
+        street_patterns=["1 RAFFLES PL", "1 RAFFLES PLACE", "ONE RAFFLES PLACE", "ONE RAFFLES PL", "MARINA BAY FINANCIAL", "MARINA BAY FINANCIAL CENTRE"],
+        city="SINGAPORE",
+        state="",
+        postal_code="048616",
+        country="SGP",
+        base_risk_score=0.85,
+        estimated_entities=20000,
+        notes="Singapore financial district premier virtual office and corporate secretarial complex.",
+        aliases=["ONE RAFFLES PLACE", "MARINA BAY"],
     ),
     CorporateRegistryEntry(
         provider_name="Earth Class Mail Digital Hub",
@@ -680,6 +813,20 @@ def _fold_ascii(s: str) -> str:
     return unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode("utf-8").upper()
 
 
+COUNTRY_SYNONYMS: Dict[str, List[str]] = {
+    "GBR": ["UNITED KINGDOM", "UK", "ENGLAND", "LONDON", "GREAT BRITAIN"],
+    "CYM": ["CAYMAN", "CAYMAN ISLANDS", "GEORGE TOWN", "UGLAND"],
+    "VGB": ["VIRGIN ISLANDS", "BVI", "BRITISH VIRGIN ISLANDS", "TORTOLA", "ROAD TOWN"],
+    "BMU": ["BERMUDA", "HAMILTON", "CLARENDON"],
+    "PAN": ["PANAMA", "PANAMA CITY"],
+    "NLD": ["NETHERLANDS", "AMSTERDAM", "HOLLAND", "NEDERLAND"],
+    "LUX": ["LUXEMBOURG", "LUXEMBURG"],
+    "CHE": ["SWITZERLAND", "ZUG", "SCHWEIZ", "SUISSE", "SVIZZERA"],
+    "IRL": ["IRELAND", "DUBLIN", "IFSC", "EIRE"],
+    "SGP": ["SINGAPORE", "RAFFLES"],
+}
+
+
 def lookup_corporate_registry(
     street1: str,
     street2: str = "",
@@ -692,36 +839,45 @@ def lookup_corporate_registry(
     """
     Looks up an address against the comprehensive curated corporate registry.
     Returns the matching CorporateRegistryEntry if found, else None.
+    Supports US domestic, UK, European, Swiss, and offshore secrecy hubs.
     """
     combined_raw = f"{street1} {street2} {city} {state} {postal_code} {raw_street}"
     combined = _fold_ascii(combined_raw)
     norm_st = _fold_ascii(street1)
     norm_c = _fold_ascii(country)
 
-    # Fast check for offshore secrecy keywords
-    if norm_c in ("CYM", "CAYMAN ISLANDS", "VGB", "VIRGIN ISLANDS, BRITISH", "PAN", "PANAMA") or any(
-        k in combined for k in ["CAYMAN", "TORTOLA", "UGLAND HOUSE", "ROAD TOWN", "CRAIGMUIR", "WICKHAMS CAY"]
-    ):
-        for entry in CURATED_CORPORATE_REGISTRY:
-            if entry.category == RegistryCategory.OFFSHORE_SECRECY:
-                if any(_fold_ascii(pat) in combined for pat in entry.street_patterns):
-                    return entry
-
-    # Domestic US check
     st_clean = (state or "").strip().upper()
     st_norm = US_STATES.get(st_clean, st_clean)
     city_clean = _fold_ascii(city)
+    post_clean = _fold_ascii(postal_code)
     zip_digits = re.sub(r"[^\d]", "", postal_code)
 
+    # Detect if address exhibits explicit domestic US state indicators
+    is_explicit_us_state = bool(st_norm and st_norm in US_STATES)
+
     for entry in CURATED_CORPORATE_REGISTRY:
-        if entry.category == RegistryCategory.OFFSHORE_SECRECY:
-            continue
+        entry_country = entry.country.upper()
 
-        # If state was explicitly provided and does not match entry.state, skip
-        if st_norm and entry.state and st_norm != entry.state:
-            continue
+        # 1. Jurisdiction compatibility filter
+        if entry_country == "USA":
+            # If user explicitly supplied a non-US country code, skip US entries
+            if norm_c and norm_c not in ("USA", "US", "UNITED STATES") and not is_explicit_us_state:
+                continue
+            # If state was explicitly provided and differs from entry state, skip
+            if st_norm and entry.state and st_norm != entry.state:
+                continue
+        else:
+            # International entry: Skip if address has an explicit domestic US state
+            # unless address combined text explicitly mentions entry's country or provider name
+            if is_explicit_us_state:
+                country_in_text = (
+                    entry_country in combined
+                    or _fold_ascii(entry.provider_name) in combined
+                )
+                if not country_in_text:
+                    continue
 
-        # Match street pattern
+        # 2. Street pattern match
         matched_street = any(
             _fold_ascii(pat) in combined or _fold_ascii(pat) in norm_st
             for pat in entry.street_patterns
@@ -729,7 +885,7 @@ def lookup_corporate_registry(
         if not matched_street:
             continue
 
-        # Match secondary unit if entry requires it
+        # 3. Secondary unit match (if required by tower hub)
         if entry.requires_secondary_match:
             sec_candidates = f" {street2} {street1} {raw_street} ".upper()
             sec_candidates_clean = re.sub(r"[,\.#;:]+", " ", sec_candidates)
@@ -748,34 +904,78 @@ def lookup_corporate_registry(
             if not matched_sec:
                 continue
 
-        # Match jurisdiction (state, city, or postal prefix)
-        state_match = False
-        if entry.state:
-            if st_norm == entry.state:
-                state_match = True
-            elif not st_norm:
-                state_match = bool(re.search(r"\b" + re.escape(entry.state) + r"\b", combined))
+        # 4. Jurisdiction confirmation
+        if entry_country == "USA":
+            state_match = False
+            if entry.state:
+                if st_norm == entry.state:
+                    state_match = True
+                elif not st_norm:
+                    state_match = bool(re.search(r"\b" + re.escape(entry.state) + r"\b", combined))
 
-        city_match = False
-        if entry.city:
-            entry_city_norm = _fold_ascii(entry.city)
-            if city_clean and city_clean == entry_city_norm:
-                city_match = True
-            elif not city_clean:
-                city_match = bool(re.search(r"\b" + re.escape(entry_city_norm) + r"\b", combined))
+            city_match = False
+            if entry.city:
+                entry_city_norm = _fold_ascii(entry.city)
+                if city_clean and city_clean == entry_city_norm:
+                    city_match = True
+                elif not city_clean:
+                    city_match = bool(re.search(r"\b" + re.escape(entry_city_norm) + r"\b", combined))
 
-        zip_match = False
-        if entry.postal_code:
-            if zip_digits and zip_digits.startswith(entry.postal_code[:3]):
-                zip_match = True
-            elif not zip_digits:
-                zip_match = entry.postal_code in combined
+            zip_match = False
+            if entry.postal_code:
+                if zip_digits and zip_digits.startswith(entry.postal_code[:3]):
+                    zip_match = True
+                elif not zip_digits:
+                    zip_match = entry.postal_code in combined
 
-        if state_match or city_match or zip_match:
-            return entry
+            if state_match or city_match or zip_match:
+                return entry
+
+        else:
+            # International Jurisdiction Confirmation
+            # A. Country matching
+            country_matched = False
+            if norm_c and norm_c in (entry_country, _fold_ascii(entry.country)):
+                country_matched = True
+            elif re.search(r"\b" + re.escape(entry_country) + r"\b", combined):
+                country_matched = True
+            elif any(k in combined for k in COUNTRY_SYNONYMS.get(entry_country, [])):
+                country_matched = True
+
+            # B. City matching
+            city_matched = False
+            if entry.city:
+                entry_city_norm = _fold_ascii(entry.city)
+                if city_clean and city_clean == entry_city_norm:
+                    city_matched = True
+                elif re.search(r"\b" + re.escape(entry_city_norm) + r"\b", combined):
+                    city_matched = True
+
+            # C. Postal code matching
+            postal_matched = False
+            if entry.postal_code:
+                entry_post_norm = _fold_ascii(entry.postal_code)
+                entry_post_clean = re.sub(r"[\s\-]", "", entry_post_norm)
+                post_input_clean = re.sub(r"[\s\-]", "", post_clean)
+                if post_input_clean and (
+                    post_input_clean == entry_post_clean
+                    or post_input_clean.startswith(entry_post_clean[:3])
+                    or (len(post_input_clean) >= 3 and entry_post_clean.startswith(post_input_clean[:3]))
+                ):
+                    postal_matched = True
+                elif entry_post_norm in combined or entry_post_clean in combined.replace(" ", "").replace("-", ""):
+                    postal_matched = True
+
+            # D. Landmark / single-island premise matching
+            is_distinct_premise_hub = any(
+                p in norm_st or p in combined
+                for p in ["UGLAND HOUSE", "CLIFTON HOUSE", "CRAIGMUIR CHAMBERS", "WICKHAMS CAY", "CLARENDON HOUSE"]
+            )
+
+            if country_matched or city_matched or postal_matched or is_distinct_premise_hub:
+                return entry
 
     return None
-
 
 
 def is_registered_agent_hub_address(
@@ -789,7 +989,8 @@ def is_registered_agent_hub_address(
 ) -> bool:
     """
     Detects whether an address corresponds to a known corporate service or formation hub.
-    Only COMMERCIAL_REGISTERED_AGENT, FORMATION_AGENT, and OFFSHORE_SECRECY set is_registered_agent_hub=True.
+    Only COMMERCIAL_REGISTERED_AGENT, FORMATION_AGENT, OFFSHORE_SECRECY, and TRUST_FIDUCIARY_COMPANY
+    set is_registered_agent_hub=True.
     Virtual offices and CMRA mail drops populate corporate_risk_score and flags, but do not set is_registered_agent_hub=True.
     """
     entry = lookup_corporate_registry(
@@ -807,28 +1008,36 @@ def is_registered_agent_hub_address(
         RegistryCategory.COMMERCIAL_REGISTERED_AGENT,
         RegistryCategory.FORMATION_AGENT,
         RegistryCategory.OFFSHORE_SECRECY,
+        RegistryCategory.TRUST_FIDUCIARY_COMPANY,
     )
 
 
 def can_safely_merge_corporate_entities(addr1: Any, addr2: Any) -> Tuple[bool, str]:
     """
-    Enforces the critical Enterprise Entity Resolution Invariant (CRA Co-Location Rule):
-    If two business entities share an identical building_key, but the location is a
-    commercial registered agent hub, MDM systems MUST NEVER automatically merge them.
+    Enforces the critical Enterprise Entity Resolution Invariants:
+    1. Multi-Tenant Skyscraper Suite Isolation (Blueprint 5.4.1)
+    2. Private Residence Protection & Data Privacy (Blueprint 5.4.2)
+    3. Formation Hub Co-Location Isolation (Blueprint 5.4.3)
     """
+    def _val(obj: Any, key: str, default: Any = None) -> Any:
+        if isinstance(obj, dict):
+            return obj.get(key, default)
+        return getattr(obj, key, default)
+
     # 0. Empty street isolation check
-    s1_1 = addr1.get("street1") if isinstance(addr1, dict) else getattr(addr1, "street1", None)
-    s1_2 = addr2.get("street1") if isinstance(addr2, dict) else getattr(addr2, "street1", None)
+    s1_1 = _val(addr1, "street1", None)
+    s1_2 = _val(addr2, "street1", None)
     if not s1_1 or not str(s1_1).strip() or not s1_2 or not str(s1_2).strip():
         return False, "EMPTY_STREET_ISOLATION: Cannot safely merge entities when an address lacks a valid street line."
 
-    # 1. Private residence isolation check
-    is_priv1 = addr1.get("is_private_residence", False) if isinstance(addr1, dict) else getattr(addr1, "is_private_residence", False)
-    is_priv2 = addr2.get("is_private_residence", False) if isinstance(addr2, dict) else getattr(addr2, "is_private_residence", False)
-    b1 = (addr1.get("building_key") if isinstance(addr1, dict) else getattr(addr1, "building_key", "")) or ""
-    b2 = (addr2.get("building_key") if isinstance(addr2, dict) else getattr(addr2, "building_key", "")) or ""
-    k1 = (addr1.get("normalized_address_key") if isinstance(addr1, dict) else getattr(addr1, "normalized_address_key", "")) or ""
-    k2 = (addr2.get("normalized_address_key") if isinstance(addr2, dict) else getattr(addr2, "normalized_address_key", "")) or ""
+    # 1. Private residence isolation check (Invariant 2)
+    is_priv1 = _val(addr1, "is_private_residence", False)
+    is_priv2 = _val(addr2, "is_private_residence", False)
+    b1 = (_val(addr1, "building_key", "") or "")
+    b2 = (_val(addr2, "building_key", "") or "")
+    k1 = (_val(addr1, "normalized_address_key", "") or "")
+    k2 = (_val(addr2, "normalized_address_key", "") or "")
+
     if (
         is_priv1
         or is_priv2
@@ -847,11 +1056,11 @@ def can_safely_merge_corporate_entities(addr1: Any, addr2: Any) -> Tuple[bool, s
     if not b1 or not b2 or b1 != b2:
         return False, "DISTINCT_BUILDINGS: Addresses do not share an identical building_key."
 
-    # Check for CRA hub
-    is_hub1 = addr1.get("is_registered_agent_hub", False) if isinstance(addr1, dict) else getattr(addr1, "is_registered_agent_hub", False)
-    is_hub2 = addr2.get("is_registered_agent_hub", False) if isinstance(addr2, dict) else getattr(addr2, "is_registered_agent_hub", False)
-    flags1 = addr1.get("corporate_risk_flags", []) if isinstance(addr1, dict) else getattr(addr1, "corporate_risk_flags", [])
-    flags2 = addr2.get("corporate_risk_flags", []) if isinstance(addr2, dict) else getattr(addr2, "corporate_risk_flags", [])
+    # 2. Formation Hub Co-Location Isolation (Invariant 3)
+    is_hub1 = _val(addr1, "is_registered_agent_hub", False)
+    is_hub2 = _val(addr2, "is_registered_agent_hub", False)
+    flags1 = _val(addr1, "corporate_risk_flags", []) or []
+    flags2 = _val(addr2, "corporate_risk_flags", []) or []
 
     if (
         is_hub1
@@ -860,6 +1069,8 @@ def can_safely_merge_corporate_entities(addr1: Any, addr2: Any) -> Tuple[bool, s
         or CorporateRiskFlag.RISK_CRA_CO_LOCATION in flags2
         or CorporateRiskFlag.RISK_OFFSHORE_SECRECY_HUB in flags1
         or CorporateRiskFlag.RISK_OFFSHORE_SECRECY_HUB in flags2
+        or CorporateRiskFlag.RISK_TRUST_FIDUCIARY in flags1
+        or CorporateRiskFlag.RISK_TRUST_FIDUCIARY in flags2
     ):
         return (
             False,
@@ -868,8 +1079,8 @@ def can_safely_merge_corporate_entities(addr1: Any, addr2: Any) -> Tuple[bool, s
         )
 
     # Check for Virtual Office / Mail Drop
-    is_cmra1 = getattr(addr1, "is_cmra", False) or getattr(addr1, "cmra", False)
-    is_cmra2 = getattr(addr2, "is_cmra", False) or getattr(addr2, "cmra", False)
+    is_cmra1 = _val(addr1, "is_cmra", False) or _val(addr1, "cmra", False)
+    is_cmra2 = _val(addr2, "is_cmra", False) or _val(addr2, "cmra", False)
     if (
         is_cmra1
         or is_cmra2
@@ -884,16 +1095,20 @@ def can_safely_merge_corporate_entities(addr1: Any, addr2: Any) -> Tuple[bool, s
             "Corporate profile consolidation is prohibited without independent EIN or SOS verification.",
         )
 
-    # Compare secondary units
-    s2_1 = (getattr(addr1, "street2", "") or "").strip().upper()
-    s2_2 = (getattr(addr2, "street2", "") or "").strip().upper()
+    # 3. Multi-Tenant Skyscraper Suite Isolation (Invariant 1)
+    s2_1 = (str(_val(addr1, "street2", "") or "")).strip().upper()
+    s2_2 = (str(_val(addr2, "street2", "") or "")).strip().upper()
 
     if s2_1 and s2_2:
         if s2_1 == s2_2:
+            if k1 and k2 and k1 != k2:
+                return False, "KEY_MISMATCH: Normalized address keys differ."
             return True, "MATCHING_SECONDARY_UNIT: Co-located entities share building and exact secondary unit."
         return False, "SECONDARY_UNIT_MISMATCH: Distinct suites/units within the same parcel."
 
     if not s2_1 and not s2_2:
+        if k1 and k2 and k1 != k2:
+            return False, "KEY_MISMATCH: Normalized address keys differ."
         return True, "SINGLE_TENANT_BUILDING: Both entities occupy the same parcel without secondary units."
 
     return False, "SECONDARY_UNIT_ASYMMETRY: One entity supplied a suite/unit while the other omitted it."
@@ -906,9 +1121,24 @@ def evaluate_corporate_risk(
     """
     Computes a normalized corporate risk score in [0.0, 1.0] and returns KYC/AML
     corporate transparency risk flags based on FinCEN CTA/BOI criteria.
+    Enforces Invariant 2: Private residence protection and data privacy guardrail.
     """
+    def _get(field_name: str, default: Any = "") -> Any:
+        if isinstance(std_address, dict):
+            return std_address.get(field_name, default)
+        return getattr(std_address, field_name, default)
+
+    # Invariant 2: Private Residence Protection & Data Privacy Invariant
+    # When is_private_residence == True, all formation hub risk scores/flags are suppressed
+    if _get("is_private_residence", False):
+        if isinstance(std_address, dict):
+            std_address["is_registered_agent_hub"] = False
+        elif hasattr(std_address, "is_registered_agent_hub"):
+            setattr(std_address, "is_registered_agent_hub", False)
+        return 0.40, [CorporateRiskFlag.RISK_RESIDENTIAL_COMMERCIAL]
+
     raw = raw_input or {}
-    raw_combined = f"{raw.get('street1', '')} {raw.get('street2', '')} {getattr(std_address, 'raw_street_address', '')}".upper()
+    raw_combined = f"{raw.get('street1', '')} {raw.get('street2', '')} {_get('raw_street_address', '')}".upper()
 
     flags: List[str] = []
 
@@ -920,13 +1150,13 @@ def evaluate_corporate_risk(
 
     # 1. Lookup in curated registry
     entry = lookup_corporate_registry(
-        street1=getattr(std_address, "street1", ""),
-        street2=getattr(std_address, "street2", ""),
-        city=getattr(std_address, "city", ""),
-        state=getattr(std_address, "state", ""),
-        postal_code=getattr(std_address, "postal_code", ""),
-        country=getattr(std_address, "country", "USA"),
-        raw_street=getattr(std_address, "raw_street_address", ""),
+        street1=_get("street1", ""),
+        street2=_get("street2", ""),
+        city=_get("city", ""),
+        state=_get("state", ""),
+        postal_code=_get("postal_code", ""),
+        country=_get("country", "USA"),
+        raw_street=_get("raw_street_address", ""),
     )
 
     if entry is not None:
@@ -937,24 +1167,28 @@ def evaluate_corporate_risk(
             _add_flag(CorporateRiskFlag.RISK_VIRTUAL_OFFICE)
         elif entry.category == RegistryCategory.OFFSHORE_SECRECY:
             _add_flag(CorporateRiskFlag.RISK_OFFSHORE_SECRECY_HUB)
+        elif entry.category == RegistryCategory.TRUST_FIDUCIARY_COMPANY:
+            _add_flag(CorporateRiskFlag.RISK_TRUST_FIDUCIARY)
         elif entry.category == RegistryCategory.MAIL_DROP_CMRA:
             _add_flag(CorporateRiskFlag.RISK_CMRA_MAIL_DROP)
-    elif getattr(std_address, "is_registered_agent_hub", False):
+    elif _get("is_registered_agent_hub", False):
         base_score = max(base_score, 0.85)
         _add_flag(CorporateRiskFlag.RISK_CRA_CO_LOCATION)
 
     # 2. Check for missing secondary unit at commercial hub
-    has_sec = bool(getattr(std_address, "street2", "").strip())
+    has_sec = bool(str(_get("street2", "") or "").strip())
     if (
         CorporateRiskFlag.RISK_CRA_CO_LOCATION in flags
         or CorporateRiskFlag.RISK_VIRTUAL_OFFICE in flags
+        or CorporateRiskFlag.RISK_OFFSHORE_SECRECY_HUB in flags
+        or CorporateRiskFlag.RISK_TRUST_FIDUCIARY in flags
     ) and not has_sec:
         _add_flag(CorporateRiskFlag.RISK_MISSING_SECONDARY_AT_HUB)
         base_score = min(1.0, base_score + 0.05)
 
     # 3. Check for disguised PMB (e.g., 'PMB' in raw, but formatted as 'Suite' in standardized)
     raw_has_pmb = "PMB" in raw_combined or "PRIVATE MAILBOX" in raw_combined
-    std_sec = (getattr(std_address, "street2", "") or "").upper()
+    std_sec = (str(_get("street2", "") or "")).upper()
     std_has_ste = any(t in std_sec for t in ["STE", "SUITE", "APT", "UNIT", "FL"])
     std_has_pmb = "PMB" in std_sec
 
@@ -965,11 +1199,6 @@ def evaluate_corporate_risk(
     elif raw_has_pmb or std_has_pmb:
         _add_flag(CorporateRiskFlag.RISK_CMRA_MAIL_DROP)
         base_score = max(base_score, 0.60)
-
-    # 4. Check for private residence commercial risk
-    if getattr(std_address, "is_private_residence", False):
-        _add_flag(CorporateRiskFlag.RISK_RESIDENTIAL_COMMERCIAL)
-        base_score = max(base_score, 0.40)
 
     final_score = round(max(0.0, min(1.0, base_score)), 4)
     return final_score, flags

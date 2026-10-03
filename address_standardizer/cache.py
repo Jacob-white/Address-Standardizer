@@ -24,6 +24,7 @@ def make_cache_key(
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
     enable_fuzzy: bool = True,
+    enable_geocoding: bool = False,
 ) -> str:
     """Computes a normalized cache key from input address components."""
     parts = [
@@ -36,6 +37,8 @@ def make_cache_key(
     ]
     if not enable_fuzzy:
         parts.append("NO_FUZZY")
+    if enable_geocoding:
+        parts.append("GEOCODE")
     return "|".join(parts)
 
 
@@ -218,6 +221,40 @@ class SQLiteCache:
                                 census_tract=c_dict.get("census_tract"),
                             )
 
+                        if data.get("spatial_result_payload"):
+                            from address_standardizer.models import SpatialResolutionResult
+                            s_dict = data["spatial_result_payload"]
+                            std.spatial_result = SpatialResolutionResult(
+                                latitude=s_dict["latitude"],
+                                longitude=s_dict["longitude"],
+                                precision=s_dict["precision"],
+                                accuracy_radius_meters=s_dict["accuracy_radius_meters"],
+                                stage=s_dict["stage"],
+                                source=s_dict["source"],
+                                h3_res10=s_dict["h3_res10"],
+                                parcel_id=s_dict.get("parcel_id"),
+                                execution_time_ms=s_dict.get("execution_time_ms", 0.0),
+                                metadata=s_dict.get("metadata", {}),
+                            )
+                        elif data.get("spatial_result") and isinstance(data["spatial_result"], dict):
+                            from address_standardizer.models import SpatialResolutionResult
+                            s_dict = data["spatial_result"]
+                            std.spatial_result = SpatialResolutionResult(
+                                latitude=s_dict["latitude"],
+                                longitude=s_dict["longitude"],
+                                precision=s_dict["precision"],
+                                accuracy_radius_meters=s_dict["accuracy_radius_meters"],
+                                stage=s_dict["stage"],
+                                source=s_dict["source"],
+                                h3_res10=s_dict["h3_res10"],
+                                parcel_id=s_dict.get("parcel_id"),
+                                execution_time_ms=s_dict.get("execution_time_ms", 0.0),
+                                metadata=s_dict.get("metadata", {}),
+                            )
+
+                        if data.get("country_iso3"):
+                            std.country_iso3 = data["country_iso3"]
+
                         return std
                     return data
                 except Exception:
@@ -235,6 +272,8 @@ class SQLiteCache:
                     d["audit_record_payload"] = value.audit_record.as_dict()
                 if value.cascade_result is not None and hasattr(value.cascade_result, "as_dict"):
                     d["cascade_result_payload"] = value.cascade_result.as_dict()
+                if value.spatial_result is not None and hasattr(value.spatial_result, "as_dict"):
+                    d["spatial_result_payload"] = value.spatial_result.as_dict()
                 payload_str = json.dumps(d)
             elif isinstance(value, (dict, list, int, float, bool)):
                 payload_str = json.dumps(value)

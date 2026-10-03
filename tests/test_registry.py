@@ -667,6 +667,390 @@ class TestCorporateRegistry:
         assert can_merge_p is False
         assert "PRIVATE_RESIDENCE_ISOLATION" in reason_p
 
+    def test_registry_taxonomy_and_risk_flags(self):
+        assert RegistryCategory.COMMERCIAL_REGISTERED_AGENT == "COMMERCIAL_REGISTERED_AGENT"
+        assert RegistryCategory.FORMATION_AGENT == "FORMATION_AGENT"
+        assert RegistryCategory.VIRTUAL_OFFICE == "VIRTUAL_OFFICE"
+        assert RegistryCategory.MAIL_DROP_CMRA == "MAIL_DROP_CMRA"
+        assert RegistryCategory.OFFSHORE_SECRECY == "OFFSHORE_SECRECY"
+        assert RegistryCategory.TRUST_FIDUCIARY_COMPANY == "TRUST_FIDUCIARY_COMPANY"
+
+        assert CorporateRiskFlag.RISK_CRA_CO_LOCATION == "RISK_CRA_CO_LOCATION"
+        assert CorporateRiskFlag.RISK_VIRTUAL_OFFICE == "RISK_VIRTUAL_OFFICE"
+        assert CorporateRiskFlag.RISK_CMRA_MAIL_DROP == "RISK_CMRA_MAIL_DROP"
+        assert CorporateRiskFlag.RISK_OFFSHORE_SECRECY_HUB == "RISK_OFFSHORE_SECRECY_HUB"
+        assert CorporateRiskFlag.RISK_TRUST_FIDUCIARY == "RISK_TRUST_FIDUCIARY"
+        assert CorporateRiskFlag.RISK_MISSING_SECONDARY_AT_HUB == "RISK_MISSING_SECONDARY_AT_HUB"
+        assert CorporateRiskFlag.RISK_DISGUISED_PMB == "RISK_DISGUISED_PMB"
+        assert CorporateRiskFlag.RISK_RESIDENTIAL_COMMERCIAL == "RISK_RESIDENTIAL_COMMERCIAL"
+
+    def test_curated_international_formation_hubs_completeness(self):
+        from address_standardizer.registry import CURATED_CORPORATE_REGISTRY
+        expected_countries = {"CYM", "VGB", "BMU", "PAN", "GBR", "NLD", "LUX", "CHE", "IRL", "SGP"}
+        found_countries = {e.country.upper() for e in CURATED_CORPORATE_REGISTRY}
+        assert expected_countries.issubset(found_countries)
+
+        intl_entries = [e for e in CURATED_CORPORATE_REGISTRY if e.country.upper() != "USA"]
+        assert len(intl_entries) >= 15
+        for entry in intl_entries:
+            assert entry.base_risk_score >= 0.85
+            assert entry.estimated_entities >= 8000
+            assert len(entry.street_patterns) > 0
+
+    def test_lookup_all_15_international_hubs(self):
+        # 1. Ugland House (CYM)
+        e1 = lookup_corporate_registry(street1="South Church St", country="CYM")
+        assert e1 is not None and e1.category == RegistryCategory.OFFSHORE_SECRECY
+        assert "Ugland House" in e1.provider_name
+
+        # 2. Clifton House (CYM)
+        e2 = lookup_corporate_registry(street1="75 Fort St", country="CYM")
+        assert e2 is not None and e2.category == RegistryCategory.OFFSHORE_SECRECY
+        assert "Clifton House" in e2.provider_name
+
+        # 3. 190 Elgin Ave (CYM)
+        e3 = lookup_corporate_registry(street1="190 Elgin Ave", country="CYM")
+        assert e3 is not None and e3.category == RegistryCategory.OFFSHORE_SECRECY
+
+        # 4. Craigmuir Chambers (VGB)
+        e4 = lookup_corporate_registry(street1="Craigmuir Chambers", country="VGB")
+        assert e4 is not None and e4.category == RegistryCategory.OFFSHORE_SECRECY
+
+        # 5. Wickhams Cay (VGB)
+        e5 = lookup_corporate_registry(street1="Wickhams Cay", country="VGB")
+        assert e5 is not None and e5.category == RegistryCategory.OFFSHORE_SECRECY
+
+        # 6. Clarendon House (BMU)
+        e6 = lookup_corporate_registry(street1="2 Church St", city="Hamilton", country="BMU")
+        assert e6 is not None and e6.category == RegistryCategory.OFFSHORE_SECRECY
+        assert "Clarendon House" in e6.provider_name
+
+        # 7. Calle 50 (PAN)
+        e7 = lookup_corporate_registry(street1="Calle 50", city="Panama City", country="PAN")
+        assert e7 is not None and e7.category == RegistryCategory.OFFSHORE_SECRECY
+
+        # 8. Shelton Street Companies Hub (GBR)
+        e8 = lookup_corporate_registry(street1="71-75 Shelton St", city="London", postal_code="WC2H 9JQ", country="GBR")
+        assert e8 is not None and e8.category == RegistryCategory.FORMATION_AGENT
+
+        # 9. Wenlock Road Registered Hub (GBR)
+        e9 = lookup_corporate_registry(street1="20-22 Wenlock Rd", city="London", postal_code="N1 7GU", country="GBR")
+        assert e9 is not None and e9.category == RegistryCategory.FORMATION_AGENT
+
+        # 10. Old Gloucester Street Mail Drop (GBR)
+        e10 = lookup_corporate_registry(street1="27 Old Gloucester St", city="London", postal_code="WC1N 3AX", country="GBR")
+        assert e10 is not None and e10.category == RegistryCategory.MAIL_DROP_CMRA
+
+        # 11. Keizersgracht Trust District (NLD)
+        e11 = lookup_corporate_registry(street1="Keizersgracht 421", city="Amsterdam", postal_code="1016 EK", country="NLD")
+        assert e11 is not None and e11.category == RegistryCategory.TRUST_FIDUCIARY_COMPANY
+
+        # 12. Boulevard Royal Financial Hub (LUX)
+        e12 = lookup_corporate_registry(street1="25A Boulevard Royal", city="Luxembourg", postal_code="L-2449", country="LUX")
+        assert e12 is not None and e12.category == RegistryCategory.TRUST_FIDUCIARY_COMPANY
+
+        # 13. Baarerstrasse "Crypto Valley" (CHE)
+        e13 = lookup_corporate_registry(street1="Baarerstrasse 82", city="Zug", postal_code="6300", country="CHE")
+        assert e13 is not None and e13.category == RegistryCategory.TRUST_FIDUCIARY_COMPANY
+
+        # 14. International Financial Services (IRL)
+        e14 = lookup_corporate_registry(street1="1 IFC", city="Dublin", postal_code="D01", country="IRL")
+        assert e14 is not None and e14.category == RegistryCategory.TRUST_FIDUCIARY_COMPANY
+
+        # 15. Marina Bay / Raffles Virtual Hub (SGP)
+        e15 = lookup_corporate_registry(street1="1 Raffles Place", city="Singapore", postal_code="048616", country="SGP")
+        assert e15 is not None and e15.category == RegistryCategory.VIRTUAL_OFFICE
+
+    def test_is_registered_agent_hub_address_international_categories(self):
+        # TRUST_FIDUCIARY_COMPANY -> True
+        assert is_registered_agent_hub_address("Baarerstrasse 82", city="Zug", country="CHE", postal_code="6300") is True
+        assert is_registered_agent_hub_address("Keizersgracht 421", city="Amsterdam", country="NLD") is True
+        assert is_registered_agent_hub_address("25A Boulevard Royal", city="Luxembourg", country="LUX") is True
+        assert is_registered_agent_hub_address("1 IFC", city="Dublin", country="IRL") is True
+
+        # FORMATION_AGENT -> True
+        assert is_registered_agent_hub_address("71-75 Shelton St", city="London", country="GBR") is True
+        assert is_registered_agent_hub_address("20-22 Wenlock Rd", city="London", country="GBR") is True
+
+        # OFFSHORE_SECRECY -> True
+        assert is_registered_agent_hub_address("2 Church St", city="Hamilton", country="BMU") is True
+        assert is_registered_agent_hub_address("South Church St", country="CYM") is True
+
+        # VIRTUAL_OFFICE -> False
+        assert is_registered_agent_hub_address("1 Raffles Place", city="Singapore", country="SGP") is False
+
+        # MAIL_DROP_CMRA -> False
+        assert is_registered_agent_hub_address("27 Old Gloucester St", city="London", country="GBR") is False
+
+    def test_evaluate_corporate_risk_all_categories_and_flags(self):
+        # Offshore secrecy hub (tests previously unexercised offshore branch)
+        std_off = standardize_address("Ugland House, South Church St, George Town, Cayman Islands")
+        score_off, flags_off = evaluate_corporate_risk(std_off)
+        assert score_off >= 0.95
+        assert CorporateRiskFlag.RISK_OFFSHORE_SECRECY_HUB in flags_off
+
+        # Trust fiduciary hub (tests new RISK_TRUST_FIDUCIARY branch and missing secondary)
+        std_trust = standardize_address("Baarerstrasse 82, 6300 Zug, Switzerland")
+        score_trust, flags_trust = evaluate_corporate_risk(std_trust)
+        assert score_trust >= 0.90
+        assert CorporateRiskFlag.RISK_TRUST_FIDUCIARY in flags_trust
+        assert CorporateRiskFlag.RISK_MISSING_SECONDARY_AT_HUB in flags_trust
+
+        # Formation agent
+        std_form = standardize_address("71-75 Shelton St, London WC2H 9JQ, UK")
+        score_form, flags_form = evaluate_corporate_risk(std_form)
+        assert score_form >= 0.90
+        assert CorporateRiskFlag.RISK_CRA_CO_LOCATION in flags_form
+
+        # Virtual office
+        std_vo = standardize_address("1 Raffles Place, Singapore 048616", country="SGP")
+        score_vo, flags_vo = evaluate_corporate_risk(std_vo)
+        assert score_vo >= 0.85
+        assert CorporateRiskFlag.RISK_VIRTUAL_OFFICE in flags_vo
+
+        # CMRA mail drop
+        std_cmra = standardize_address("27 Old Gloucester St, London WC1N 3AX, UK")
+        score_cmra, flags_cmra = evaluate_corporate_risk(std_cmra)
+        assert score_cmra >= 0.90
+        assert CorporateRiskFlag.RISK_CMRA_MAIL_DROP in flags_cmra
+
+    def test_evaluate_corporate_risk_dict_inputs(self):
+        # Dict input without residential
+        d1 = {
+            "street1": "Baarerstrasse 82",
+            "city": "Zug",
+            "postal_code": "6300",
+            "country": "CHE",
+            "is_registered_agent_hub": True,
+        }
+        score1, flags1 = evaluate_corporate_risk(d1)
+        assert score1 >= 0.90
+        assert CorporateRiskFlag.RISK_TRUST_FIDUCIARY in flags1
+
+        # Dict input with is_private_residence=True
+        d_priv = {
+            "street1": "Baarerstrasse 82",
+            "city": "Zug",
+            "country": "CHE",
+            "is_private_residence": True,
+            "is_registered_agent_hub": True,
+        }
+        score_p, flags_p = evaluate_corporate_risk(d_priv)
+        assert score_p == 0.40
+        assert flags_p == [CorporateRiskFlag.RISK_RESIDENTIAL_COMMERCIAL]
+        assert d_priv["is_registered_agent_hub"] is False
+
+    def test_invariant_1_skyscraper_suite_isolation_keys(self):
+        # Matching suites but mismatched normalized_address_key
+        a1 = StandardizedAddress(
+            street1="100 WALL ST",
+            street2="STE 400",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+            country="USA",
+            normalized_address_key="100 WALL ST|STE 400|NEW YORK|NY|10005|USA",
+            address_status="standardized",
+            raw_street_address="100 Wall St, Ste 400",
+            is_us=True,
+            building_key="100 WALL ST||NEW YORK|NY|10005|USA",
+        )
+        a2 = StandardizedAddress(
+            street1="100 WALL ST",
+            street2="STE 400",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+            country="USA",
+            normalized_address_key="CORRUPTED_OR_DIFFERING_KEY",
+            address_status="standardized",
+            raw_street_address="100 Wall St, Ste 400",
+            is_us=True,
+            building_key="100 WALL ST||NEW YORK|NY|10005|USA",
+        )
+        can_merge1, reason1 = can_safely_merge_corporate_entities(a1, a2)
+        assert can_merge1 is False
+        assert "KEY_MISMATCH" in reason1
+
+        # No secondary units but mismatched normalized_address_key
+        a3 = StandardizedAddress(
+            street1="500 INDUSTRIAL PKWY",
+            street2="",
+            city="AUSTIN",
+            state="TX",
+            postal_code="78701",
+            country="USA",
+            normalized_address_key="500 INDUSTRIAL PKWY||AUSTIN|TX|78701|USA",
+            address_status="standardized",
+            raw_street_address="500 Industrial Pkwy",
+            is_us=True,
+            building_key="500 INDUSTRIAL PKWY||AUSTIN|TX|78701|USA",
+        )
+        a4 = StandardizedAddress(
+            street1="500 INDUSTRIAL PKWY",
+            street2="",
+            city="AUSTIN",
+            state="TX",
+            postal_code="78701",
+            country="USA",
+            normalized_address_key="DIFFERING_KEY",
+            address_status="standardized",
+            raw_street_address="500 Industrial Pkwy",
+            is_us=True,
+            building_key="500 INDUSTRIAL PKWY||AUSTIN|TX|78701|USA",
+        )
+        can_merge2, reason2 = can_safely_merge_corporate_entities(a3, a4)
+        assert can_merge2 is False
+        assert "KEY_MISMATCH" in reason2
+
+    def test_invariant_2_private_residence_protection_end_to_end(self):
+        # End-to-end standardization of a private residence
+        std_us = standardize_address("1209 N Orange St, Wilmington DE (Private Residence)")
+        assert std_us.is_private_residence is True
+        assert std_us.is_registered_agent_hub is False
+        assert std_us.corporate_risk_score == 0.40
+        assert std_us.corporate_risk_flags == [CorporateRiskFlag.RISK_RESIDENTIAL_COMMERCIAL]
+
+        # International private residence
+        std_intl = standardize_address("Baarerstrasse 82, Zug, Switzerland (Private Residence)")
+        assert std_intl.is_private_residence is True
+        assert std_intl.is_registered_agent_hub is False
+        assert std_intl.corporate_risk_score == 0.40
+        assert std_intl.corporate_risk_flags == [CorporateRiskFlag.RISK_RESIDENTIAL_COMMERCIAL]
+
+    def test_invariant_3_formation_hub_co_location_isolation(self):
+        # Trust fiduciary co-location at Baarerstrasse
+        a_trust1 = StandardizedAddress(
+            street1="BAARERSTRASSE 82",
+            street2="",
+            city="ZUG",
+            state="",
+            postal_code="6300",
+            country="CHE",
+            normalized_address_key="BAARERSTRASSE 82||ZUG||6300|CHE",
+            address_status="standardized",
+            raw_street_address="Baarerstrasse 82",
+            is_us=False,
+            building_key="BAARERSTRASSE 82||ZUG||6300|CHE",
+            is_registered_agent_hub=True,
+        )
+        a_trust1.corporate_risk_flags = [CorporateRiskFlag.RISK_TRUST_FIDUCIARY]
+
+        a_trust2 = StandardizedAddress(
+            street1="BAARERSTRASSE 82",
+            street2="",
+            city="ZUG",
+            state="",
+            postal_code="6300",
+            country="CHE",
+            normalized_address_key="BAARERSTRASSE 82||ZUG||6300|CHE",
+            address_status="standardized",
+            raw_street_address="Baarerstrasse 82",
+            is_us=False,
+            building_key="BAARERSTRASSE 82||ZUG||6300|CHE",
+            is_registered_agent_hub=True,
+        )
+        a_trust2.corporate_risk_flags = [CorporateRiskFlag.RISK_TRUST_FIDUCIARY]
+
+        can_merge_t, reason_t = can_safely_merge_corporate_entities(a_trust1, a_trust2)
+        assert can_merge_t is False
+        assert "CO_LOCATION_ISOLATION_INVARIANT" in reason_t
+
+        # Dict input for co-location isolation
+        d1 = {
+            "street1": "BAARERSTRASSE 82",
+            "building_key": "B_TRUST",
+            "normalized_address_key": "K_TRUST",
+            "corporate_risk_flags": [CorporateRiskFlag.RISK_TRUST_FIDUCIARY],
+        }
+        d2 = {
+            "street1": "BAARERSTRASSE 82",
+            "building_key": "B_TRUST",
+            "normalized_address_key": "K_TRUST",
+            "corporate_risk_flags": [CorporateRiskFlag.RISK_TRUST_FIDUCIARY],
+        }
+        can_merge_d, reason_d = can_safely_merge_corporate_entities(d1, d2)
+        assert can_merge_d is False
+        assert "CO_LOCATION_ISOLATION_INVARIANT" in reason_d
+
+    def test_international_false_positive_prevention(self):
+        # Non-hub UK address
+        e_uk = lookup_corporate_registry(street1="10 Downing St", city="London", country="GBR")
+        assert e_uk is None
+
+        # Non-hub Dutch address
+        e_nl = lookup_corporate_registry(street1="Prinsengracht 263", city="Amsterdam", country="NLD")
+        assert e_nl is None
+
+        # Non-hub Swiss address
+        e_ch = lookup_corporate_registry(street1="Bahnhofstrasse 10", city="Zug", country="CHE")
+        assert e_ch is None
+
+        # Domestic US namesake: London, OH
+        e_oh = lookup_corporate_registry(street1="71-75 Shelton St", city="London", state="OH", postal_code="43140")
+        assert e_oh is None
+
+        # Domestic US namesake: Amsterdam, NY
+        e_ny = lookup_corporate_registry(street1="Keizersgracht 421", city="Amsterdam", state="NY", postal_code="12010")
+        assert e_ny is None
+
+    def test_international_matching_edge_cases(self):
+        # Country synonym GBR match via "UK" in combined
+        e1 = lookup_corporate_registry(street1="71-75 Shelton St", raw_street="71-75 Shelton St UK")
+        assert e1 is not None and e1.category == RegistryCategory.FORMATION_AGENT
+
+        # City match via combined regex search
+        e2 = lookup_corporate_registry(street1="25A Boulevard Royal", raw_street="25A Boulevard Royal Luxembourg")
+        assert e2 is not None and e2.category == RegistryCategory.TRUST_FIDUCIARY_COMPANY
+
+        # Postal match via clean prefix
+        e3 = lookup_corporate_registry(street1="Baarerstrasse 82", postal_code="6300")
+        assert e3 is not None and e3.category == RegistryCategory.TRUST_FIDUCIARY_COMPANY
+
+        # Postal match in combined text
+        e4 = lookup_corporate_registry(street1="20-22 Wenlock Rd", raw_street="20-22 Wenlock Rd N1 7GU")
+        assert e4 is not None and e4.category == RegistryCategory.FORMATION_AGENT
+
+        # Word boundary country regex match: "SGP" in combined
+        e5 = lookup_corporate_registry(street1="1 Raffles Place", raw_street="1 Raffles Place SGP")
+        assert e5 is not None and e5.category == RegistryCategory.VIRTUAL_OFFICE
+
+        # Country synonym match for Ireland
+        e6 = lookup_corporate_registry(street1="1 IFC", raw_street="1 IFC Dublin Ireland")
+        assert e6 is not None and e6.category == RegistryCategory.TRUST_FIDUCIARY_COMPANY
+
+    def test_as_dict_14_key_invariant(self):
+        expected_keys = [
+            "street1", "street2", "city", "state", "postal_code", "country",
+            "normalized_address_key", "building_key", "phonetic_key",
+            "address_status", "raw_street_address", "is_us",
+            "is_private_residence", "is_registered_agent_hub",
+        ]
+
+        # 1. Domestic US address
+        std_us = standardize_address("1209 N Orange St, Wilmington, DE 19801")
+        d_us = std_us.as_dict(include_metadata=False)
+        assert len(d_us) == 14
+        assert list(d_us.keys()) == expected_keys
+
+        # 2. International address
+        std_intl = standardize_address("71-75 Shelton St, London WC2H 9JQ, UK")
+        d_intl = std_intl.as_dict(include_metadata=False)
+        assert len(d_intl) == 14
+        assert list(d_intl.keys()) == expected_keys
+
+        # 3. Private residence address
+        std_priv = standardize_address("123 Elm St, Austin, TX 78701 (Private Residence)")
+        d_priv = std_priv.as_dict(include_metadata=False)
+        assert len(d_priv) == 14
+        assert list(d_priv.keys()) == expected_keys
+
+        # 4. Offshore secrecy address
+        std_off = standardize_address("Ugland House, South Church St, George Town, Cayman Islands")
+        d_off = std_off.as_dict(include_metadata=False)
+        assert len(d_off) == 14
+        assert list(d_off.keys()) == expected_keys
+
 
 
 

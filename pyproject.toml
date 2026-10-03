@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "address-standardizer"
-version = "1.0.0"
-description = "Fast, multi-jurisdiction address standardization, USPS Pub 28 parsing, two-tier entity resolution clustering, and Census geocoding."
+version = "3.2.0"
+description = "Universal multi-national address standardization, offline spatial rooftop geocoding, high-throughput acceleration, and cross-border corporate entity resolution."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }

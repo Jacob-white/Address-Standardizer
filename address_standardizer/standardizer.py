@@ -77,7 +77,6 @@ from address_standardizer._patterns import (
     RE_INTL_FLAT,
     RE_INTL_SEC_INLINE,
     RE_INTL_SEC_START,
-    RE_CAN_PROV_POSTAL,
     RE_NUMBER_HYPHEN_NUMBER,
     FROZEN_DIRECTIONAL_VALUES,
     FROZEN_US_STATE_CODES,
@@ -91,6 +90,10 @@ from address_standardizer.phonetics import (
     generate_phonetic_address_key,
 )
 from address_standardizer.fast_path import fast_path_parse
+from address_standardizer.international import (
+    CountryGrammarRegistry,
+    fold_to_ascii_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +133,7 @@ def normalize_country_code(
         c_clean_alphanumeric = RE_NON_ALPHANUMERIC.sub("", c_clean)
         if c_clean_alphanumeric in COUNTRY_MAP:
             country_cand = COUNTRY_MAP[c_clean_alphanumeric]
-        elif len(c_clean_alphanumeric) == 3 and c_clean_alphanumeric.isalpha():
+        elif len(c_clean_alphanumeric) == 3 and c_clean_alphanumeric.isascii() and c_clean_alphanumeric.isalpha():
             country_cand = c_clean_alphanumeric
 
     # If country is explicitly non-US, return it immediately
@@ -1030,6 +1033,7 @@ def _finalize_standardized_address(
     std: StandardizedAddress,
     raw_input: Optional[Dict[str, Any]] = None,
     cache_key: Optional[str] = None,
+    enable_geocoding: bool = False,
 ) -> StandardizedAddress:
     from address_standardizer.delivery import evaluate_delivery_intelligence
     from address_standardizer.registry import evaluate_corporate_risk
@@ -1063,6 +1067,12 @@ def _finalize_standardized_address(
             std, conf, raw_input=raw_input
         )
         std.audit_record = audit_rec
+
+    # 4. Offline Spatial Coordinate Resolution
+    if enable_geocoding:
+        from address_standardizer.spatial import resolve_spatial_coordinates
+        std.spatial_result = resolve_spatial_coordinates(std)
+
     if cache_key is not None:
         cache = get_default_cache()
         if cache.is_enabled():
@@ -1079,6 +1089,7 @@ def standardize_address(
     country: Optional[str] = None,
     is_vacant: Optional[bool] = None,
     enable_fuzzy: bool = True,
+    enable_geocoding: bool = False,
     **kwargs: Any,
 ) -> StandardizedAddress:
     """
@@ -1095,12 +1106,22 @@ def standardize_address(
         "country": country,
         "is_vacant": is_vacant if is_vacant is not None else kwargs.get("vacant"),
         "enable_fuzzy": enable_fuzzy,
+        "enable_geocoding": enable_geocoding,
     }
 
     cache = get_default_cache()
     cache_key = None
     if cache.is_enabled():
-        cache_key = make_cache_key(street1, street2, city, state, postal_code, country, enable_fuzzy=enable_fuzzy)
+        cache_key = make_cache_key(
+            street1,
+            street2,
+            city,
+            state,
+            postal_code,
+            country,
+            enable_fuzzy=enable_fuzzy,
+            enable_geocoding=enable_geocoding,
+        )
         cached = cache.get(cache_key)
         if cached is not None:
             return copy.copy(cached)
@@ -1133,7 +1154,8 @@ def standardize_address(
             phonetic_key=None,
             is_registered_agent_hub=False,
         )
-        return _finalize_standardized_address(empty_std, raw_dict, cache_key)
+        empty_std.country_iso3 = "USA"
+        return _finalize_standardized_address(empty_std, raw_dict, cache_key, enable_geocoding=enable_geocoding)
 
     if len(raw_components) == 1 and s1_raw.upper() in ("N/A", "NONE", "NULL", "UNKNOWN", "-", ".", "NO ADDRESS"):
         garbage_std = StandardizedAddress(
@@ -1151,7 +1173,8 @@ def standardize_address(
             phonetic_key=None,
             is_registered_agent_hub=False,
         )
-        return _finalize_standardized_address(garbage_std, raw_dict, cache_key)
+        garbage_std.country_iso3 = "USA"
+        return _finalize_standardized_address(garbage_std, raw_dict, cache_key, enable_geocoding=enable_geocoding)
 
     # Detect country code
     country_iso = normalize_country_code(
@@ -1176,7 +1199,8 @@ def standardize_address(
             enable_fuzzy=enable_fuzzy,
         )
         if fast_res is not None:
-            return _finalize_standardized_address(fast_res, raw_dict, cache_key)
+            fast_res.country_iso3 = country_iso
+            return _finalize_standardized_address(fast_res, raw_dict, cache_key, enable_geocoding=enable_geocoding)
 
     # Tier 2 & Tier 3: Deterministic Rule Matrix and Statistical CRF Fallback
     if is_us:
@@ -1233,19 +1257,28 @@ def standardize_address(
             p_key = None
         else:
             status = "standardized"
-            key = f"{norm_s1}|{norm_s2}|{norm_city}|{norm_state}|{zip5}|{country_iso}"
-            b_key = f"{norm_s1}||{norm_city}|{norm_state}|{zip5}|{country_iso}"
-            p_key = generate_phonetic_address_key(norm_s1, zip5, norm_city)
+            k_s1 = fold_to_ascii_key(norm_s1)
+            k_s2 = fold_to_ascii_key(norm_s2)
+            k_city = fold_to_ascii_key(norm_city)
+            k_state = fold_to_ascii_key(norm_state)
+            k_post = fold_to_ascii_key(zip5)
+            k_country = fold_to_ascii_key(country_iso) or "USA"
+            key = f"{k_s1}|{k_s2}|{k_city}|{k_state}|{k_post}|{k_country}"
+            b_key = f"{k_s1}||{k_city}|{k_state}|{k_post}|{k_country}"
+            p_key = generate_phonetic_address_key(k_s1, k_post, k_city)
 
-        is_hub = is_registered_agent_hub_address(
-            street1=norm_s1,
-            street2=norm_s2,
-            city=norm_city,
-            state=norm_state,
-            postal_code=zip5,
-            country=country_iso,
-            raw_street=raw_street_address,
-        )
+        if is_priv:
+            is_hub = False
+        else:
+            is_hub = is_registered_agent_hub_address(
+                street1=norm_s1,
+                street2=norm_s2,
+                city=norm_city,
+                state=norm_state,
+                postal_code=zip5,
+                country=country_iso,
+                raw_street=raw_street_address,
+            )
 
         std_us = StandardizedAddress(
             street1=norm_s1,
@@ -1263,11 +1296,14 @@ def standardize_address(
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
         )
-        return _finalize_standardized_address(std_us, raw_dict, cache_key)
+        std_us.country_iso3 = country_iso
+        return _finalize_standardized_address(std_us, raw_dict, cache_key, enable_geocoding=enable_geocoding)
     else:
         # International Pipeline
         norm_s1 = ""
         norm_s2 = ""
+        dep_loc = None
+        bldg_name = None
         raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
         is_priv = any(p in raw_combined_upper for p in [
             "PRIVATE RESIDENCE", "RESIDENTIAL", "PRIVATE ADDRESS", "CONFIDENTIAL", "RESIDENCE ONLY", "PERSONAL RESIDENCE"
@@ -1275,86 +1311,27 @@ def standardize_address(
         if is_priv:
             norm_s1 = "PRIVATE RESIDENCE"
             norm_s2 = ""
+            norm_city = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", city_raw).strip().upper())
+            norm_state = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", state_raw).strip().upper())
+            norm_postal = RE_WHITESPACE.sub(" ", postal_raw.strip().upper())
         else:
-            # Handle comma-delimited single string international parsing
-            if not city_raw and s1_raw and "," in s1_raw:
-                parts_comma = [p.strip() for p in s1_raw.split(",") if p.strip()]
-                # Strip trailing country if present
-                if len(parts_comma) >= 2 and (
-                    parts_comma[-1].upper() in COUNTRY_MAP or
-                    parts_comma[-1].upper() in ("CANADA", "UK", "UNITED KINGDOM", "CAYMAN ISLANDS")
-                ):
-                    parts_comma = parts_comma[:-1]
-
-                if len(parts_comma) >= 3:
-                    # Check for PO Box in parts_comma[1]
-                    if RE_PO_BOX.search(parts_comma[1]):
-                        norm_s1 = parts_comma[0].upper()
-                        m_box = RE_PO_BOX.search(parts_comma[1])
-                        norm_s2 = f"PO BOX {m_box.group(1).upper()}" if m_box else parts_comma[1].upper()
-                        city_raw = parts_comma[2]
-                        if len(parts_comma) >= 4:
-                            postal_raw = parts_comma[3]
-                    elif (
-                        "75 FORT" in parts_comma[1].upper()
-                        or "CHURCH" in parts_comma[1].upper()
-                        or (len(parts_comma) >= 4 and parts_comma[2].upper() in GLOBAL_METRO_TO_COUNTRY)
-                    ):
-                        norm_s1 = "75 FORT ST" if "75 FORT" in parts_comma[1].upper() else parts_comma[1].upper()
-                        norm_s2 = parts_comma[0].upper()
-                        city_raw = parts_comma[2]
-                        if len(parts_comma) >= 4:
-                            postal_raw = parts_comma[3]
-                    else:
-                        norm_s1_base, norm_s2_base = _split_international_secondary_unit(parts_comma[0], "")
-                        norm_s1 = norm_s1_base
-                        norm_s2 = norm_s2_base
-                        city_raw = parts_comma[1]
-                        if len(parts_comma) >= 3:
-                            rem_loc = parts_comma[2]
-                            m_can = RE_CAN_PROV_POSTAL.match(rem_loc.upper())
-                            if m_can:
-                                state_raw = m_can.group(1)
-                                postal_raw = m_can.group(2)
-                            else:
-                                postal_raw = rem_loc
-                elif len(parts_comma) == 2:
-                    m_can = RE_CAN_PROV_POSTAL.match(parts_comma[1].upper())
-                    m_can_post = RE_CAN_POSTCODE.match(parts_comma[1].upper())
-                    m_uk_post = RE_UK_POSTCODE.match(parts_comma[1].upper())
-                    if m_can:
-                        city_raw = parts_comma[0]
-                        state_raw = m_can.group(1)
-                        postal_raw = m_can.group(2)
-                        norm_s1 = ""
-                    elif m_can_post or m_uk_post:
-                        city_raw = parts_comma[0]
-                        postal_raw = parts_comma[1]
-                        norm_s1 = ""
-                    else:
-                        norm_s1_base, norm_s2_base = _split_international_secondary_unit(parts_comma[0], "")
-                        norm_s1 = norm_s1_base
-                        norm_s2 = norm_s2_base
-                        city_raw = parts_comma[1]
-                elif len(parts_comma) == 1:
-                    p0 = parts_comma[0].strip().upper()
-                    if p0 in GLOBAL_METRO_TO_COUNTRY or p0 in ("LONDON", "PARIS", "TORONTO", "MONTREAL", "VANCOUVER", "SYDNEY", "MELBOURNE"):
-                        city_raw = parts_comma[0]
-                        norm_s1 = ""
-                    else:
-                        norm_s1_base, norm_s2_base = _split_international_secondary_unit(parts_comma[0], "")
-                        norm_s1 = norm_s1_base
-                        norm_s2 = norm_s2_base
-            else:
-                norm_s1_base = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", s1_raw).strip().upper())
-                norm_s2_base = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", s2_raw).strip().upper())
-                norm_s1, norm_s2 = _split_international_secondary_unit(norm_s1_base, norm_s2_base)
-
-        norm_city = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", city_raw).strip().upper())
-        norm_state = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", state_raw).strip().upper())
-        if country_iso == "CAN" and norm_state in CANADIAN_PROVINCES:
-            norm_state = CANADIAN_PROVINCES[norm_state]
-        norm_postal = RE_WHITESPACE.sub(" ", postal_raw.strip().upper())
+            grammar = CountryGrammarRegistry.get(country_iso)
+            parsed = grammar.standardize(
+                street1=s1_raw,
+                street2=s2_raw,
+                city=city_raw,
+                state=state_raw,
+                postal_code=postal_raw,
+                country=country_iso,
+                raw_street_address=raw_street_address,
+            )
+            norm_s1 = parsed.format_street1()
+            norm_s2 = parsed.format_street2()
+            norm_city = parsed.city or ""
+            norm_state = parsed.state or ""
+            norm_postal = parsed.postal_code or ""
+            dep_loc = parsed.dependent_locality
+            bldg_name = parsed.building_name
 
         if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
             norm_s1 = ""
@@ -1367,19 +1344,28 @@ def standardize_address(
             p_key = None
         else:
             status = "standardized"
-            key = f"{norm_s1}|{norm_s2}|{norm_city}|{norm_state}|{norm_postal}|{country_iso}"
-            b_key = f"{norm_s1}||{norm_city}|{norm_state}|{norm_postal}|{country_iso}"
-            p_key = generate_phonetic_address_key(norm_s1, norm_postal, norm_city)
+            k_s1 = fold_to_ascii_key(norm_s1)
+            k_s2 = fold_to_ascii_key(norm_s2)
+            k_city = fold_to_ascii_key(norm_city)
+            k_state = fold_to_ascii_key(norm_state)
+            k_post = fold_to_ascii_key(norm_postal)
+            k_country = fold_to_ascii_key(country_iso)
+            key = f"{k_s1}|{k_s2}|{k_city}|{k_state}|{k_post}|{k_country}"
+            b_key = f"{k_s1}||{k_city}|{k_state}|{k_post}|{k_country}"
+            p_key = generate_phonetic_address_key(k_s1, k_post, k_city)
 
-        is_hub = is_registered_agent_hub_address(
-            street1=norm_s1,
-            street2=norm_s2,
-            city=norm_city,
-            state=norm_state,
-            postal_code=norm_postal,
-            country=country_iso,
-            raw_street=raw_street_address,
-        )
+        if is_priv:
+            is_hub = False
+        else:
+            is_hub = is_registered_agent_hub_address(
+                street1=norm_s1,
+                street2=norm_s2,
+                city=norm_city,
+                state=norm_state,
+                postal_code=norm_postal,
+                country=country_iso,
+                raw_street=raw_street_address,
+            )
 
         std_intl = StandardizedAddress(
             street1=norm_s1,
@@ -1396,5 +1382,8 @@ def standardize_address(
             building_key=b_key,
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
+            dependent_locality=dep_loc,
+            building_name=bldg_name,
         )
-        return _finalize_standardized_address(std_intl, raw_dict, cache_key)
+        std_intl.country_iso3 = country_iso
+        return _finalize_standardized_address(std_intl, raw_dict, cache_key, enable_geocoding=enable_geocoding)

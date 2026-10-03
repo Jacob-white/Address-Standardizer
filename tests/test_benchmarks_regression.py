@@ -74,3 +74,35 @@ def test_run_all_benchmarks_execution():
     assert res["accuracy"]["total_records"] == 1000
     assert res["accuracy"]["total_passed"] == 1000
     assert res["accuracy"]["overall_accuracy_pct"] == 100.0
+
+
+def test_multinational_golden_dataset_integrity():
+    """Verify that the multinational golden dataset file exists and contains 1,000 valid records across INTL-01..06."""
+    p = "/home/jwhite/Address-Standardizer/benchmarks/data/golden_dataset_multinational.json"
+    assert os.path.exists(p), f"Multinational dataset file missing: {p}"
+    with open(p, "r", encoding="utf-8") as f:
+        records = json.load(f)
+    assert len(records) == 1000, f"Expected 1,000 records, got {len(records)}"
+
+    expected_categories = {
+        "uk_commonwealth_postcodes": 200,
+        "canada_bilingual_rural": 150,
+        "eu_inverted_compound": 200,
+        "latam_compound_urbanization": 150,
+        "global_formation_hubs": 150,
+        "multilingual_diacritics_messy": 150,
+    }
+    from collections import Counter
+    cat_counts = Counter(r["category"] for r in records)
+    for cat, expected_count in expected_categories.items():
+        assert cat_counts[cat] == expected_count, f"Category {cat} count mismatch: {cat_counts[cat]} vs {expected_count}"
+
+    # Verify schema of records
+    for r in records[:50]:
+        assert "test_id" in r
+        assert "category" in r
+        assert "jurisdiction" in r
+        assert "raw_input" in r
+        assert "expected_output" in r
+        assert r["expected_output"]["normalized_address_key"]
+        assert r["expected_output"]["building_key"]

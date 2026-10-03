@@ -33,6 +33,7 @@ from address_standardizer.geocoder import (
 )
 from address_standardizer.batch import (
     chunk_generator,
+    buffered_chunk_generator,
     process_chunk,
     stream_standardize_csv,
 )
@@ -97,8 +98,22 @@ from address_standardizer.offline_index import (
     resolve_offline_coordinates,
     validate_parcel_offline,
 )
+from address_standardizer.spatial import (
+    SpatialEngine,
+    SpatialResolutionResult,
+    get_default_spatial_engine,
+    resolve_spatial_coordinates,
+    lat_lng_to_h3,
+)
+from address_standardizer._native_dispatch import (
+    is_native_available,
+    is_using_native,
+    get_engine_info,
+    standardize_record_dispatch,
+    standardize_batch_dispatch,
+)
 
-__version__ = "2.1.0"
+__version__ = "3.2.0"
 
 __all__ = [
     "StandardizedAddress",
@@ -118,6 +133,7 @@ __all__ = [
     "CensusGeocoder",
     "get_fallback_centroid",
     "chunk_generator",
+    "buffered_chunk_generator",
     "process_chunk",
     "stream_standardize_csv",
     # Confidence scoring
@@ -178,5 +194,18 @@ __all__ = [
     "get_default_offline_index",
     "resolve_offline_coordinates",
     "validate_parcel_offline",
+    # Milestone 3.2: Spatial Engine Subsystem
+    "SpatialEngine",
+    "SpatialResolutionResult",
+    "get_default_spatial_engine",
+    "resolve_spatial_coordinates",
+    "lat_lng_to_h3",
+    # Milestone 3.3: Acceleration Engine & Native Dispatch
+    "is_native_available",
+    "is_using_native",
+    "get_engine_info",
+    "standardize_record_dispatch",
+    "standardize_batch_dispatch",
     "__version__",
 ]
+

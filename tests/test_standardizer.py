@@ -1497,5 +1497,11 @@ class TestRuleBasedFallbackAndEdgeCases:
         assert res_high_st.street1 == "100 HIGH ST"
         assert res_high_st.address_status == "standardized"
 
+    def test_split_international_secondary_unit_directional_normalization(self):
+        from address_standardizer.standardizer import _split_international_secondary_unit
+        s1, s2 = _split_international_secondary_unit("10 North Road, Suite 4", "")
+        assert "N RD" in s1
+        assert "STE 4" in s2
+
 
 

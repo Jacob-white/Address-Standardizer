@@ -425,3 +425,378 @@ class TestCLI:
         captured_empty = capsys.readouterr()
         assert "No suggestions found." in captured_empty.out
 
+    def test_cli_parse_format_text(self, capsys):
+        test_args = ["address-standardizer", "parse", "100 Wall Street, Suite 400, New York, NY 10005", "--format", "text"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "STANDARDIZED ADDRESS" in captured.out
+        assert "Street 1:              100 WALL ST" in captured.out
+        assert "Street 2:              STE 400" in captured.out
+        assert "City:                  NEW YORK" in captured.out
+        assert "State:                 NY" in captured.out
+        assert "Postal Code:           10005" in captured.out
+        assert "Country:               USA (ISO3: USA)" in captured.out
+        assert "Address Key:           100 WALL ST|STE 400|NEW YORK|NY|10005|USA" in captured.out
+
+    def test_cli_parse_format_text_with_details(self, capsys):
+        test_args = [
+            "address-standardizer",
+            "parse",
+            "100 Wall Street, New York, NY 10005",
+            "--format", "text",
+            "--enable-geocoding",
+            "--confidence",
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "STANDARDIZED ADDRESS" in captured.out
+        assert "Coordinates:" in captured.out
+        assert "Confidence Score:" in captured.out
+
+    def test_cli_parse_with_enable_geocoding(self, capsys):
+        test_args = ["address-standardizer", "parse", "100 Wall Street, Suite 400, New York, NY 10005", "--enable-geocoding"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["street1"] == "100 WALL ST"
+        assert "latitude" in data
+        assert "longitude" in data
+        assert data["latitude"] == 40.7061
+        assert data["longitude"] == -74.0060
+        assert data["spatial_precision"] == "CONFIRMED_ROOFTOP"
+        assert "spatial_result" in data
+
+    def test_cli_parse_with_custom_spatial_db(self, tmp_path, capsys):
+        from address_standardizer.spatial import SpatialEngine
+        db_path = tmp_path / "custom_spatial.db"
+        engine = SpatialEngine(db_path=str(db_path), seed=True)
+        engine.close()
+
+        test_args = [
+            "address-standardizer", "parse", "100 Wall Street, Suite 400, New York, NY 10005",
+            "--enable-geocoding", "--spatial-db", str(db_path)
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["latitude"] == 40.7061
+
+    def test_cli_parse_international_extended_fields_text_and_json(self, capsys):
+        test_args = [
+            "address-standardizer", "parse",
+            "--street1", "Flat 2, The Mansions, 15 High Street",
+            "--street2", "Headingley",
+            "--city", "Leeds",
+            "--zip", "LS6 2AA",
+            "--country", "United Kingdom",
+            "--format", "text",
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "STANDARDIZED ADDRESS" in captured.out
+        assert "ISO3: GBR" in captured.out
+
+    def test_cli_batch_with_enable_geocoding(self, tmp_path):
+        input_file = tmp_path / "input_spatial.csv"
+        output_file = tmp_path / "output_spatial.csv"
+
+        with open(input_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["id", "street1", "city", "state", "postal_code", "country"])
+            writer.writerow(["1", "100 Wall Street", "New York", "NY", "10005", "USA"])
+
+        test_args = [
+            "address-standardizer", "batch",
+            str(input_file), str(output_file),
+            "--enable-geocoding",
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+
+        assert output_file.exists()
+        with open(output_file, "r", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+            assert rows[0]["latitude"] != ""
+            assert rows[0]["spatial_precision"] != ""
+            assert rows[0]["spatial_source"] != ""
+
+    def test_cli_batch_with_include_intl(self, tmp_path):
+        input_file = tmp_path / "input_intl.csv"
+        output_file = tmp_path / "output_intl.csv"
+
+        with open(input_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["id", "street1", "city", "state", "postal_code", "country"])
+            writer.writerow(["1", "25 Bank Street", "London", "", "E14 5JP", "GBR"])
+
+        test_args = [
+            "address-standardizer", "batch",
+            str(input_file), str(output_file),
+            "--include-intl",
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+
+        assert output_file.exists()
+        with open(output_file, "r", encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+            assert "std_dependent_locality" in rows[0]
+            assert "std_building_name" in rows[0]
+            assert rows[0]["std_country_iso3"] == "GBR"
+
+    def test_cli_benchmark_domestic_text(self, capsys):
+        test_args = ["address-standardizer", "benchmark", "--dataset", "domestic", "--iterations", "1", "--format", "text"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "ADDRESS STANDARDIZER PRODUCTION BENCHMARK REPORT" in captured.out
+        assert "DOMESTIC GOLDEN DATASET ACCURACY" in captured.out
+        assert "ENTERPRISE ARCHITECTURE SLA VALIDATION STATUS" in captured.out
+        assert "PASS" in captured.out
+
+    def test_cli_benchmark_multinational_json(self, capsys):
+        test_args = ["address-standardizer", "benchmark", "--dataset", "multi_national", "--iterations", "1", "--format", "json"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert "performance" in data
+        assert "accuracy" in data
+        assert "accuracy_multinational" in data
+        assert data["accuracy"]["overall_accuracy_pct"] >= 99.5
+
+    def test_cli_benchmark_all(self, capsys):
+        test_args = ["address-standardizer", "benchmark", "--dataset", "all", "--iterations", "1"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "DOMESTIC GOLDEN DATASET ACCURACY" in captured.out
+        assert "MULTINATIONAL GOLDEN DATASET ACCURACY" in captured.out
+        assert "PASS" in captured.out
+
+    def test_cli_benchmark_custom_dataset(self, tmp_path, capsys):
+        custom_file = tmp_path / "custom_golden.json"
+        record = [{
+            "test_id": "CUSTOM-01",
+            "category": "standard_clean",
+            "raw_input": {"street1": "100 Wall St", "city": "New York", "state": "NY", "postal_code": "10005", "country": "USA"},
+            "expected_output": {
+                "street1": "100 WALL ST", "street2": "", "city": "NEW YORK", "state": "NY", "postal_code": "10005",
+                "country": "USA", "normalized_address_key": "100 WALL ST||NEW YORK|NY|10005|USA",
+                "building_key": "100 WALL ST||NEW YORK|NY|10005|USA", "phonetic_key": "100|W400|10005",
+                "is_registered_agent_hub": False
+            }
+        }]
+        with open(custom_file, "w", encoding="utf-8") as f:
+            json.dump(record, f)
+
+        test_args = ["address-standardizer", "benchmark", "--dataset", str(custom_file), "--iterations", "1"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "GOLDEN DATASET ACCURACY" in captured.out
+
+    def test_cli_benchmark_import_fallback(self, capsys):
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "benchmarks.run_benchmarks":
+                raise ImportError("Mocked import error")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            test_args = ["address-standardizer", "benchmark", "--dataset", "domestic", "--iterations", "1", "--format", "json"]
+            with patch.object(sys, "argv", test_args):
+                main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert "performance" in data
+
+    def test_cli_spatial_lookup_by_address(self, capsys):
+        test_args = ["address-standardizer", "spatial", "lookup", "100 Wall St, New York, NY 10005"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert len(data) == 1
+        assert data[0]["latitude"] == 40.7061
+        assert data[0]["longitude"] == -74.0060
+
+    def test_cli_spatial_lookup_by_explicit_address_text(self, capsys):
+        test_args = ["address-standardizer", "spatial", "lookup", "--address", "100 Wall St, New York, NY 10005", "--format", "text"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "SPATIAL RESOLUTION RESULT" in captured.out
+        assert "Status:                CONFIRMED_ROOFTOP" in captured.out
+        assert "40.7061" in captured.out
+
+    def test_cli_spatial_lookup_by_coordinates_radius(self, capsys):
+        test_args = ["address-standardizer", "spatial", "lookup", "--lat", "40.7061", "--lon", "-74.0060", "--radius", "500"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert len(data) >= 1
+        assert data[0]["latitude"] == 40.7061
+
+    def test_cli_spatial_lookup_by_coordinates_radius_text(self, capsys):
+        test_args = ["address-standardizer", "spatial", "lookup", "--lat", "40.7061", "--lon", "-74.0060", "--radius", "500", "--format", "text"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "Found" in captured.out
+        assert "within 500.0m" in captured.out
+
+    def test_cli_spatial_lookup_by_bounding_box(self, capsys):
+        test_args = [
+            "address-standardizer", "spatial", "lookup",
+            "--min-lat", "40.70", "--min-lon", "-74.01",
+            "--max-lat", "40.71", "--max-lon", "-74.00"
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert len(data) >= 1
+        assert data[0]["latitude"] == 40.7061
+
+    def test_cli_spatial_lookup_by_bounding_box_text(self, capsys):
+        test_args = [
+            "address-standardizer", "spatial", "lookup",
+            "--min-lat", "40.70", "--min-lon", "-74.01",
+            "--max-lat", "40.71", "--max-lon", "-74.00",
+            "--format", "text"
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "Found" in captured.out
+        assert "in bounding box" in captured.out
+
+    def test_cli_spatial_lookup_by_bbox_argument(self, capsys):
+        test_args = [
+            "address-standardizer", "spatial", "lookup",
+            "--bbox", "-74.01,40.70,-74.00,40.71"
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert len(data) >= 1
+
+    def test_cli_spatial_lookup_by_bbox_argument_text(self, capsys):
+        test_args = [
+            "address-standardizer", "spatial", "lookup",
+            "--bbox", "-74.01,40.70,-74.00,40.71",
+            "--format", "text"
+        ]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "in bounding box" in captured.out
+
+    def test_cli_spatial_lookup_invalid_bbox_error(self):
+        test_args = ["address-standardizer", "spatial", "lookup", "--bbox", "-74.01,40.70"]
+        with patch.object(sys, "argv", test_args):
+            with pytest.raises(SystemExit) as exc:
+                main()
+            assert exc.value.code == 2
+
+    def test_cli_spatial_lookup_no_query_error(self):
+        test_args = ["address-standardizer", "spatial", "lookup"]
+        with patch.object(sys, "argv", test_args):
+            with pytest.raises(SystemExit) as exc:
+                main()
+            assert exc.value.code == 2
+
+    def test_cli_spatial_info_text_and_json(self, capsys):
+        # 1. Text format
+        with patch.object(sys, "argv", ["address-standardizer", "spatial", "info", "--format", "text"]):
+            main()
+        captured_text = capsys.readouterr()
+        assert "SPATIAL DATABASE DIAGNOSTICS & INDEX STATISTICS" in captured_text.out
+        assert "Indexed Spatial Points:" in captured_text.out
+        assert "R*Tree Index Enabled:      True" in captured_text.out
+
+        # 2. JSON format
+        with patch.object(sys, "argv", ["address-standardizer", "spatial", "info", "--format", "json"]):
+            main()
+        captured_json = capsys.readouterr()
+        data = json.loads(captured_json.out)
+        assert data["total_spatial_points"] >= 5
+        assert data["rtree_index_enabled"] is True
+
+    def test_cli_spatial_stats_alias(self, capsys):
+        with patch.object(sys, "argv", ["address-standardizer", "spatial", "stats", "--format", "json"]):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert "total_spatial_points" in data
+
+    def test_cli_spatial_custom_db(self, tmp_path, capsys):
+        from address_standardizer.spatial import SpatialEngine
+        db_path = tmp_path / "custom_spatial_info.db"
+        engine = SpatialEngine(db_path=str(db_path), seed=True)
+        engine.close()
+
+        with patch.object(sys, "argv", ["address-standardizer", "spatial", "info", "--spatial-db", str(db_path), "--format", "json"]):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["database_path"] == str(db_path)
+
+    def test_cli_spatial_no_action_prints_help(self):
+        with patch.object(sys, "argv", ["address-standardizer", "spatial"]):
+            with pytest.raises(SystemExit) as exc:
+                main()
+            assert exc.value.code == 1
+
+    def test_cli_shorthand_invocation_benchmark_spatial_not_intercepted(self, capsys):
+        # Invoking benchmark with iterations=1 should run benchmark, not treat "benchmark" as street1
+        with patch.object(sys, "argv", ["address-standardizer", "benchmark", "--iterations", "1", "--format", "json"]):
+            main()
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        # Should be benchmark output, not StandardizedAddress dict
+        assert "performance" in data
+        assert "street1" not in data
+
+    def test_cli_parse_format_text_with_cascade(self, capsys):
+        test_args = ["address-standardizer", "parse", "100 Wall St, New York, NY 10005", "--cascade", "--format", "text"]
+        with patch.object(sys, "argv", test_args):
+            main()
+        captured = capsys.readouterr()
+        assert "Coordinates:" in captured.out
+        assert "Stage" in captured.out
+
+    def test_cli_benchmark_import_failure_raises(self):
+        import builtins
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "benchmarks.run_benchmarks":
+                raise ImportError("Mocked import error")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            with patch("importlib.util.spec_from_file_location", return_value=None):
+                test_args = ["address-standardizer", "benchmark"]
+                with patch.object(sys, "argv", test_args):
+                    with pytest.raises(ImportError) as exc:
+                        main()
+                    assert "Cannot load benchmarks from" in str(exc.value)
+
+    def test_cli_spatial_lookup_bbox_non_numeric_error(self):
+        test_args = ["address-standardizer", "spatial", "lookup", "--bbox", "invalid,coords,not,numbers"]
+        with patch.object(sys, "argv", test_args):
+            with pytest.raises(SystemExit) as exc:
+                main()
+            assert exc.value.code == 2
+
