@@ -1,8 +1,9 @@
 """
 Address Standardizer
 ====================
-High-performance, zero-external-service address standardization and entity resolution engine.
-Adheres to USPS Publication 28 and ISO-3166 standards.
+High-performance, universal multi-national address standardization, offline spatial rooftop geocoding,
+and cross-border corporate entity resolution platform.
+Adheres to USPS Publication 28, Universal Postal Union (UPU) S42, and ISO 19160-4 standards.
 """
 
 from address_standardizer.models import StandardizedAddress
