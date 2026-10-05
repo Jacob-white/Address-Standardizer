@@ -1503,5 +1503,41 @@ class TestRuleBasedFallbackAndEdgeCases:
         assert "N RD" in s1
         assert "STE 4" in s2
 
+    def test_municipal_only_sovereign_country_and_firm_network_edge_cases(self):
+        # 1. Single string municipal-only ending in United States does not become UNITED ESTS
+        res_naples = standardize_address("Naples, FL, United States")
+        assert res_naples.street1 == ""
+        assert res_naples.city == "NAPLES"
+        assert res_naples.state == "FL"
+        assert res_naples.address_status == "parse_failed"
+        assert res_naples.confidence_score == 0.0
+
+        # 2. Structured municipal-only with country in street1
+        res_struct_naples = standardize_address(
+            street1="Naples, FL, United States",
+            city="Naples",
+            state="FL",
+            country="United States",
+        )
+        assert res_struct_naples.street1 == ""
+        assert res_struct_naples.city == "NAPLES"
+        assert res_struct_naples.state == "FL"
+        assert res_struct_naples.address_status == "parse_failed"
+
+        # 3. Firm Network redundant city, state, zip, and sovereign country in street1
+        res_walnut = standardize_address(
+            street1="1212 Broadway Plaza, Walnut Creek, CA 94596, United States",
+            city="Walnut Creek",
+            state="CA",
+            postal_code="94596",
+            country="United States",
+        )
+        assert res_walnut.street1 == "1212 BROADWAY PLZ"
+        assert res_walnut.city == "WALNUT CREEK"
+        assert res_walnut.state == "CA"
+        assert res_walnut.postal_code == "94596"
+        assert res_walnut.address_status == "standardized"
+        assert res_walnut.confidence_score >= 0.95
+
 
 

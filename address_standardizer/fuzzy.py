@@ -121,6 +121,8 @@ PROTECTED_STREET_WORDS: frozenset[str] = frozenset({
     "TREE", "PEACH", "ASH", "BIRCH", "FLOWER", "GRAND", "BROADWAY", "MARKET",
     "BELL", "BALL", "HALL", "CALL", "TALL", "BILL", "BULL", "DOLL", "POLL", "ROLL", "TOLL",
     "MICHIGAN", "PENNSYLVANIA", "CALIFORNIA",
+    # Sovereign country / territorial words
+    "STATES", "UNITED", "AMERICA", "ISLANDS",
 })
 
 
@@ -135,7 +137,7 @@ def heal_street_suffix(token: str, max_distance: int = 2) -> Optional[str]:
         return None
 
     tok_clean = re.sub(r"[^A-Z]", "", token.upper())
-    if not tok_clean or tok_clean in ("STATE", "COUNTY", "NORTH", "SOUTH", "EAST", "WEST"):
+    if not tok_clean or tok_clean in ("STATE", "STATES", "COUNTY", "UNITED", "AMERICA", "ISLANDS", "COUNTRY", "NORTH", "SOUTH", "EAST", "WEST"):
         return None
 
     if tok_clean in STREET_SUFFIXES:

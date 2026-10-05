@@ -33,6 +33,8 @@ from address_standardizer._patterns import (
     ROUTE_PREFIXES,
     get_fuzzy_suffix,
     get_fuzzy_directional,
+    RE_TERMINAL_COUNTRY,
+    clean_redundant_street_tail,
 )
 from address_standardizer.phonetics import generate_phonetic_address_key
 
@@ -92,7 +94,10 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
     Parses clean street phrase e.g. '100 Main St' or '200 Park Ave Suite 1200'.
     Returns (normalized_street1, normalized_street2) or None if complex/ambiguous.
     """
-    phrase_upper = phrase.strip().upper()
+    phrase_upper = re.sub(r"[\r\n\t]+", " ", phrase).strip().upper()
+    if not phrase_upper:
+        return None
+    phrase_upper = RE_TERMINAL_COUNTRY.sub("", phrase_upper).rstrip(" ,.-")
     if not phrase_upper:
         return None
 
@@ -190,7 +195,7 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
     else:
         return None
 
-    if not name_tokens:
+    if not name_tokens or len(name_tokens) > 5 or any(len(tok) == 5 and tok.isdigit() for tok in name_tokens):
         return None
 
     # Normalize street name tokens (ordinals, words)
@@ -217,8 +222,10 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
         else:
             # Check if ordinal like 42ND, 5TH
             m_num = RE_NUMBERED_STREET.match(t)
-            if m_num:
+            if m_num and 1 <= int(m_num.group(1)) <= 999:
                 norm_name_parts.append(_fast_num_to_ordinal(int(m_num.group(1))))
+            elif m_num:
+                norm_name_parts.append(t)
             elif enable_fuzzy:
                 from address_standardizer.fuzzy import heal_street_name
                 h_name = heal_street_name(t)
@@ -261,18 +268,26 @@ def fast_path_parse(
     if c_raw not in ("USA", "US", "UNITED STATES", "UNITED STATES OF AMERICA"):
         return None
 
-    s1_raw = (street1 or "").strip()
-    s2_raw = (street2 or "").strip()
-    city_raw = (city or "").strip()
-    state_raw = (state or "").strip()
-    zip_raw = (postal_code or "").strip()
+    s1_raw = re.sub(r"[\r\n\t]+", " ", (street1 or "")).strip()
+    s2_raw = re.sub(r"[\r\n\t]+", " ", (street2 or "")).strip()
+    city_raw = re.sub(r"[\r\n\t]+", " ", (city or "")).strip()
+    state_raw = re.sub(r"[\r\n\t]+", " ", (state or "")).strip()
+    zip_raw = re.sub(r"[\r\n\t]+", " ", (postal_code or "")).strip()
 
     # Path A: Structured Inputs (street1, city, state, postal_code provided)
     if s1_raw and city_raw and state_raw and zip_raw:
+        s1_raw = RE_TERMINAL_COUNTRY.sub("", s1_raw).rstrip(" ,.-")
+        if s2_raw:
+            s2_raw = RE_TERMINAL_COUNTRY.sub("", s2_raw).rstrip(" ,.-")
         # Validate state
         st_clean = state_raw.upper().replace(".", "").strip()
         state_code = US_STATES.get(st_clean, st_clean if st_clean in FROZEN_US_STATE_CODES else None)
         if not state_code:
+            return None
+
+        # Clean redundant city/state/zip if present at end of s1_raw
+        s1_raw = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_code, postal_code=zip_raw)
+        if not s1_raw:
             return None
 
         # Validate ZIP5

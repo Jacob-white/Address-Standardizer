@@ -300,4 +300,37 @@ class TestFastPathPrivacyPlaceholders:
         assert res_punct is not None
         assert res_punct.street1 == "100 MAIN ST"
 
+    def test_sovereign_country_and_fuzzy_suffix_guardrails(self):
+        from address_standardizer.fuzzy import heal_street_suffix
+        # Verify sovereign words are protected and never healed to street suffixes
+        assert heal_street_suffix("STATES") is None
+        assert heal_street_suffix("UNITED") is None
+        assert heal_street_suffix("AMERICA") is None
+        assert heal_street_suffix("ISLANDS") is None
+        assert heal_street_suffix("STATE") is None
+        assert heal_street_suffix("COUNTRY") is None
+
+    def test_fast_path_redundant_tail_and_ordinal_bounds(self):
+        # 5-digit zip code in street name is blocked from ordinal expansion (94596TH)
+        res_zip_in_street = _normalize_fast_street_phrase("1212 Broadway 94596")
+        assert res_zip_in_street is None
+
+        # Numbered streets within 1-999 are converted to ordinals
+        res_valid_ord = _normalize_fast_street_phrase("100 42 Street")
+        assert res_valid_ord == ("100 42ND ST", "")
+
+        # Structured input with redundant trailing city, state, zip, and country
+        res = fast_path_parse(
+            street1="1212 Broadway Plaza, Walnut Creek, CA 94596, United States",
+            city="Walnut Creek",
+            state="CA",
+            postal_code="94596",
+            country="United States",
+        )
+        assert res is not None
+        assert res.street1 == "1212 BROADWAY PLZ"
+        assert res.city == "WALNUT CREEK"
+        assert res.state == "CA"
+        assert res.postal_code == "94596"
+
 

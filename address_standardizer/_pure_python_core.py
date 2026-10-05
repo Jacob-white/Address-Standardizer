@@ -17,6 +17,8 @@ from address_standardizer._patterns import (
     RE_COMMA_DOT,
     RE_NON_ALPHANUMERIC,
     RE_WHITESPACE,
+    RE_TERMINAL_COUNTRY,
+    clean_redundant_street_tail,
 )
 from address_standardizer.fast_path import (
     fast_path_parse,
@@ -121,12 +123,13 @@ def standardize_record(
     When finalize=False, executes ultra-fast core normalization (> 10,000 rec/s).
     """
     # 1. Tier 0: Pre-flight sanitization
-    s1_raw = unicodedata.normalize("NFKC", street1).strip() if street1 else ""
-    s2_raw = unicodedata.normalize("NFKC", street2).strip() if street2 else ""
-    city_raw = unicodedata.normalize("NFKC", city).strip() if city else ""
-    state_raw = unicodedata.normalize("NFKC", state).strip() if state else ""
-    postal_raw = unicodedata.normalize("NFKC", postal_code).strip() if postal_code else ""
-    country_raw = unicodedata.normalize("NFKC", country).strip() if country else ""
+    import re
+    s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", street1)).strip() if street1 else ""
+    s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", street2)).strip() if street2 else ""
+    city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", city)).strip() if city else ""
+    state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", state)).strip() if state else ""
+    postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", postal_code)).strip() if postal_code else ""
+    country_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", country)).strip() if country else ""
 
     raw_components = [v for v in [s1_raw, s2_raw, city_raw, state_raw, postal_raw, country_raw] if v]
     raw_street_address = ", ".join(raw_components)
@@ -203,6 +206,12 @@ def standardize_record(
     )
     is_us = country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
 
+    # Strip terminal sovereign country before US or international parsing if structured components present
+    if city_raw or state_raw or postal_raw:
+        s1_raw = RE_TERMINAL_COUNTRY.sub("", s1_raw).rstrip(" ,.-")
+        if s2_raw:
+            s2_raw = RE_TERMINAL_COUNTRY.sub("", s2_raw).rstrip(" ,.-")
+
     # 3. US Domestic Path
     if is_us:
         # Tier 1 Fast Path
@@ -225,8 +234,9 @@ def standardize_record(
             return fast_res
 
         # Tier 2 Deterministic Rule Matrix
+        s1_clean = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
         norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
-            s1_raw, s2_raw, enable_fuzzy=kwargs.get("enable_fuzzy", True), city_raw=city_raw
+            s1_clean, s2_raw, enable_fuzzy=kwargs.get("enable_fuzzy", True), city_raw=city_raw
         )
         if not city_raw and p_city:
             city_raw = p_city

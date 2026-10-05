@@ -69,6 +69,12 @@ RE_URBANIZATION = re.compile(
 RE_UK_POSTCODE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.IGNORECASE)
 RE_CAN_POSTCODE = re.compile(r"\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b", re.IGNORECASE)
 
+# Sovereign Country Terminal Pattern
+RE_TERMINAL_COUNTRY = re.compile(
+    r"(?:,\s*|\s+)(?:UNITED\s+STATES(?:\s+OF\s+AMERICA)?|U\.S\.A\.|USA|CAYMAN\s+ISLANDS|UNITED\s+KINGDOM|GREAT\s+BRITAIN|CANADA)\.?\s*$",
+    re.IGNORECASE,
+)
+
 # Numbered streets
 RE_NUMBERED_STREET = re.compile(r"^(\d+)(?:ST|ND|RD|TH)?$", re.IGNORECASE)
 
@@ -210,13 +216,59 @@ def get_fuzzy_suffix(token: str) -> Optional[str]:
     tok_clean = RE_CLEAN_ALPHA.sub("", token.upper())
     if not tok_clean:
         return None
-    if tok_clean in ("STATE", "COUNTY"):
+    if tok_clean in ("STATE", "STATES", "COUNTY", "UNITED", "AMERICA", "ISLANDS", "COUNTRY"):
         return None
     if tok_clean in STREET_SUFFIXES:
         return STREET_SUFFIXES[tok_clean]
 
     from address_standardizer.fuzzy import heal_street_suffix
     return heal_street_suffix(tok_clean, max_distance=2)
+
+
+def clean_redundant_street_tail(
+    s: str,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    postal_code: Optional[str] = None,
+) -> str:
+    """
+    Strips terminal sovereign country tokens and redundant trailing city, state,
+    and postal codes that were already provided in separate fields or concatenated.
+    """
+    if not s:
+        return ""
+    curr = s.strip()
+
+    # 1. Strip terminal sovereign country
+    curr = RE_TERMINAL_COUNTRY.sub("", curr).rstrip(" ,.-")
+
+    # 2. Strip matching postal code if at end
+    if postal_code:
+        zip_clean = postal_code.strip()
+        if zip_clean and curr.endswith(zip_clean):
+            curr = curr[:-len(zip_clean)].rstrip(" ,.-")
+        elif len(zip_clean) >= 5 and curr.endswith(zip_clean[:5]):
+            curr = curr[:-5].rstrip(" ,.-")
+
+    # 3. Strip matching state if at end
+    if state:
+        st_clean = state.strip().upper()
+        if st_clean:
+            m_st = re.search(r"(?:,\s*|\s+)" + re.escape(st_clean) + r"$", curr, re.IGNORECASE)
+            if m_st:
+                curr = curr[:m_st.start()].rstrip(" ,.-")
+
+    # 4. Strip matching city if at end or exact match
+    if city:
+        city_clean = city.strip().upper()
+        if city_clean:
+            m_city = re.search(r"(?:,\s*|\s+)" + re.escape(city_clean) + r"$", curr, re.IGNORECASE)
+            if m_city:
+                curr = curr[:m_city.start()].rstrip(" ,.-")
+            if curr.upper() == city_clean:
+                curr = ""
+
+    return curr
 
 
 def get_fuzzy_directional(token: str) -> Optional[str]:

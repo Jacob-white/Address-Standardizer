@@ -63,6 +63,8 @@ from address_standardizer._patterns import (
     RE_GLUED_UNIT,
     RE_MILITARY_UNIT_BOX,
     RE_RURAL_ROUTE,
+    RE_TERMINAL_COUNTRY,
+    clean_redundant_street_tail,
     RE_HIGHWAY_CONTRACT,
     RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
     RE_ATTACHED_SUFFIX_BARE_UNIT,
@@ -758,8 +760,10 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 f_dir = get_fuzzy_directional(clean) if enable_fuzzy else None
                 f_suf = get_fuzzy_suffix(clean) if enable_fuzzy else None
                 m_ord = RE_NUMBERED_STREET.match(clean)
-                if m_ord:
+                if m_ord and 1 <= int(m_ord.group(1)) <= 999:
                     street_parts.append(num_to_ordinal(int(m_ord.group(1))))
+                elif m_ord:
+                    street_parts.append(clean)
                 elif f_dir and len(street_parts) == 1 and i + 1 < len(parsed) and parsed[i+1][1] == "StreetName":
                     street_parts.append(f_dir)
                 elif f_suf and len(street_parts) >= 2 and (i == len(parsed) - 1 or (i == len(parsed) - 2 and parsed[i+1][1] in ("StateName", "ZipCode"))):
@@ -892,6 +896,8 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
     """Parses US address lines and returns (st1, st2, ok, p_city, p_state, p_zip)."""
     s1_clean = (street1_raw or "").strip()
     s2_clean = (street2_raw or "").strip()
+    if city_raw:
+        s1_clean = clean_redundant_street_tail(s1_clean, city=city_raw)
 
     # Check if street1 has physical street and street2 has PO Box (Dual-Address line)
     m_s1_po = RE_PO_BOX.search(s1_clean)
@@ -1127,12 +1133,12 @@ def standardize_address(
             return copy.copy(cached)
 
     # Tier 0: Pre-Flight Sanity & Unicode NFKC Normalization
-    s1_raw = unicodedata.normalize('NFKC', street1).strip() if street1 else ""
-    s2_raw = unicodedata.normalize('NFKC', street2).strip() if street2 else ""
-    city_raw = unicodedata.normalize('NFKC', city).strip() if city else ""
-    state_raw = unicodedata.normalize('NFKC', state).strip() if state else ""
-    postal_raw = unicodedata.normalize('NFKC', postal_code).strip() if postal_code else ""
-    country_raw = unicodedata.normalize('NFKC', country).strip() if country else ""
+    s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', street1)).strip() if street1 else ""
+    s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', street2)).strip() if street2 else ""
+    city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', city)).strip() if city else ""
+    state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', state)).strip() if state else ""
+    postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', postal_code)).strip() if postal_code else ""
+    country_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', country)).strip() if country else ""
 
     raw_components = [v for v in [s1_raw, s2_raw, city_raw, state_raw, postal_raw, country_raw] if v]
     raw_street_address = ", ".join(raw_components)
@@ -1186,6 +1192,12 @@ def standardize_address(
     )
     is_us = country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
 
+    # Strip terminal sovereign country before US or international parsing if structured components present
+    if city_raw or state_raw or postal_raw:
+        s1_raw = RE_TERMINAL_COUNTRY.sub("", s1_raw).rstrip(" ,.-")
+        if s2_raw:
+            s2_raw = RE_TERMINAL_COUNTRY.sub("", s2_raw).rstrip(" ,.-")
+
     # Tier 1: Ultra-Fast Deterministic Fast-Path Parser (< 0.015 ms)
     if is_us:
         fast_res = fast_path_parse(
@@ -1205,8 +1217,9 @@ def standardize_address(
     # Tier 2 & Tier 3: Deterministic Rule Matrix and Statistical CRF Fallback
     if is_us:
         # US Pipeline (USPS Pub 28)
+        s1_clean = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
         norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
-            s1_raw, s2_raw, enable_fuzzy=enable_fuzzy, city_raw=city_raw
+            s1_clean, s2_raw, enable_fuzzy=enable_fuzzy, city_raw=city_raw
         )
         if not city_raw and p_city:
             city_raw = p_city
