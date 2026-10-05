@@ -1,0 +1,290 @@
+"""Eastern European and Cyrillic Address Grammar (POL, CZE, ROU, GRC, BGR, SRB, UKR).
+
+Provides specialized parsing and normalization for:
+- Poland (POL): Prefix road types (ul., al., pl.), house numbers with slashes (10/12),
+  mieszkanie/lokal (m. 14, lok. 2), postal codes (00-950).
+- Czechia (CZE): Prefix road types (ul., nám., tř.), descriptive/orientation numbers,
+  postal codes (110 00).
+- Romania (ROU): Strada, Bulevardul, Calea, secondary units (Bl., Sc., Ap.), postal codes (010011).
+- Greece (GRC): Odos, Leoforos, Plateia, Greek alphabet and Romanized, postal codes (105 63).
+- Bulgaria (BGR): Cyrillic and Romanized (ул., бул., пл.), postal codes (1000).
+- Serbia (SRB): Cyrillic and Latin (ul., bul., trg, Knez Mihailova), postal codes (11000).
+- Ukraine (UKR): Cyrillic and Romanized (вул., просп., кв., оф.), postal codes (01001).
+"""
+
+from __future__ import annotations
+
+import re
+from typing import ClassVar, List, Optional, Tuple
+
+from address_standardizer._patterns import RE_COMMA_DOT
+from address_standardizer.international.base import (
+    CountryGrammar,
+    ParsedAddressComponents,
+    split_intl_secondary_unit,
+)
+from address_standardizer.international.diacritics import (
+    normalize_to_canonical_unicode,
+)
+from address_standardizer.tables import COUNTRY_MAP, GLOBAL_METRO_TO_COUNTRY
+
+# Secondary unit indicators (Polish, Czech, Romanian, Greek, Cyrillic, Latin)
+RE_EE_SECONDARY = re.compile(
+    r"\b(?:m\.|lok\.|mieszkanie|lokal|ap\.|apt|ap|apartament|byt|bl\.|bloc|sc\.|scara|et\.|etaj|кв\.|кв|квартира|ап\.|ап|оф\.|офис|офіс|вх\.|вход|ет\.|етаж|διαμ\.|diam\.|orofos)\s*([A-Za-z0-9\-]+)?",
+    re.IGNORECASE,
+)
+
+# House number addition at end of thoroughfare: e.g. "10/12", "5A", "1", "123/4", "45-47"
+RE_EE_HOUSE_NUM = re.compile(
+    r"^(.*?)\s+(\d+[A-Za-z0-9\-\/]*(?:\s+[A-Za-z]\b)?)$"
+)
+
+
+class EasternEuropeGrammar(CountryGrammar):
+    """Regional grammar family for Eastern Europe & Cyrillic jurisdictions."""
+
+    country_iso3: ClassVar[str] = "POL"
+    supported_countries: ClassVar[Tuple[str, ...]] = (
+        "POL", "POLAND", "POLSKA", "PL",
+        "CZE", "CZECH REPUBLIC", "CZECHIA", "CESKA REPUBLIKA", "ČESKÁ REPUBLIKA", "CZ",
+        "ROU", "ROMANIA", "ROMÂNIA", "RO",
+        "GRC", "GREECE", "HELLAS", "ELLADA", "ΕΛΛΑΔΑ", "ΕΛΛΆΔΑ", "ΕΛΛΑΣ", "ΕΛΛΆΣ", "GR",
+        "BGR", "BULGARIA", "BALGARIYA", "БЪЛГАРИЯ", "BG",
+        "SRB", "SERBIA", "SRBIJA", "СРБИЈА", "RS",
+        "UKR", "UKRAINE", "UKRAYINA", "УКРАЇНА", "УКРАИНА", "UA",
+    )
+
+    def normalize_postal_code(self, raw_code: str) -> str:
+        """Normalize Eastern European postal code."""
+        if not raw_code:
+            return ""
+        clean = " ".join(raw_code.strip().upper().split())
+        # Strip European ISO prefix if present (e.g. "PL-00-950", "CZ-110 00", "GR-105 63")
+        m_pfx = re.match(r"^(?:PL|CZ|RO|GR|BG|RS|UA)-?(.*)$", clean)
+        if m_pfx:
+            clean = m_pfx.group(1).strip()
+
+        # Poland with explicit hyphen: XX-XXX
+        m_pl = re.match(r"^(\d{2})-(\d{3})$", clean)
+        if m_pl:
+            return f"{m_pl.group(1)}-{m_pl.group(2)}"
+
+        # Czechia & Greece: XXX XX (with space)
+        m_sp = re.match(r"^(\d{3})\s+(\d{2})$", clean)
+        if m_sp:
+            return f"{m_sp.group(1)} {m_sp.group(2)}"
+
+        # Romania: XXXXXX (6 digits)
+        m_ro = re.match(r"^(\d{6})$", clean)
+        if m_ro:
+            return m_ro.group(1)
+
+        # Bulgaria: XXXX (4 digits)
+        m_bg = re.match(r"^(\d{4})$", clean)
+        if m_bg:
+            return m_bg.group(1)
+
+        # Serbia & Ukraine / unhyphenated 5 digits: XXXXX
+        m_5d = re.match(r"^(\d{5})$", clean)
+        if m_5d:
+            return m_5d.group(1)
+
+        return clean
+
+    def extract_premise_and_thoroughfare(
+        self, street_line: str
+    ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+        """Extract (premise, street_number, thoroughfare) from Eastern European street line."""
+        if not street_line:
+            return None, None, None
+
+        line = street_line.strip()
+        m = RE_EE_HOUSE_NUM.match(line)
+        if m:
+            st_num = m.group(2).strip()
+            return None, st_num, line
+
+        return None, None, line
+
+    def _resolve_country_iso(self, country_cand: Optional[str]) -> str:
+        if not country_cand:
+            return "POL"
+        c = country_cand.strip().upper()
+        if c in ("POL", "POLAND", "POLSKA", "PL"):
+            return "POL"
+        if c in ("CZE", "CZECH REPUBLIC", "CZECHIA", "CESKA REPUBLIKA", "ČESKÁ REPUBLIKA", "CZ"):
+            return "CZE"
+        if c in ("ROU", "ROMANIA", "ROMÂNIA", "RO"):
+            return "ROU"
+        if c in ("GRC", "GREECE", "HELLAS", "ELLADA", "ΕΛΛΑΔΑ", "ΕΛΛΆΔΑ", "ΕΛΛΑΣ", "ΕΛΛΆΣ", "GR"):
+            return "GRC"
+        if c in ("BGR", "BULGARIA", "BALGARIYA", "БЪЛГАРИЯ", "BG"):
+            return "BGR"
+        if c in ("SRB", "SERBIA", "SRBIJA", "СРБИЈА", "RS"):
+            return "SRB"
+        if c in ("UKR", "UKRAINE", "UKRAYINA", "УКРАЇНА", "УКРАИНА", "UA"):
+            return "UKR"
+        return "POL"
+
+    def parse(self, raw_tokens: List[str], metadata: dict) -> ParsedAddressComponents:
+        s1_raw = metadata.get("street1", "")
+        s2_raw = metadata.get("street2", "")
+        city_raw = metadata.get("city", "")
+        state_raw = metadata.get("state", "")
+        postal_raw = metadata.get("postal_code", "")
+        country_raw = metadata.get("country", self.country_iso3)
+        country_iso = self._resolve_country_iso(country_raw)
+
+        unit_type: Optional[str] = None
+        unit_number: Optional[str] = None
+        street_line = s1_raw
+
+        # Handle comma-delimited single string when city_raw is empty
+        if not city_raw and s1_raw and "," in s1_raw:
+            parts = [p.strip() for p in s1_raw.split(",") if p.strip()]
+            # Strip trailing country if present
+            if len(parts) >= 2 and (
+                parts[-1].upper() in self.supported_countries
+                or parts[-1].upper() in COUNTRY_MAP
+            ):
+                country_iso = self._resolve_country_iso(parts[-1])
+                parts = parts[:-1]
+
+            sec_units: List[str] = []
+            rem_parts: List[str] = []
+            for part in parts:
+                m_sec = RE_EE_SECONDARY.search(part)
+                if m_sec:
+                    if m_sec.start() > 0:
+                        street_p = part[:m_sec.start()].strip(" ,.-")
+                        sec_p = part[m_sec.start():].strip(" ,.-")
+                        if street_p:
+                            rem_parts.append(street_p)
+                        if sec_p:
+                            sec_units.append(sec_p)
+                    else:
+                        sec_units.append(part.strip())
+                    continue
+
+                # Check if entire part is a standalone postal code
+                if re.match(r"^(?:[A-Z]{2}-)?(?:\d{2}-\d{3}|\d{3}\s+\d{2}|\d{4,6})$", part.strip(), re.IGNORECASE):
+                    postal_raw = part.strip()
+                    continue
+
+                rem_parts.append(part)
+
+            if sec_units:
+                unit_number = " ".join(sec_units)
+
+            if len(rem_parts) >= 2:
+                # Check for "<Postal Code> <City>" OR "<City> <Postal Code>" in last part
+                # e.g. "00-026 Warszawa", "110 00 Praha", "010011 București", "105 63 Αθήνα", "1000 София", "01001 Київ"
+                # OR "София 1000", "Αθήνα 105 63", "Београд 11000"
+                m_pc_city = re.match(
+                    r"^(?:[A-Z]{2}-)?(\d{2}-\d{3}|\d{3}\s+\d{2}|\d{4,6})\s+(.*)$",
+                    rem_parts[-1],
+                    re.IGNORECASE,
+                )
+                m_city_pc = re.match(
+                    r"^(.*?)\s+((?:[A-Z]{2}-)?(?:\d{2}-\d{3}|\d{3}\s+\d{2}|\d{4,6}))$",
+                    rem_parts[-1],
+                    re.IGNORECASE,
+                )
+                if m_pc_city:
+                    postal_raw = m_pc_city.group(1)
+                    city_raw = m_pc_city.group(2)
+                    street_line = ", ".join(rem_parts[:-1])
+                elif m_city_pc:
+                    city_raw = m_city_pc.group(1)
+                    postal_raw = m_city_pc.group(2)
+                    street_line = ", ".join(rem_parts[:-1])
+                else:
+                    city_raw = rem_parts[-1]
+                    street_line = ", ".join(rem_parts[:-1])
+            elif len(rem_parts) == 1:
+                p0 = rem_parts[0].strip().upper()
+                if not city_raw and p0 in GLOBAL_METRO_TO_COUNTRY:
+                    city_raw = rem_parts[0]
+                    street_line = ""
+                else:
+                    street_line = rem_parts[0]
+
+        # Handle secondary units in s2_raw or embedded in street_line
+        if s2_raw and not unit_number:
+            m_sec = RE_EE_SECONDARY.search(s2_raw)
+            if m_sec:
+                unit_number = s2_raw.strip()
+            else:
+                unit_number = s2_raw.strip()
+
+        # Check inline secondary unit in street_line
+        m_sec_inline = RE_EE_SECONDARY.search(street_line)
+        if m_sec_inline and not unit_number:
+            unit_number = street_line[m_sec_inline.start():].strip(" ,.-")
+            street_line = street_line[:m_sec_inline.start()].strip(" ,.-")
+
+        # Extract secondary unit via split_intl_secondary_unit
+        st1_base, st2_base = split_intl_secondary_unit(street_line, "")
+        if st2_base and not unit_number:
+            s2_p = st2_base.split(maxsplit=1)
+            unit_type = s2_p[0]
+            unit_number = s2_p[1] if len(s2_p) > 1 else None
+            street_line = st1_base
+        else:
+            street_line = st1_base
+
+        # Ensure Polish postal code \b\d{2}-\d{3}\b is isolated and extracted
+        if not postal_raw or country_iso == "POL":
+            if not postal_raw:
+                m_pl_post = re.search(r"\b(\d{2}-\d{3})\b", s1_raw)
+                if m_pl_post:
+                    postal_raw = m_pl_post.group(1)
+            if city_raw:
+                m_c_post = re.search(r"\b(\d{2}-\d{3})\b", city_raw)
+                if m_c_post:
+                    if not postal_raw:
+                        postal_raw = m_c_post.group(1)
+                    city_raw = re.sub(r"\b\d{2}-\d{3}\b", "", city_raw).strip(" ,.-")
+            if street_line:
+                m_s_post = re.search(r"\b(\d{2}-\d{3})\b", street_line)
+                if m_s_post:
+                    if not postal_raw:
+                        postal_raw = m_s_post.group(1)
+                    street_line = re.sub(r"\b\d{2}-\d{3}\b", "", street_line).strip(" ,.-")
+
+        _, st_num, thoroughfare = self.extract_premise_and_thoroughfare(street_line)
+
+        norm_postal = self.normalize_postal_code(postal_raw)
+        if country_iso == "POL" and re.match(r"^\d{5}$", norm_postal):
+            norm_postal = f"{norm_postal[:2]}-{norm_postal[2:]}"
+        elif country_iso in ("CZE", "GRC") and re.match(r"^\d{5}$", norm_postal):
+            norm_postal = f"{norm_postal[:3]} {norm_postal[3:]}"
+        norm_city = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", city_raw).strip())
+        norm_state = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", state_raw).strip())
+        norm_street = normalize_to_canonical_unicode(thoroughfare.strip()) if thoroughfare else None
+
+        # Uppercase Latin scripts while preserving authentic Cyrillic and Greek Unicode casing
+        if norm_city and norm_city.isascii():
+            norm_city = norm_city.upper()
+        elif norm_city:
+            norm_city = norm_city.upper()
+        if norm_state and norm_state.isascii():
+            norm_state = norm_state.upper()
+        elif norm_state:
+            norm_state = norm_state.upper()
+        if norm_street:
+            norm_street = norm_street.upper()
+        if unit_number:
+            unit_number = unit_number.upper()
+
+        return ParsedAddressComponents(
+            street_number=st_num,
+            street_name=norm_street,
+            unit_type=unit_type,
+            unit_number=unit_number,
+            city=norm_city if norm_city else None,
+            state=norm_state if norm_state else None,
+            postal_code=norm_postal if norm_postal else None,
+            country_iso3=country_iso,
+            raw_tokens=raw_tokens,
+        )

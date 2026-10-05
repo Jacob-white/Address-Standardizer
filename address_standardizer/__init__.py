@@ -20,6 +20,14 @@ from address_standardizer.standardizer import (
     num_to_ordinal,
     _split_international_secondary_unit,
 )
+from address_standardizer.international import (
+    CountryInfo,
+    CountryRegistry,
+    PostalValidationResult,
+    extract_postal_code,
+    format_upu_address,
+    validate_postal_code,
+)
 from address_standardizer.phonetics import (
     compute_soundex,
     generate_phonetic_address_key,
@@ -37,6 +45,9 @@ from address_standardizer.batch import (
     buffered_chunk_generator,
     process_chunk,
     stream_standardize_csv,
+    stream_standardize_jsonl,
+    stream_standardize_json,
+    batch_standardize,
 )
 from address_standardizer.confidence import (
     RoutingTier,
@@ -137,6 +148,9 @@ __all__ = [
     "buffered_chunk_generator",
     "process_chunk",
     "stream_standardize_csv",
+    "stream_standardize_jsonl",
+    "stream_standardize_json",
+    "batch_standardize",
     # Confidence scoring
     "RoutingTier",
     "ConfidenceResult",
@@ -207,6 +221,12 @@ __all__ = [
     "get_engine_info",
     "standardize_record_dispatch",
     "standardize_batch_dispatch",
+    "CountryInfo",
+    "CountryRegistry",
+    "format_upu_address",
+    "PostalValidationResult",
+    "validate_postal_code",
+    "extract_postal_code",
     "__version__",
 ]
 

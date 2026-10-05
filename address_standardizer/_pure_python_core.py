@@ -124,12 +124,12 @@ def standardize_record(
     """
     # 1. Tier 0: Pre-flight sanitization
     import re
-    s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", street1)).strip() if street1 else ""
-    s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", street2)).strip() if street2 else ""
-    city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", city)).strip() if city else ""
-    state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", state)).strip() if state else ""
-    postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", postal_code)).strip() if postal_code else ""
-    country_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", country)).strip() if country else ""
+    s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(street1))).strip() if street1 is not None else ""
+    s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(street2))).strip() if street2 is not None else ""
+    city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(city))).strip() if city is not None else ""
+    state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(state))).strip() if state is not None else ""
+    postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(postal_code))).strip() if postal_code is not None else ""
+    country_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(country))).strip() if country is not None else ""
 
     raw_components = [v for v in [s1_raw, s2_raw, city_raw, state_raw, postal_raw, country_raw] if v]
     raw_street_address = ", ".join(raw_components)
@@ -137,12 +137,12 @@ def standardize_record(
     raw_dict: Optional[Dict[str, Any]] = None
     if finalize:
         raw_dict = kwargs.get("raw_dict") or {
-            "street1": street1,
-            "street2": street2,
-            "city": city,
-            "state": state,
-            "postal_code": postal_code,
-            "country": country,
+            "street1": str(street1) if street1 is not None else "",
+            "street2": str(street2) if street2 is not None else "",
+            "city": str(city) if city is not None else "",
+            "state": str(state) if state is not None else "",
+            "postal_code": str(postal_code) if postal_code is not None else "",
+            "country": str(country) if country is not None else "",
             "is_vacant": kwargs.get("is_vacant") if kwargs.get("is_vacant") is not None else kwargs.get("vacant"),
             "enable_fuzzy": kwargs.get("enable_fuzzy", True),
             "enable_geocoding": kwargs.get("enable_geocoding", False),

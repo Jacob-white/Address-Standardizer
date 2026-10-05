@@ -7,14 +7,77 @@ Provides memory-bounded chunked streaming CSV processing for massive datasets
 """
 
 import csv
+import json
 import multiprocessing
-from typing import Any, Dict, Generator, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Generator, Iterable, Iterator, List, Optional, Tuple, Union
 
 from address_standardizer._native_dispatch import standardize_batch_dispatch
 from address_standardizer.geocoder import CensusGeocoder
+from address_standardizer.models import StandardizedAddress
 from address_standardizer.standardizer import standardize_address
+from address_standardizer.cache import get_default_cache
 
 _ORIGINAL_STANDARDIZE_ADDRESS = standardize_address
+
+
+def resolve_column_mappings(
+    mapping: Optional[Dict[str, str]],
+    street_col: str = "street1",
+    street2_col: str = "street2",
+    city_col: str = "city",
+    state_col: str = "state",
+    zip_col: str = "postal_code",
+    country_col: str = "country",
+) -> Tuple[str, str, str, str, str, str]:
+    """
+    Resolves source-to-canonical or canonical-to-source column mappings.
+    Handles user mappings like {"address": "street1", "zip": "postal_code"}
+    or {"street1": "address", "postal_code": "zip"}.
+    """
+    if not mapping:
+        return street_col, street2_col, city_col, state_col, zip_col, country_col
+
+    target_norm = {
+        "street": "street1", "street1": "street1", "address": "street1", "address1": "street1",
+        "street2": "street2", "suite": "street2", "apt": "street2", "unit": "street2", "address2": "street2",
+        "city": "city", "state": "state", "province": "state",
+        "postal_code": "postal_code", "zip": "postal_code", "zipcode": "postal_code", "postcode": "postal_code",
+        "country": "country",
+    }
+
+    canon_map = {
+        "street1": street_col,
+        "street2": street2_col,
+        "city": city_col,
+        "state": state_col,
+        "postal_code": zip_col,
+        "country": country_col,
+    }
+
+    canonical_keys = {"street1", "street2", "city", "state", "postal_code", "country"}
+    for k, v in mapping.items():
+        k_str = str(k).strip()
+        v_str = str(v).strip()
+        k_lower = k_str.lower()
+        v_lower = v_str.lower()
+
+        if k_lower in canonical_keys:
+            canon_map[k_lower] = v_str
+        elif v_lower in canonical_keys:
+            canon_map[v_lower] = k_str
+        elif v_lower in target_norm:
+            canon_map[target_norm[v_lower]] = k_str
+        elif k_lower in target_norm:
+            canon_map[target_norm[k_lower]] = v_str
+
+    return (
+        canon_map["street1"],
+        canon_map["street2"],
+        canon_map["city"],
+        canon_map["state"],
+        canon_map["postal_code"],
+        canon_map["country"],
+    )
 
 
 def buffered_chunk_generator(
@@ -48,6 +111,14 @@ def chunk_generator(
     yield from buffered_chunk_generator(reader, chunk_size=chunk_size)
 
 
+def _safe_str(val: Any, default: str = "") -> str:
+    """Coerces any scalar (int, float, etc.) to clean stripped string; None maps to default."""
+    if val is None:
+        return default
+    s = str(val).strip()
+    return s if s else default
+
+
 def _process_row_dict(
     row: Dict[str, Any],
     street_col: str = "street1",
@@ -59,14 +130,16 @@ def _process_row_dict(
     include_confidence: bool = False,
     collect_audit: bool = False,
     include_intl: bool = False,
+    country: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Standardizes a single row dictionary and appends standardized fields."""
-    s1 = row.get(street_col) or ""
-    s2 = row.get(street2_col) or ""
-    city = row.get(city_col) or ""
-    state = row.get(state_col) or ""
-    postal = row.get(zip_col) or ""
-    country = row.get(country_col) or "USA"
+    s1 = _safe_str(row.get(street_col))
+    s2 = _safe_str(row.get(street2_col))
+    city = _safe_str(row.get(city_col))
+    state = _safe_str(row.get(state_col))
+    postal = _safe_str(row.get(zip_col))
+    country_val = row.get(country_col) if country_col in row else None
+    resolved_country = _safe_str(country_val, default=country or "USA") if (country_val or country) else None
 
     st = standardize_address(
         street1=s1,
@@ -74,7 +147,7 @@ def _process_row_dict(
         city=city,
         state=state,
         postal_code=postal,
-        country=country,
+        country=resolved_country,
     )
 
     res_row = dict(row)
@@ -106,11 +179,15 @@ def _worker_process_chunk(
     args: Tuple[Any, ...]
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Worker function for multiprocessing pool to process a single chunk with memoization and batch dispatch."""
-    if len(args) >= 9:
+    if len(args) >= 10:
+        chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl, default_country = args[:10]
+    elif len(args) >= 9:
         chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl = args[:9]
+        default_country = None
     else:
         chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence = args[:8]
         include_intl = False
+        default_country = None
     n_chunk = len(chunk)
     if n_chunk == 0:
         return [], []
@@ -126,12 +203,13 @@ def _worker_process_chunk(
 
     if is_mocked:
         for idx, row in enumerate(chunk):
-            s1 = row.get(street_col) or ""
-            s2 = row.get(street2_col) or ""
-            city = row.get(city_col) or ""
-            state = row.get(state_col) or ""
-            postal = row.get(zip_col) or ""
-            country = row.get(country_col) or "USA"
+            s1 = _safe_str(row.get(street_col))
+            s2 = _safe_str(row.get(street2_col))
+            city = _safe_str(row.get(city_col))
+            state = _safe_str(row.get(state_col))
+            postal = _safe_str(row.get(zip_col))
+            c_val = row.get(country_col) if country_col in row else None
+            country = _safe_str(c_val, default=default_country or "USA")
             cache_key = (s1, s2, city, state, postal, country)
 
             if cache_key in row_cache:
@@ -153,6 +231,7 @@ def _worker_process_chunk(
                     include_confidence=include_confidence,
                     collect_audit=True,
                     include_intl=include_intl,
+                    country=default_country,
                 )
                 aud = res.pop("_audit_record", None)
                 if aud is not None:
@@ -191,12 +270,13 @@ def _worker_process_chunk(
     uncached_keys: List[Tuple[str, str, str, str, str, str]] = []
     seen_uncached = set()
     for row in chunk:
-        s1 = row.get(street_col) or ""
-        s2 = row.get(street2_col) or ""
-        city = row.get(city_col) or ""
-        state = row.get(state_col) or ""
-        postal = row.get(zip_col) or ""
-        country = row.get(country_col) or "USA"
+        s1 = _safe_str(row.get(street_col))
+        s2 = _safe_str(row.get(street2_col))
+        city = _safe_str(row.get(city_col))
+        state = _safe_str(row.get(state_col))
+        postal = _safe_str(row.get(zip_col))
+        c_val = row.get(country_col) if country_col in row else None
+        country = _safe_str(c_val, default=default_country or "USA")
         cache_key = (s1, s2, city, state, postal, country)
         if cache_key not in row_cache and cache_key not in seen_uncached:
             seen_uncached.add(cache_key)
@@ -234,12 +314,13 @@ def _worker_process_chunk(
 
     # 3. Assemble pre-allocated processed rows
     for idx, row in enumerate(chunk):
-        s1 = row.get(street_col) or ""
-        s2 = row.get(street2_col) or ""
-        city = row.get(city_col) or ""
-        state = row.get(state_col) or ""
-        postal = row.get(zip_col) or ""
-        country = row.get(country_col) or "USA"
+        s1 = _safe_str(row.get(street_col))
+        s2 = _safe_str(row.get(street2_col))
+        city = _safe_str(row.get(city_col))
+        state = _safe_str(row.get(state_col))
+        postal = _safe_str(row.get(zip_col))
+        c_val = row.get(country_col) if country_col in row else None
+        country = _safe_str(c_val, default=default_country or "USA")
         cache_key = (s1, s2, city, state, postal, country)
 
         cached_fields, cached_aud = row_cache[cache_key]
@@ -263,10 +344,11 @@ def process_chunk(
     country_col: str = "country",
     include_confidence: bool = False,
     include_intl: bool = False,
+    country: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Standardizes a chunk of rows."""
     processed_rows, _ = _worker_process_chunk(
-        (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl)
+        (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl, country)
     )
     return processed_rows
 
@@ -282,6 +364,7 @@ def stream_standardize_csv(
     state_col: str = "state",
     zip_col: str = "postal_code",
     country_col: str = "country",
+    mapping: Optional[Dict[str, str]] = None,
     geocode: bool = False,
     geocoder: Optional[CensusGeocoder] = None,
     include_confidence: bool = False,
@@ -289,6 +372,7 @@ def stream_standardize_csv(
     enable_geocoding: bool = False,
     spatial_db: Optional[str] = None,
     include_intl: bool = False,
+    country: Optional[str] = None,
 ) -> int:
     """
     Streams CSV address standardization with constant O(chunk_size) RSS memory footprint (< 100MB).
@@ -297,6 +381,11 @@ def stream_standardize_csv(
     """
     import json
     from address_standardizer.audit import get_audit_ledger, StewardshipAuditRecord
+
+    if mapping:
+        street_col, street2_col, city_col, state_col, zip_col, country_col = resolve_column_mappings(
+            mapping, street_col, street2_col, city_col, state_col, zip_col, country_col
+        )
 
     # Enforce strict system resource limit (max 2 workers)
     effective_workers = max(1, min(max_workers, 2))
@@ -422,7 +511,7 @@ def stream_standardize_csv(
                 if effective_workers <= 1:
                     for chunk in chunk_generator(reader, chunk_size):
                         processed, chunk_audits = _worker_process_chunk(
-                            (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl)
+                            (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl, country)
                         )
                         _handle_chunk_audits(chunk_audits)
                         if geocode:
@@ -433,7 +522,7 @@ def stream_standardize_csv(
                         total_processed += len(processed)
                 else:
                     chunk_args_gen = (
-                        (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl)
+                        (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl, country)
                         for chunk in chunk_generator(reader, chunk_size)
                     )
                     with multiprocessing.Pool(processes=effective_workers) as pool:
@@ -452,3 +541,337 @@ def stream_standardize_csv(
                 active_spatial.close()
 
     return total_processed
+
+
+def stream_standardize_jsonl(
+    input_path: str,
+    output_path: str,
+    chunk_size: int = 5000,
+    max_workers: int = 2,
+    street_col: str = "street1",
+    street2_col: str = "street2",
+    city_col: str = "city",
+    state_col: str = "state",
+    zip_col: str = "postal_code",
+    country_col: str = "country",
+    mapping: Optional[Dict[str, str]] = None,
+    geocode: bool = False,
+    geocoder: Optional[CensusGeocoder] = None,
+    include_confidence: bool = False,
+    audit_csv_path: Optional[str] = None,
+    enable_geocoding: bool = False,
+    spatial_db: Optional[str] = None,
+    include_intl: bool = False,
+    country: Optional[str] = None,
+) -> int:
+    """
+    Streams line-delimited JSON (JSONL / NDJSON) address standardization with constant O(chunk_size) RSS memory footprint (< 100MB).
+    Strictly enforces resource throttling rules: max_workers is capped at 2.
+    Returns total number of rows processed.
+    """
+    from address_standardizer.audit import get_audit_ledger, StewardshipAuditRecord
+
+    if mapping:
+        street_col, street2_col, city_col, state_col, zip_col, country_col = resolve_column_mappings(
+            mapping, street_col, street2_col, city_col, state_col, zip_col, country_col
+        )
+
+    effective_workers = max(1, min(max_workers, 2))
+    total_processed = 0
+
+    audit_file = None
+    audit_writer = None
+    if audit_csv_path:
+        audit_file = open(audit_csv_path, mode="w", encoding="utf-8", newline="")
+        audit_fieldnames = [
+            "audit_id", "record_id", "batch_id", "timestamp_utc", "agent_or_system_id",
+            "action_type", "confidence_score", "failure_reason_codes",
+            "normalized_address_key", "building_key", "phonetic_key",
+            "is_registered_agent_hub", "is_private_residence", "dpv_confirmation_code",
+            "raw_input_payload", "proposed_standardized_payload", "final_committed_payload",
+            "steward_commentary", "review_status", "reviewed_by", "reviewed_at"
+        ]
+        audit_writer = csv.DictWriter(audit_file, fieldnames=audit_fieldnames)
+        audit_writer.writeheader()
+
+    ledger = get_audit_ledger()
+
+    def _handle_chunk_audits(audit_records: List[Dict[str, Any]]):
+        for aud in audit_records:
+            ledger.record(StewardshipAuditRecord.from_dict(aud))
+            if audit_writer:
+                row_to_write = dict(aud)
+                for k in ("failure_reason_codes", "raw_input_payload", "proposed_standardized_payload", "final_committed_payload"):
+                    val = row_to_write.get(k)
+                    if isinstance(val, (dict, list)):
+                        row_to_write[k] = json.dumps(val)
+                audit_writer.writerow(row_to_write)
+
+    active_spatial = None
+    if enable_geocoding:
+        from address_standardizer.spatial import SpatialEngine, get_default_spatial_engine
+        active_spatial = SpatialEngine(db_path=spatial_db) if spatial_db else get_default_spatial_engine()
+
+    def _apply_spatial_to_chunk(processed_chunk: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        for r in processed_chunk:
+            lookup_dict = {
+                "normalized_address_key": r.get("normalized_address_key"),
+                "building_key": r.get("building_key"),
+                "street1": r.get("std_street1"),
+                "city": r.get("std_city"),
+                "state": r.get("std_state"),
+                "postal_code": r.get("std_postal_code"),
+            }
+            sp_res = active_spatial.resolve(lookup_dict)
+            if sp_res and sp_res.precision != "UNRESOLVED":
+                r["latitude"] = str(sp_res.latitude)
+                r["longitude"] = str(sp_res.longitude)
+                r["geocode_precision"] = sp_res.precision
+                r["spatial_precision"] = sp_res.precision
+                r["spatial_source"] = sp_res.source
+                r["accuracy_radius_meters"] = str(sp_res.accuracy_radius_meters)
+                r["h3_r10_index"] = sp_res.h3_res10
+            else:
+                r["latitude"] = ""
+                r["longitude"] = ""
+                r["geocode_precision"] = ""
+                r["spatial_precision"] = ""
+                r["spatial_source"] = ""
+                r["accuracy_radius_meters"] = ""
+                r["h3_r10_index"] = ""
+        return processed_chunk
+
+    active_geocoder = geocoder or (CensusGeocoder() if geocode else None)
+
+    def _apply_geocoding_to_chunk(processed_chunk: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        geo_batch = []
+        for idx, r in enumerate(processed_chunk):
+            if r.get("std_country") == "USA" and r.get("std_street1"):
+                geo_batch.append((str(idx), r["std_street1"], r["std_city"], r["std_state"], r["std_postal_code"]))
+        if geo_batch:
+            geo_results = active_geocoder.geocode_batch(geo_batch)
+            for idx, r in enumerate(processed_chunk):
+                idx_str = str(idx)
+                if idx_str in geo_results:
+                    r["latitude"] = geo_results[idx_str]["latitude"]
+                    r["longitude"] = geo_results[idx_str]["longitude"]
+                    r["geocode_precision"] = geo_results[idx_str]["precision"]
+                else:
+                    r["latitude"] = ""
+                    r["longitude"] = ""
+                    r["geocode_precision"] = ""
+        else:
+            for r in processed_chunk:
+                r["latitude"] = ""
+                r["longitude"] = ""
+                r["geocode_precision"] = ""
+        return processed_chunk
+
+    def _jsonl_line_generator(f):
+        for line in f:
+            line_str = line.strip()
+            if line_str:
+                yield json.loads(line_str)
+
+    try:
+        with open(input_path, mode="r", encoding="utf-8", errors="replace") as fin, \
+             open(output_path, mode="w", encoding="utf-8") as fout:
+            reader = _jsonl_line_generator(fin)
+
+            if effective_workers <= 1:
+                for chunk in chunk_generator(reader, chunk_size):
+                    processed, chunk_audits = _worker_process_chunk(
+                        (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl, country)
+                    )
+                    _handle_chunk_audits(chunk_audits)
+                    if geocode:
+                        processed = _apply_geocoding_to_chunk(processed)
+                    if enable_geocoding:
+                        processed = _apply_spatial_to_chunk(processed)
+                    for row in processed:
+                        fout.write(json.dumps(row) + "\n")
+                    total_processed += len(processed)
+            else:
+                chunk_args_gen = (
+                    (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl, country)
+                    for chunk in chunk_generator(reader, chunk_size)
+                )
+                with multiprocessing.Pool(processes=effective_workers) as pool:
+                    for processed_chunk, chunk_audits in pool.imap(_worker_process_chunk, chunk_args_gen):
+                        _handle_chunk_audits(chunk_audits)
+                        if geocode:
+                            processed_chunk = _apply_geocoding_to_chunk(processed_chunk)
+                        if enable_geocoding:
+                            processed_chunk = _apply_spatial_to_chunk(processed_chunk)
+                        for row in processed_chunk:
+                            fout.write(json.dumps(row) + "\n")
+                        total_processed += len(processed_chunk)
+    finally:
+        if audit_file:
+            audit_file.close()
+        if active_spatial and spatial_db:
+            active_spatial.close()
+
+    return total_processed
+
+
+def stream_standardize_json(
+    input_path: str,
+    output_path: str,
+    chunk_size: int = 5000,
+    max_workers: int = 2,
+    street_col: str = "street1",
+    street2_col: str = "street2",
+    city_col: str = "city",
+    state_col: str = "state",
+    zip_col: str = "postal_code",
+    country_col: str = "country",
+    mapping: Optional[Dict[str, str]] = None,
+    geocode: bool = False,
+    geocoder: Optional[CensusGeocoder] = None,
+    include_confidence: bool = False,
+    audit_csv_path: Optional[str] = None,
+    enable_geocoding: bool = False,
+    spatial_db: Optional[str] = None,
+    include_intl: bool = False,
+    country: Optional[str] = None,
+) -> int:
+    """
+    Streams and processes JSON array address datasets with chunked execution.
+    Returns total number of rows processed.
+    """
+    with open(input_path, mode="r", encoding="utf-8", errors="replace") as fin:
+        data = json.load(fin)
+        raw_items = data if isinstance(data, list) else [data]
+
+    if mapping:
+        street_col, street2_col, city_col, state_col, zip_col, country_col = resolve_column_mappings(
+            mapping, street_col, street2_col, city_col, state_col, zip_col, country_col
+        )
+
+    all_processed: List[Dict[str, Any]] = []
+
+    for chunk in chunk_generator(iter(raw_items), chunk_size):
+        processed, _ = _worker_process_chunk(
+            (chunk, street_col, street2_col, city_col, state_col, zip_col, country_col, include_confidence, include_intl, country)
+        )
+        all_processed.extend(processed)
+
+    with open(output_path, mode="w", encoding="utf-8") as fout:
+        json.dump(all_processed, fout, indent=2)
+
+    return len(all_processed)
+
+
+def batch_standardize(
+    addresses: Iterable[Union[str, Dict[str, Any]]],
+    enable_fuzzy: bool = True,
+    enable_geocoding: bool = False,
+    country: Optional[str] = None,
+    batch_size: int = 1000,
+    use_cache: bool = False,
+    **kwargs: Any,
+) -> Iterator[StandardizedAddress]:
+    """
+    Standardize a stream or sequence of addresses with sensible defaults.
+
+    Accepts an iterable of address strings or component dictionaries and
+    yields StandardizedAddress instances.
+
+    Parameters
+    ----------
+    addresses : Iterable[Union[str, Dict[str, Any]]]
+        Iterable containing raw address strings or component dictionaries.
+    enable_fuzzy : bool, default True
+        Whether to enable typo recovery and fuzzy candidate matching.
+    enable_geocoding : bool, default False
+        Whether to resolve spatial coordinates.
+    country : Optional[str], default None
+        Default country if not specified per address.
+    batch_size : int, default 1000
+        Chunk size for internal batch processing.
+    use_cache : bool, default False
+        Whether to enable global cache lookup and storage. Defaults to False
+        to guarantee bounded O(1) memory during streaming batch runs.
+    **kwargs : Any
+        Additional keyword arguments forwarded to `standardize_address`.
+
+    Yields
+    ------
+    StandardizedAddress
+        Standardized address instances.
+    """
+    item_count = 0
+    effective_use_cache = kwargs.pop("use_cache", use_cache)
+
+    for item in addresses:
+        item_count += 1
+        if isinstance(item, str):
+            res = standardize_address(
+                street1=item,
+                country=country,
+                enable_fuzzy=enable_fuzzy,
+                enable_geocoding=enable_geocoding,
+                use_cache=effective_use_cache,
+                **kwargs,
+            )
+        elif isinstance(item, dict):
+            s1_val = (
+                item.get("street1")
+                if "street1" in item
+                else (item.get("street") if "street" in item else (item.get("address") if "address" in item else item.get("address1")))
+            )
+            s2_val = (
+                item.get("street2")
+                if "street2" in item
+                else (item.get("suite") if "suite" in item else (item.get("apt") if "apt" in item else (item.get("unit") if "unit" in item else item.get("address2"))))
+            )
+            city_val = item.get("city")
+            state_val = item.get("state") if "state" in item else item.get("province")
+            zip_val = (
+                item.get("postal_code")
+                if "postal_code" in item
+                else (item.get("zip") if "zip" in item else (item.get("zipcode") if "zipcode" in item else item.get("postcode")))
+            )
+            country_val = item.get("country") if "country" in item else country
+
+            s1 = _safe_str(s1_val)
+            s2 = _safe_str(s2_val)
+            c_city = _safe_str(city_val)
+            c_state = _safe_str(state_val)
+            c_zip = _safe_str(zip_val)
+            c_country = _safe_str(country_val, default=country or "USA") if (country_val or country) else None
+
+            item_kwargs = dict(kwargs)
+            if "is_vacant" in item and "is_vacant" not in item_kwargs:
+                item_kwargs["is_vacant"] = item["is_vacant"]
+            if "vacant" in item and "is_vacant" not in item_kwargs:
+                item_kwargs["is_vacant"] = item["vacant"]
+
+            res = standardize_address(
+                street1=s1,
+                street2=s2,
+                city=c_city,
+                state=c_state,
+                postal_code=c_zip,
+                country=c_country,
+                enable_fuzzy=enable_fuzzy,
+                enable_geocoding=enable_geocoding,
+                use_cache=effective_use_cache,
+                **item_kwargs,
+            )
+        else:
+            res = standardize_address(
+                street1=str(item),
+                country=country,
+                enable_fuzzy=enable_fuzzy,
+                enable_geocoding=enable_geocoding,
+                use_cache=effective_use_cache,
+                **kwargs,
+            )
+
+        if effective_use_cache and batch_size > 0 and item_count % batch_size == 0:
+            get_default_cache().clear()
+
+        yield res
+

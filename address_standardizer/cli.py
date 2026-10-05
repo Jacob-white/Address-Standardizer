@@ -79,25 +79,320 @@ def _format_text_address(data: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def main():
-    # Direct shorthand invocation: address-standardizer "100 Wall St, New York, NY 10005"
-    if (
-        len(sys.argv) > 1
-        and not sys.argv[1].startswith("-")
-        and sys.argv[1] not in (
-            "parse", "batch", "benchmark", "spatial", "audit", "cache", "autocomplete"
+def _format_table_header() -> str:
+    hdr = f"{'Street 1':<25} | {'Street 2':<12} | {'City':<18} | {'State':<5} | {'Postal Code':<11} | {'Status':<14} | {'Confidence':<10}"
+    sep = "-" * len(hdr)
+    return f"{hdr}\n{sep}"
+
+
+def _format_table_row(data: Dict[str, Any]) -> str:
+    st1 = str(data.get("street1") or "")[:25]
+    st2 = str(data.get("street2") or "")[:12]
+    city = str(data.get("city") or "")[:18]
+    state = str(data.get("state") or "")[:5]
+    post = str(data.get("postal_code") or "")[:11]
+    status = str(data.get("address_status") or "")[:14]
+    conf_val = data.get("confidence_score")
+    conf = f"{conf_val:.4f}" if isinstance(conf_val, float) else (str(conf_val) if conf_val is not None else "")
+    return f"{st1:<25} | {st2:<12} | {city:<18} | {state:<5} | {post:<11} | {status:<14} | {conf:<10}"
+
+
+def _format_csv_header() -> str:
+    return "street1,street2,city,state,postal_code,country,address_status,confidence_score,normalized_address_key"
+
+
+def _format_csv_row(data: Dict[str, Any]) -> str:
+    import csv
+    import io
+    out = io.StringIO()
+    writer = csv.writer(out)
+    conf_val = data.get("confidence_score")
+    conf = f"{conf_val:.4f}" if isinstance(conf_val, float) else (str(conf_val) if conf_val is not None else "")
+    writer.writerow([
+        data.get("street1") or "",
+        data.get("street2") or "",
+        data.get("city") or "",
+        data.get("state") or "",
+        data.get("postal_code") or "",
+        data.get("country") or "",
+        data.get("address_status") or "",
+        conf,
+        data.get("normalized_address_key") or "",
+    ])
+    return out.getvalue().rstrip("\r\n")
+
+
+def _has_stdin_data() -> bool:
+    """Check if sys.stdin has data available to read without blocking."""
+    if sys.stdin is None or sys.stdin.isatty():
+        return False
+    if getattr(sys.stdin, "__class__", None).__name__ == "DontReadFromInput":
+        return False
+    if hasattr(sys.stdin, "getvalue"):
+        return bool(sys.stdin.getvalue().strip())
+    try:
+        fileno = sys.stdin.fileno()
+    except Exception:
+        fileno = None
+    if fileno is not None:
+        import select
+        try:
+            r, _, _ = select.select([sys.stdin], [], [], 0.0)
+            return bool(r)
+        except Exception:
+            return False
+    if hasattr(sys.stdin, "seekable") and sys.stdin.seekable():
+        try:
+            pos = sys.stdin.tell()
+            char = sys.stdin.read(1)
+            sys.stdin.seek(pos)
+            return bool(char)
+        except Exception:
+            return False
+    return False
+
+
+def _format_postal_text(res: Dict[str, Any]) -> str:
+    lines = [
+        "POSTAL CODE VALIDATION",
+        "======================",
+        f"Validity:              {res.get('is_valid', False)}",
+        f"Country:               {res.get('country', '')}",
+        f"Postal Code:           {res.get('postal_code', '')}",
+        f"Formatted Code:        {res.get('formatted_code') or ''}",
+        f"Non-Postal Country:    {res.get('is_non_postal_country', False)}",
+        f"Reason:                {res.get('reason', '')}",
+    ]
+    return "\n".join(lines)
+
+
+def _format_postal_table_header() -> str:
+    hdr = f"{'Postal Code':<15} | {'Country':<7} | {'Valid':<5} | {'Formatted Code':<15} | {'Non-Postal':<10} | {'Reason'}"
+    sep = "-" * len(hdr)
+    return f"{hdr}\n{sep}"
+
+
+def _format_postal_table_row(res: Dict[str, Any]) -> str:
+    pc = str(res.get("postal_code") or "")[:15]
+    c = str(res.get("country") or "")[:7]
+    v = str(bool(res.get("is_valid")))[:5]
+    fc = str(res.get("formatted_code") or "")[:15]
+    np = str(bool(res.get("is_non_postal_country")))[:10]
+    r = str(res.get("reason") or "")
+    return f"{pc:<15} | {c:<7} | {v:<5} | {fc:<15} | {np:<10} | {r}"
+
+
+def _execute_postal_validation(
+    code_or_text: str, country_hint: Any = None
+) -> Dict[str, Any]:
+    from address_standardizer.international.countries import CountryRegistry
+    from address_standardizer.international.postal import (
+        PostalValidationResult,
+        extract_postal_code,
+        validate_postal_code,
+    )
+
+    input_str = (code_or_text or "").strip()
+    target_country = str(country_hint).strip() if country_hint else None
+
+    if target_country:
+        c_info = CountryRegistry.get(target_country)
+        if c_info is None:
+            res = validate_postal_code(input_str, target_country, return_details=True)
+            if isinstance(res, PostalValidationResult):
+                return {
+                    "is_valid": res.is_valid,
+                    "country": res.country_code,
+                    "postal_code": res.postal_code,
+                    "formatted_code": res.formatted_code,
+                    "is_non_postal_country": res.is_non_postal_country,
+                    "reason": res.reason,
+                }
+        norm_country = c_info.alpha3
+        if not c_info.has_postal_codes:
+            res = validate_postal_code(input_str, norm_country, return_details=True)
+            if isinstance(res, PostalValidationResult):
+                return {
+                    "is_valid": res.is_valid,
+                    "country": res.country_code,
+                    "postal_code": res.postal_code,
+                    "formatted_code": res.formatted_code,
+                    "is_non_postal_country": res.is_non_postal_country,
+                    "reason": res.reason,
+                }
+        direct_res = validate_postal_code(input_str, norm_country, return_details=True)
+        if isinstance(direct_res, PostalValidationResult) and direct_res.is_valid:
+            return {
+                "is_valid": direct_res.is_valid,
+                "country": direct_res.country_code,
+                "postal_code": direct_res.postal_code,
+                "formatted_code": direct_res.formatted_code,
+                "is_non_postal_country": direct_res.is_non_postal_country,
+                "reason": direct_res.reason,
+            }
+        ext = extract_postal_code(input_str, country_hint=norm_country)
+        if ext and ext != input_str:
+            ext_res = validate_postal_code(ext, norm_country, return_details=True)
+            if isinstance(ext_res, PostalValidationResult) and ext_res.is_valid:
+                return {
+                    "is_valid": ext_res.is_valid,
+                    "country": ext_res.country_code,
+                    "postal_code": ext_res.postal_code,
+                    "formatted_code": ext_res.formatted_code,
+                    "is_non_postal_country": ext_res.is_non_postal_country,
+                    "reason": ext_res.reason,
+                }
+        if isinstance(direct_res, PostalValidationResult):
+            return {
+                "is_valid": direct_res.is_valid,
+                "country": direct_res.country_code,
+                "postal_code": direct_res.postal_code,
+                "formatted_code": direct_res.formatted_code,
+                "is_non_postal_country": direct_res.is_non_postal_country,
+                "reason": direct_res.reason,
+            }
+
+    det = CountryRegistry.detect_country(input_str)
+    if det:
+        norm_country = det.alpha3
+        if not det.has_postal_codes:
+            res = validate_postal_code(input_str, norm_country, return_details=True)
+            if isinstance(res, PostalValidationResult):
+                return {
+                    "is_valid": res.is_valid,
+                    "country": res.country_code,
+                    "postal_code": res.postal_code,
+                    "formatted_code": res.formatted_code,
+                    "is_non_postal_country": res.is_non_postal_country,
+                    "reason": res.reason,
+                }
+        ext = extract_postal_code(input_str, country_hint=norm_country)
+        code_to_validate = ext if ext else input_str
+        val_res = validate_postal_code(code_to_validate, norm_country, return_details=True)
+        if isinstance(val_res, PostalValidationResult):
+            return {
+                "is_valid": val_res.is_valid,
+                "country": val_res.country_code,
+                "postal_code": val_res.postal_code,
+                "formatted_code": val_res.formatted_code,
+                "is_non_postal_country": val_res.is_non_postal_country,
+                "reason": val_res.reason,
+            }
+
+    import re
+    if re.match(r"^\d{5}(-\d{4})?$", input_str):
+        val_res = validate_postal_code(input_str, "USA", return_details=True)
+        if isinstance(val_res, PostalValidationResult):
+            return {
+                "is_valid": val_res.is_valid,
+                "country": val_res.country_code,
+                "postal_code": val_res.postal_code,
+                "formatted_code": val_res.formatted_code,
+                "is_non_postal_country": val_res.is_non_postal_country,
+                "reason": val_res.reason,
+            }
+
+    return {
+        "is_valid": False,
+        "country": "",
+        "postal_code": input_str,
+        "formatted_code": None,
+        "is_non_postal_country": False,
+        "reason": "Country not specified and could not be inferred from input",
+    }
+
+
+def _process_piped_stream(
+    lines: Any,
+    format_type: str = "json",
+    country: str = "USA",
+    enable_fuzzy: bool = True,
+    enable_geocoding: bool = False,
+    confidence: bool = False,
+) -> None:
+    """Process lines from stdin and emit in requested format (json, table, csv, text, upu)."""
+    if format_type == "table":
+        _emit_cli_output(_format_table_header())
+    elif format_type == "csv":
+        _emit_cli_output(_format_csv_header())
+
+    for line in lines:
+        addr_text = line.strip()
+        if not addr_text:
+            continue
+        res = standardize_address(
+            street1=addr_text,
+            country=country,
+            enable_fuzzy=enable_fuzzy,
+            enable_geocoding=enable_geocoding,
         )
-    ):
-        raw_addr = " ".join(sys.argv[1:])
-        res = standardize_address(street1=raw_addr)
-        # codeql[py/clear-text-logging-sensitive-data]
-        _emit_cli_output(json.dumps(res.as_dict(), indent=2))
-        return
+        data = res.as_dict()
+        if res.dependent_locality:
+            data["dependent_locality"] = res.dependent_locality
+        if res.building_name:
+            data["building_name"] = res.building_name
+        data["country_iso3"] = getattr(res, "country_iso3", None) or res.country or ""
+        if confidence:
+            data["confidence_score"] = res.confidence_score
+            data["routing_tier"] = res.routing_tier
+
+        if format_type == "table":
+            _emit_cli_output(_format_table_row(data))
+        elif format_type == "csv":
+            _emit_cli_output(_format_csv_row(data))
+        elif format_type == "text":
+            _emit_cli_output(_format_text_address(data))
+        elif format_type == "upu":
+            _emit_cli_output(res.format_upu())
+        else:
+            _emit_cli_output(json.dumps(data))
+
+
+def main():
+    _known_subcommands = {
+        "parse", "batch", "benchmark", "spatial", "audit", "cache", "autocomplete", "validate-postal"
+    }
+
+    # Shorthand invocation check: when no subcommand or help flag is passed
+    if len(sys.argv) > 1 and "-h" not in sys.argv[1:] and "--help" not in sys.argv[1:]:
+        if not any(arg in _known_subcommands for arg in sys.argv[1:]):
+            shorthand_parser = argparse.ArgumentParser(prog="address-standardizer", add_help=False)
+            shorthand_parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json")
+            shorthand_parser.add_argument("--country", "-c", default="USA")
+            shorthand_parser.add_argument("address", nargs="*")
+            s_args, _ = shorthand_parser.parse_known_args(sys.argv[1:])
+            if s_args.address:
+                raw_addr = " ".join(s_args.address)
+                res = standardize_address(street1=raw_addr, country=s_args.country)
+                data = res.as_dict()
+                if res.dependent_locality:
+                    data["dependent_locality"] = res.dependent_locality
+                if res.building_name:
+                    data["building_name"] = res.building_name
+                data["country_iso3"] = getattr(res, "country_iso3", None) or res.country or ""
+                if s_args.format == "upu":
+                    _emit_cli_output(res.format_upu())
+                elif s_args.format == "text":
+                    _emit_cli_output(_format_text_address(data))
+                elif s_args.format == "table":
+                    _emit_cli_output(_format_table_header())
+                    _emit_cli_output(_format_table_row(data))
+                elif s_args.format == "csv":
+                    _emit_cli_output(_format_csv_header())
+                    _emit_cli_output(_format_csv_row(data))
+                else:
+                    _emit_cli_output(json.dumps(data, indent=2))
+                return
+            elif _has_stdin_data():
+                _process_piped_stream(sys.stdin, format_type=s_args.format, country=s_args.country)
+                return
 
     parser = argparse.ArgumentParser(
         prog="address-standardizer",
         description="Standardize US and international addresses to USPS Pub 28 and ISO standards.",
     )
+    parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json", help="Output format for piped input or address parsing (default: json)")
+    parser.add_argument("--country", "-c", default="USA", help="Default country for address standardization (default: USA)")
     subparsers = parser.add_subparsers(dest="command", help="Available subcommands")
 
     # Command: parse single address
@@ -108,8 +403,8 @@ def main():
     parse_parser.add_argument("--city", help="City name")
     parse_parser.add_argument("--state", help="State / province code or name")
     parse_parser.add_argument("--zip", dest="postal_code", help="Postal code or ZIP")
-    parse_parser.add_argument("--country", default="USA", help="Country name or ISO code (default: USA)")
-    parse_parser.add_argument("--format", choices=["json", "text"], default="json", help="Output format (default: json)")
+    parse_parser.add_argument("--country", "-c", default="USA", help="Country name or ISO code (default: USA)")
+    parse_parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json", help="Output format (default: json)")
     parse_parser.add_argument("--enable-geocoding", action="store_true", help="Enrich with offline spatial R*Tree geocoder")
     parse_parser.add_argument("--spatial-db", "--db", dest="spatial_db", help="Path to offline SQLite spatial database file")
     parse_parser.add_argument("--geocode", action="store_true", help="Enrich with US Census geocoder coordinates")
@@ -122,12 +417,15 @@ def main():
     batch_parser = subparsers.add_parser("batch", help="Batch standardize a CSV file")
     batch_parser.add_argument("input_csv", help="Path to input CSV file")
     batch_parser.add_argument("output_csv", help="Path to write standardized CSV output")
+    batch_parser.add_argument("--format", choices=["auto", "csv", "jsonl", "ndjson", "json"], default="auto", help="File format: csv, jsonl, ndjson, json (default: auto)")
+    batch_parser.add_argument("--mapping", help="Column/field mapping as a JSON string or path to a JSON file (e.g. '{\"address\": \"street1\", \"zip\": \"postal_code\"}')")
     batch_parser.add_argument("--street-col", default="street1", help="Column name for street (default: street1)")
     batch_parser.add_argument("--street2-col", default="street2", help="Column name for street line 2 (default: street2)")
     batch_parser.add_argument("--city-col", default="city", help="Column name for city (default: city)")
     batch_parser.add_argument("--state-col", default="state", help="Column name for state (default: state)")
     batch_parser.add_argument("--zip-col", default="postal_code", help="Column name for zip (default: postal_code)")
     batch_parser.add_argument("--country-col", default="country", help="Column name for country (default: country)")
+    batch_parser.add_argument("--country", "-c", dest="country", default=None, help="Default country name or ISO code for batch")
     batch_parser.add_argument("--chunk-size", type=int, default=5000, help="Streaming chunk size (default: 5000)")
     batch_parser.add_argument("--workers", type=int, default=2, help="Multiprocessing workers, max 2 (default: 2)")
     batch_parser.add_argument("--enable-geocoding", action="store_true", help="Batch geocode with offline spatial engine")
@@ -197,6 +495,28 @@ def main():
     auto_parser.add_argument("--state", help="Filter suggestions by state code")
     auto_parser.add_argument("--format", choices=["json", "text"], default="text", help="Output format (default: text)")
 
+    # Command: validate-postal
+    postal_parser = subparsers.add_parser(
+        "validate-postal",
+        help="Validate or extract international postal codes across 249 ISO-3166-1 jurisdictions",
+    )
+    postal_parser.add_argument(
+        "code_or_text",
+        nargs="*",
+        help="Postal code or text segment containing a postal code",
+    )
+    postal_parser.add_argument(
+        "--country", "-c",
+        default=None,
+        help="ISO-3166-1 alpha-2, alpha-3, numeric code, or country name (optional, auto-detected if omitted)",
+    )
+    postal_parser.add_argument(
+        "--format",
+        choices=["json", "text", "table"],
+        default="json",
+        help="Output format: json, text, table (default: json)",
+    )
+
     raw_args = sys.argv[1:]
     normalized_args = []
     i = 0
@@ -212,12 +532,29 @@ def main():
     args = parser.parse_args(normalized_args)
 
     if not args.command:
+        if _has_stdin_data():
+            _process_piped_stream(
+                sys.stdin,
+                format_type=getattr(args, "format", "json"),
+                country=getattr(args, "country", "USA"),
+            )
+            return
         parser.print_help()
         sys.exit(1)
 
     if args.command == "parse":
         if args.no_cache:
             configure_cache(enabled=False)
+
+        if args.address == ["-"] or (not args.address and not args.street1 and _has_stdin_data()):
+            _process_piped_stream(
+                sys.stdin,
+                format_type=args.format,
+                country=args.country,
+                enable_geocoding=args.enable_geocoding,
+                confidence=args.confidence,
+            )
+            return
 
         st1 = args.street1
         if not st1 and args.address:
@@ -308,37 +645,151 @@ def main():
                 data["cascade_source"] = casc.source
                 data["cascade_stage"] = casc.stage
 
-        if args.format == "text":
+        if args.format == "upu":
+            _emit_cli_output(res.format_upu())
+        elif args.format == "text":
             # codeql[py/clear-text-logging-sensitive-data]
             _emit_cli_output(_format_text_address(data))
+        elif args.format == "table":
+            # codeql[py/clear-text-logging-sensitive-data]
+            _emit_cli_output(_format_table_header())
+            _emit_cli_output(_format_table_row(data))
+        elif args.format == "csv":
+            # codeql[py/clear-text-logging-sensitive-data]
+            _emit_cli_output(_format_csv_header())
+            _emit_cli_output(_format_csv_row(data))
         else:
             # codeql[py/clear-text-logging-sensitive-data]
             _emit_cli_output(json.dumps(data, indent=2))
+
+    elif args.command == "validate-postal":
+        if args.code_or_text == ["-"] or (not args.code_or_text and _has_stdin_data()):
+            if args.format == "table":
+                _emit_cli_output(_format_postal_table_header())
+            for line in sys.stdin:
+                line_str = line.strip()
+                if not line_str:
+                    continue
+                res = _execute_postal_validation(line_str, args.country)
+                if args.format == "text":
+                    _emit_cli_output(_format_postal_text(res))
+                elif args.format == "table":
+                    _emit_cli_output(_format_postal_table_row(res))
+                else:
+                    _emit_cli_output(json.dumps(res))
+            return
+
+        if args.code_or_text:
+            input_str = " ".join(args.code_or_text).strip()
+            res = _execute_postal_validation(input_str, args.country)
+            if args.format == "text":
+                _emit_cli_output(_format_postal_text(res))
+            elif args.format == "table":
+                _emit_cli_output(_format_postal_table_header())
+                _emit_cli_output(_format_postal_table_row(res))
+            else:
+                _emit_cli_output(json.dumps(res, indent=2))
+            return
+
+        postal_parser.print_help()
+        sys.exit(1)
 
     elif args.command == "batch":
         if args.no_cache:
             configure_cache(enabled=False)
 
+        mapping_dict = None
+        if getattr(args, "mapping", None):
+            m_str = args.mapping.strip()
+            if m_str.startswith("{"):
+                mapping_dict = json.loads(m_str)
+            elif os.path.isfile(m_str):
+                with open(m_str, "r", encoding="utf-8") as mf:
+                    mapping_dict = json.load(mf)
+            else:
+                mapping_dict = json.loads(m_str)
+
+        fmt = getattr(args, "format", "auto").lower()
+        if fmt == "auto":
+            in_lower = args.input_csv.lower()
+            out_lower = args.output_csv.lower()
+            if in_lower.endswith(".jsonl") or in_lower.endswith(".ndjson") or out_lower.endswith(".jsonl") or out_lower.endswith(".ndjson"):
+                fmt = "jsonl"
+            elif in_lower.endswith(".json") or out_lower.endswith(".json"):
+                fmt = "json"
+            else:
+                fmt = "csv"
+
         geocoder = CensusGeocoder() if args.geocode else None
-        total = stream_standardize_csv(
-            input_path=args.input_csv,
-            output_path=args.output_csv,
-            chunk_size=args.chunk_size,
-            max_workers=args.workers,
-            street_col=args.street_col,
-            street2_col=args.street2_col,
-            city_col=args.city_col,
-            state_col=args.state_col,
-            zip_col=args.zip_col,
-            country_col=args.country_col,
-            geocode=args.geocode,
-            geocoder=geocoder,
-            include_confidence=args.confidence,
-            audit_csv_path=args.audit_csv,
-            enable_geocoding=args.enable_geocoding,
-            spatial_db=args.spatial_db,
-            include_intl=args.include_intl,
-        )
+
+        if fmt in ("jsonl", "ndjson"):
+            from address_standardizer.batch import stream_standardize_jsonl
+            total = stream_standardize_jsonl(
+                input_path=args.input_csv,
+                output_path=args.output_csv,
+                chunk_size=args.chunk_size,
+                max_workers=args.workers,
+                street_col=args.street_col,
+                street2_col=args.street2_col,
+                city_col=args.city_col,
+                state_col=args.state_col,
+                zip_col=args.zip_col,
+                country_col=args.country_col,
+                mapping=mapping_dict,
+                geocode=args.geocode,
+                geocoder=geocoder,
+                include_confidence=args.confidence,
+                audit_csv_path=args.audit_csv,
+                enable_geocoding=args.enable_geocoding,
+                spatial_db=args.spatial_db,
+                include_intl=args.include_intl,
+                country=args.country,
+            )
+        elif fmt == "json":
+            from address_standardizer.batch import stream_standardize_json
+            total = stream_standardize_json(
+                input_path=args.input_csv,
+                output_path=args.output_csv,
+                chunk_size=args.chunk_size,
+                max_workers=args.workers,
+                street_col=args.street_col,
+                street2_col=args.street2_col,
+                city_col=args.city_col,
+                state_col=args.state_col,
+                zip_col=args.zip_col,
+                country_col=args.country_col,
+                mapping=mapping_dict,
+                geocode=args.geocode,
+                geocoder=geocoder,
+                include_confidence=args.confidence,
+                audit_csv_path=args.audit_csv,
+                enable_geocoding=args.enable_geocoding,
+                spatial_db=args.spatial_db,
+                include_intl=args.include_intl,
+                country=args.country,
+            )
+        else:
+            total = stream_standardize_csv(
+                input_path=args.input_csv,
+                output_path=args.output_csv,
+                chunk_size=args.chunk_size,
+                max_workers=args.workers,
+                street_col=args.street_col,
+                street2_col=args.street2_col,
+                city_col=args.city_col,
+                state_col=args.state_col,
+                zip_col=args.zip_col,
+                country_col=args.country_col,
+                mapping=mapping_dict,
+                geocode=args.geocode,
+                geocoder=geocoder,
+                include_confidence=args.confidence,
+                audit_csv_path=args.audit_csv,
+                enable_geocoding=args.enable_geocoding,
+                spatial_db=args.spatial_db,
+                include_intl=args.include_intl,
+                country=args.country,
+            )
         _emit_cli_output(f"Standardized {total} record(s) -> {args.output_csv}")
         if args.audit_csv:
             _emit_cli_output(f"Wrote audit record(s) -> {args.audit_csv}")

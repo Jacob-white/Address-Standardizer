@@ -28,12 +28,12 @@ def make_cache_key(
 ) -> str:
     """Computes a normalized cache key from input address components."""
     parts = [
-        (street1 or "").strip().upper(),
-        (street2 or "").strip().upper(),
-        (city or "").strip().upper(),
-        (state or "").strip().upper(),
-        (postal_code or "").strip().upper(),
-        (country or "USA").strip().upper(),
+        (str(street1).strip().upper() if street1 is not None else ""),
+        (str(street2).strip().upper() if street2 is not None else ""),
+        (str(city).strip().upper() if city is not None else ""),
+        (str(state).strip().upper() if state is not None else ""),
+        (str(postal_code).strip().upper() if postal_code is not None else ""),
+        (str(country).strip().upper() if country is not None and str(country).strip() else "USA"),
     ]
     if not enable_fuzzy:
         parts.append("NO_FUZZY")
@@ -106,12 +106,14 @@ class LRUCache:
 class SQLiteCache:
     """Thread-safe L2 Embedded Persistent Cache using SQLite WAL mode."""
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, max_entries: int = 50000):
         import os
         self.db_path = db_path or ":memory:"
+        self.max_entries = max_entries
         self._lock = threading.RLock()
         self._hits = 0
         self._misses = 0
+        self._evictions = 0
         self._pid = os.getpid()
         self._conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
@@ -147,6 +149,12 @@ class SQLiteCache:
             self._conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_l2_cache_key ON l2_address_cache(cache_key);"
             )
+            try:
+                self._conn.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_l2_created_at ON l2_address_cache(created_at);"
+                )
+            except Exception:
+                pass
 
     def get(self, key: str) -> Optional[Any]:
         with self._lock:
@@ -283,9 +291,20 @@ class SQLiteCache:
             conn = self._get_conn()
             with conn:
                 conn.execute(
-                    "INSERT OR REPLACE INTO l2_address_cache (cache_key, payload) VALUES (?, ?)",
+                    "INSERT OR REPLACE INTO l2_address_cache (cache_key, payload, created_at) VALUES (?, ?, strftime('%s', 'now'))",
                     (key, payload_str),
                 )
+                if self.max_entries and self.max_entries > 0:
+                    cur = conn.execute("SELECT COUNT(*) AS cnt FROM l2_address_cache")
+                    row = cur.fetchone()
+                    cnt = int(row["cnt"]) if row else 0
+                    if cnt > self.max_entries:
+                        excess = cnt - self.max_entries
+                        del_cur = conn.execute(
+                            "DELETE FROM l2_address_cache WHERE rowid IN (SELECT rowid FROM l2_address_cache ORDER BY created_at ASC, rowid ASC LIMIT ?)",
+                            (excess,),
+                        )
+                        self._evictions += del_cur.rowcount
 
     def delete(self, key: str) -> bool:
         with self._lock:
@@ -303,6 +322,7 @@ class SQLiteCache:
                 conn.execute("DELETE FROM l2_address_cache")
             self._hits = 0
             self._misses = 0
+            self._evictions = 0
 
     def size(self) -> int:
         with self._lock:
@@ -319,6 +339,7 @@ class SQLiteCache:
                 "size": self.size(),
                 "hits": self._hits,
                 "misses": self._misses,
+                "evictions": self._evictions,
                 "hit_rate": round(hit_rate, 4),
             }
 
@@ -332,11 +353,12 @@ class MultiTierCache:
         self,
         l1_maxsize: int = 50000,
         l2_db_path: Optional[str] = None,
+        l2_max_entries: int = 50000,
         enabled: bool = True,
     ):
         self._enabled = enabled
         self._l1 = LRUCache(maxsize=l1_maxsize)
-        self._l2 = SQLiteCache(db_path=l2_db_path)
+        self._l2 = SQLiteCache(db_path=l2_db_path, max_entries=l2_max_entries)
         self._lock = threading.RLock()
 
     def is_enabled(self) -> bool:
@@ -413,12 +435,14 @@ def configure_cache(
     enabled: bool = True,
     l1_maxsize: int = 50000,
     l2_db_path: Optional[str] = None,
+    l2_max_entries: int = 50000,
 ) -> MultiTierCache:
     """Configures global caching parameters."""
     global _DEFAULT_CACHE
     _DEFAULT_CACHE = MultiTierCache(
         l1_maxsize=l1_maxsize,
         l2_db_path=l2_db_path,
+        l2_max_entries=l2_max_entries,
         enabled=enabled,
     )
     return _DEFAULT_CACHE

@@ -258,3 +258,17 @@ class StandardizedAddress:
     def as_extended_dict(self) -> Dict[str, Any]:
         """Returns comprehensive enterprise dictionary including all risk, confidence, and audit metadata."""
         return self.as_dict(include_metadata=True)
+
+    def format_upu(
+        self,
+        recipient: Optional[str] = None,
+        include_country_name: bool = True,
+    ) -> str:
+        """Render address in Universal Postal Union (UPU S42) envelope layout."""
+        from address_standardizer.international.upu import format_upu_address
+
+        return format_upu_address(
+            self,
+            recipient=recipient,
+            include_country_name=include_country_name,
+        )

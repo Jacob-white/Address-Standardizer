@@ -19,9 +19,15 @@ DISALLOWED_NLD_COMBOS = {"SA", "SD", "SS"}
 RE_EURO_POSTCODE = re.compile(r"^(\d{4,5})$")
 
 # Inverted Germanic street number: Thoroughfare followed by number and optional addition
-# e.g. "Musterstraße 12", "Am Hauptbahnhof 5a", "Friedrichstraße 43-45", "Keizersgracht 421-B"
+# e.g. "Musterstraße 12", "Am Hauptbahnhof 5a", "Friedrichstraße 43-45", "Keizersgracht 421-B", "Mannerheimintie 12 B"
 RE_INVERTED_STREET_NUMBER = re.compile(
-    r"^(.*?)\s+(\d+[A-Za-z0-9\-\/]*)(?:[\s,]+(?:Apt|Suite|Unit|Fl|Wohnung|Wg)\.?\s*([A-Za-z0-9\-]+))?$",
+    r"^(.*?)\s+(\d+[A-Za-z0-9\-\/]*(?:\s+[A-Za-z]\b)?)(?:[\s,]+(?:Apt|Suite|Unit|Fl|Wohnung|Wg)\.?\s*([A-Za-z0-9\-]+))?$",
+    re.IGNORECASE,
+)
+
+# Nordic floor and door indicators (e.g. "2. tv.", "st. th.", "1. mf.")
+RE_NORDIC_FLOOR_DOOR = re.compile(
+    r"[, ]+(\d+\.|\bst\.)\s*(tv|th|mf)\.?",
     re.IGNORECASE,
 )
 
@@ -46,6 +52,14 @@ COMPOUND_SUFFIXES = (
     "vägen",
     "gade",
     "vei",
+    "katu",
+    "tie",
+    "kuja",
+    "väylä",
+    "polku",
+    "kaari",
+    "ranta",
+    "aukio",
 )
 
 
@@ -86,6 +100,9 @@ class GermanicGrammar(CountryGrammar):
         "SWEDEN",
         "NOR",
         "NORWAY",
+        "FIN",
+        "FINLAND",
+        "SUOMI",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -150,20 +167,35 @@ class GermanicGrammar(CountryGrammar):
             elif len(parts_comma) == 1:
                 street_line = parts_comma[0]
 
+        # Check for Nordic floor/door (e.g. "45, 2. tv.")
+        m_nordic_fd = RE_NORDIC_FLOOR_DOOR.search(street_line)
+        if m_nordic_fd:
+            if not unit_number:
+                unit_number = f"{m_nordic_fd.group(1)} {m_nordic_fd.group(2).lower()}"
+            street_line = street_line[:m_nordic_fd.start()] + street_line[m_nordic_fd.end():]
+            street_line = street_line.strip(" ,")
+
         # Extract secondary unit from s2_raw or street_line
         st1_base, st2_base = split_intl_secondary_unit(street_line, s2_raw)
-        if st2_base:
+        if st2_base and not unit_number:
             s2_parts = st2_base.split(maxsplit=1)
             unit_type = s2_parts[0]
             unit_number = s2_parts[1] if len(s2_parts) > 1 else None
 
         # Check for Dutch/Germanic addition like "421-B" -> number: 421, unit: APT B
         m_dash_unit = re.match(r"^(.*?)\s+(\d+)-([A-Za-z0-9]+)$", st1_base)
-        if m_dash_unit and not unit_type:
+        # Check for Finnish/Nordic stairwell and apartment like "12 B 25"
+        m_stair_apt = re.match(r"^(.*?)\s+(\d+)\s+([A-Za-z]\s*\d+)$", st1_base)
+        if m_dash_unit and not unit_type and not unit_number:
             thoroughfare_stem = m_dash_unit.group(1).strip()
             st_num = m_dash_unit.group(2).strip()
             unit_type = "APT"
             unit_number = m_dash_unit.group(3).strip().upper()
+            full_street = f"{thoroughfare_stem} {st_num}"
+        elif m_stair_apt and not unit_type and not unit_number:
+            thoroughfare_stem = m_stair_apt.group(1).strip()
+            st_num = m_stair_apt.group(2).strip()
+            unit_number = m_stair_apt.group(3).strip().upper()
             full_street = f"{thoroughfare_stem} {st_num}"
         else:
             _, st_num, thoroughfare_stem = self.extract_premise_and_thoroughfare(st1_base)

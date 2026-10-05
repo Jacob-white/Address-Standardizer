@@ -85,7 +85,10 @@ RE_GLUED_UNIT = re.compile(r"\b(APT|STE|UNIT|FL)\.?(?=\d)", re.IGNORECASE)
 # Military Mail (APO, FPO, DPO)
 RE_MILITARY_CITY = re.compile(r"\b(APO|FPO|DPO)\b", re.IGNORECASE)
 RE_MILITARY_STATE = re.compile(r"\b(AE|AP|AA)\b", re.IGNORECASE)
-RE_MILITARY_UNIT_BOX = re.compile(r"\b(UNIT\s+\d+)\s+(BOX\s+\d+)\b", re.IGNORECASE)
+RE_MILITARY_UNIT_BOX = re.compile(
+    r"\b((?:UNIT|PSC|CMR)\s+\d+)\s*(?:,)?\s*(BOX\s+\d+)\b",
+    re.IGNORECASE,
+)
 
 # Rural Route & Highway Contract
 RE_RURAL_ROUTE = re.compile(r"\b(RR|RURAL\s+ROUTE)\s*#?\s*(\d+)\b(?:\s*BOX\s*([A-Z0-9\-]+))?", re.IGNORECASE)

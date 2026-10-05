@@ -396,7 +396,7 @@ class CountryGrammarRegistry:
             elif len(c_clean_alphanumeric) == 3 and c_clean_alphanumeric.isascii() and c_clean_alphanumeric.isalpha():
                 country_cand = c_clean_alphanumeric
 
-        if country_cand and country_cand not in ("USA", ""):
+        if country_cand and country_cand not in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM", ""):
             return country_cand
 
         is_valid_us_state = False
@@ -409,6 +409,9 @@ class CountryGrammarRegistry:
 
         if is_valid_us_state:
             return "USA"
+
+        if country_cand in ("PRI", "GUM", "VIR", "MNP", "ASM"):
+            return country_cand
 
         if city_raw:
             c_clean = RE_NON_ALPHANUMERIC.sub(" ", city_raw).strip().upper()
@@ -444,13 +447,36 @@ class CountryGrammarRegistry:
             ):
                 return "CAN"
             m_sz = RE_STATE_ZIP.search(st_clean)
-            if m_sz and m_sz.group(1) in FROZEN_US_STATE_CODES:
+            if m_sz and m_sz.group(1).upper() in FROZEN_US_STATE_CODES:
                 return "USA"
+
+            # Check if address ends with a US state code/name (or US state before country)
+            # BEFORE scanning raw components against COUNTRY_MAP to prevent domestic namesake cities
+            # (e.g. Lebanon NH, Mexico ME, Brazil IN, Paris TX, London OH, Berlin CT)
+            # from being hijacked by sovereign country names.
+            raw_parts = [p.strip() for p in raw_street.split(",") if p.strip()]
+            if raw_parts:
+                last_clean = RE_NON_ALPHANUMERIC.sub("", raw_parts[-1]).strip().upper()
+                if last_clean in ("USA", "US", "UNITED STATES", "UNITED STATES OF AMERICA"):
+                    if len(raw_parts) >= 2:
+                        prev_clean = RE_NON_ALPHANUMERIC.sub("", raw_parts[-2]).strip().upper()
+                        if prev_clean in FROZEN_US_STATE_CODES or prev_clean in US_STATES:
+                            return "USA"
+                elif last_clean in FROZEN_US_STATE_CODES or last_clean in US_STATES:
+                    return "USA"
+                else:
+                    subwords = raw_parts[-1].split()
+                    if subwords:
+                        sub_last = RE_NON_ALPHANUMERIC.sub("", subwords[-1]).strip().upper()
+                        if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
+                            return "USA"
 
             for part in raw_street.split(","):
                 p_clean = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()
                 p_clean = " ".join(p_clean.split())
                 p_alphanumeric = RE_NON_ALPHANUMERIC.sub("", part).strip().upper()
+                if p_alphanumeric in FROZEN_US_STATE_CODES or p_alphanumeric.isdigit():
+                    continue
                 if p_clean in COUNTRY_MAP and COUNTRY_MAP[p_clean] != "USA":
                     return COUNTRY_MAP[p_clean]
                 if p_alphanumeric in COUNTRY_MAP and COUNTRY_MAP[p_alphanumeric] != "USA":
@@ -462,7 +488,8 @@ class CountryGrammarRegistry:
                 if two_w in COUNTRY_MAP and COUNTRY_MAP[two_w] != "USA":
                     return COUNTRY_MAP[two_w]
             if raw_words and raw_words[-1] in COUNTRY_MAP and COUNTRY_MAP[raw_words[-1]] != "USA":
-                return COUNTRY_MAP[raw_words[-1]]
+                if (len(raw_words[-1]) > 2 or raw_words[-1] not in FROZEN_US_STATE_CODES) and not raw_words[-1].isdigit():
+                    return COUNTRY_MAP[raw_words[-1]]
 
             for part in raw_street.split(","):
                 p_clean = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()

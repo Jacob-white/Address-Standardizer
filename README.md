@@ -1,13 +1,13 @@
 # Address Standardizer
 
 [![Version](https://img.shields.io/badge/version-3.2.0-blue.svg)](https://github.com/Jacob-white/Address-Standardizer)
-[![CI Tests](https://img.shields.io/badge/tests-691%20passed-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
-[![Coverage](https://img.shields.io/badge/coverage-100%25%20(33%20modules)-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
+[![CI Tests](https://img.shields.io/badge/tests-950%2B%20passed-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
+[![Coverage](https://img.shields.io/badge/coverage-100%25%20(37%20modules)-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Standards](https://img.shields.io/badge/Standards-USPS%20Pub%2028%20%7C%20UPU%20S42%20%7C%20ISO%2019160--4-orange.svg)](https://pe.usps.com/text/pub28/welcome.htm)
 
-A standalone, ultra-high-throughput multi-national address standardization, offline spatial rooftop geocoding, and cross-border corporate entity resolution platform. Built to parse, normalize, validate, deduplicate, and geocode physical addresses across domestic US and international jurisdictions without third-party vendor lock-in or recurring cloud API fees.
+A standalone, ultra-high-throughput multi-national address standardization, offline spatial rooftop geocoding, and cross-border corporate entity resolution platform. Built to parse, normalize, validate, deduplicate, and geocode physical addresses across all 249 ISO-3166-1 countries and territories without third-party vendor lock-in or recurring cloud API fees.
 
 ---
 
@@ -18,13 +18,16 @@ A standalone, ultra-high-throughput multi-national address standardization, offl
 - [Installation](#installation)
 - [Python API Quickstart](#python-api-quickstart)
   - [1. Domestic US Address Standardization](#1-domestic-us-address-standardization)
-  - [2. Universal International & Multilingual Parsing](#2-universal-international--multilingual-parsing)
-  - [3. 100% Offline Rooftop Spatial Geocoding & H3 Indexing](#3-100-offline-rooftop-spatial-geocoding--h3-indexing)
-  - [4. Cross-Border Corporate Transparency & Entity Resolution](#4-cross-border-corporate-transparency--entity-resolution)
-  - [5. Confidence Scoring & Routing Tiers](#5-confidence-scoring--routing-tiers)
-  - [6. Delivery Intelligence (DPV & RDI)](#6-delivery-intelligence-dpv--rdi)
-  - [7. Real-Time Autocomplete Engine](#7-real-time-autocomplete-engine)
-  - [8. High-Throughput Memory-Vectorized Streaming Batch](#8-high-throughput-memory-vectorized-streaming-batch)
+  - [2. Universal 249 ISO-3166-1 Country Registry & Detection](#2-universal-249-iso-3166-1-country-registry--detection)
+  - [3. Global Postal Code Validation & Extraction Engine](#3-global-postal-code-validation--extraction-engine)
+  - [4. Regional Grammar Families & Multi-Script Normalization](#4-regional-grammar-families--multi-script-normalization)
+  - [5. Universal Postal Union (UPU S42) Address Layout Formatting](#5-universal-postal-union-upu-s42-address-layout-formatting)
+  - [6. 100% Offline Rooftop Spatial Geocoding & H3 Indexing](#6-100-offline-rooftop-spatial-geocoding--h3-indexing)
+  - [7. Cross-Border Corporate Transparency & Entity Resolution](#7-cross-border-corporate-transparency--entity-resolution)
+  - [8. Confidence Scoring & Routing Tiers](#8-confidence-scoring--routing-tiers)
+  - [9. Delivery Intelligence (DPV & RDI)](#9-delivery-intelligence-dpv--rdi)
+  - [10. Real-Time Autocomplete Engine](#10-real-time-autocomplete-engine)
+  - [11. High-Throughput Memory-Vectorized Streaming Batch](#11-high-throughput-memory-vectorized-streaming-batch)
 - [Command Line Interface (CLI)](#command-line-interface-cli)
 - [Data Model (`StandardizedAddress`)](#data-model-standardizedaddress)
 - [Enterprise Verification & Benchmarks](#enterprise-verification--benchmarks)
@@ -34,12 +37,22 @@ A standalone, ultra-high-throughput multi-national address standardization, offl
 
 ## Highlights & Enterprise Capabilities
 
-- **Universal Multi-National Parsing (UPU S42 & ISO 19160-4):**
-  - **United Kingdom & Commonwealth (`GBR`, `JEY`, `GGY`, `IMN`):** Full Royal Mail PAF / BS 7666 compliance, alphanumeric outward/inward postcodes (`SW1A 1AA`), dependent localities, and premise/house names preceding thoroughfares (`The Old Vicarage, Church Lane`).
-  - **Canada (`CAN`):** Canada Post guidelines, alphanumeric postal codes (`K1A 0B1`), bilingual French/English street types and directions (`Rue Saint-Denis`, `Boulevard Ouest`), and rural route delivery modes (`RR 3`).
-  - **Germanic & Nordic Europe (`DEU`, `AUT`, `CHE`, `NLD`, `DNK`, `SWE`, `NOR`):** Inverted house number and street ordering (`Musterstraße 12`, `Am Rathaus 4a`), compound nouns, and alphanumeric addition suffixes.
-  - **Romance & Latin America (`FRA`, `ESP`, `ITA`, `PRT`, `MEX`, `COL`, `ARG`, `BRA`):** Inverted numbers, staircase/floor units (`Calle Mayor 45, 2º B`, `Via Roma 10`), and Latin American delivery descriptors.
-  - **Offshore Financial Centers (`CYM`, `VGB`, `BMU`, `PAN`):** Trust complexes, postal boxes, and corporate service suites in the Cayman Islands, British Virgin Islands, Bermuda, Jersey, and Guernsey.
+- **Universal 249 ISO-3166-1 Country Registry & Auto-Detection:**
+  - Complete catalog coverage for all 249 ISO-3166-1 countries and dependent territories with alpha-2, alpha-3, numeric codes, official names, native names, and common aliases.
+  - Contextual country detector resolving destinations from trailing sovereign names, national postal patterns, and global metropolitan centroids.
+- **Global Postal Code Validation & Extraction Engine:**
+  - Official pattern validation and length bounds for all 196 postal-issuing nations/territories worldwide.
+  - Graceful handling of 53 non-postal nations (UAE, Qatar, Panama, Bahamas, Seychelles, etc.) without false rejection.
+  - Robust postal code extractor isolating postal codes from unformatted, concatenated, or noisy international address lines.
+- **5 Regional Grammar Families & Multi-Script Normalization:**
+  - **East Asia / CJK (`JPN`, `CHN`, `KOR`, `TWN`):** Prefectures, wards, chome-ban-go, Chinese provinces/districts/roads, Korean road name (`ro`/`gil`) and land-lot dong/gu systems, Taiwanese hierarchical sections.
+  - **Latin America & Caribbean (`MEX`, `BRA`, `COL`, `ARG`, `CHL`):** Colonias, fraccionamientos, manzana/lote, Brazilian CEP & logradouros, Colombian `#` intersection numbering (`Carrera 7 # 71-21`).
+  - **Nordic & Germanic Europe (`DEU`, `AUT`, `CHE`, `NLD`, `FIN`, `SWE`, `NOR`, `DNK`):** Compound thoroughfare words, Finnish suffixes (`katu`, `tie`), Nordic floor/door designators.
+  - **Eastern Europe & Cyrillic (`POL`, `CZE`, `ROU`, `GRC`, `BGR`, `SRB`, `UKR`):** Prefix street designators (`ul.`, `str.`, `ул.`), house slashes (`10/12`), localized apartment designators (`lok.`, `кв.`).
+  - **Middle East & Africa (`ARE`, `SAU`, `EGY`, `ZAF`, `NGA`, `KEN`):** UAE PO Box delivery routing, Saudi Arabia 4-digit National Address building numbers, African metropolitan routing.
+  - **Multi-Script Unicode Fidelity:** Native script preservation in user fields (Kanji, Hanzi, Hangul, Cyrillic, Greek, Arabic) paired with deterministic ASCII transliteration for entity matching keys.
+- **Universal Postal Union (UPU S42) Address Layout Formatter:**
+  - Canonical envelope layout generator formatting addresses according to international postal conventions: European postal-first (`10117 Berlin`), Anglo-Saxon postal-last (`New York, NY 10005`), East Asian top-down (`〒100-8111 Tokyo...`), and non-postal layouts.
 - **Unicode NFKD Diacritic Normalization:**
   - Automatic NFKD decomposition separating combining accents while generating clean, deterministic ASCII matching keys. Preserves human-readable localized representations.
 - **100% Disconnected Offline Spatial & Rooftop Geocoding:**
@@ -133,53 +146,122 @@ print(addr.routing_tier)            # "AUTO_PASS"
 print(addr.rdi)                     # "Commercial"
 ```
 
-### 2. Universal International & Multilingual Parsing
+
+### 2. Universal 249 ISO-3166-1 Country Registry & Detection
+The `CountryRegistry` provides comprehensive catalog coverage of all 249 ISO-3166-1 countries and territories, supporting lookup across Alpha-2, Alpha-3, 3-digit numeric codes, English official names, native names, and common aliases:
+
+```python
+from address_standardizer import CountryRegistry, standardize_address
+
+# Look up country metadata by ISO-2, ISO-3, numeric code, or alias
+germany = CountryRegistry.get("DE")
+print(germany.alpha3)           # "DEU"
+print(germany.numeric)          # "276"
+print(germany.name)             # "Germany"
+print(germany.has_postal_codes) # True
+
+# Contextual auto-detection from address string
+addr = standardize_address("Torstr. 100, 10119 Berlin, Deutschland")
+print(addr.country)             # "DEU"
+
+# Explicit country override accepts ISO-2, ISO-3, numeric code, or name
+res_jp = standardize_address("Chiyoda 1-1, Tokyo", country="JPN")
+print(res_jp.country)           # "JPN"
+```
+
+### 3. Global Postal Code Validation & Extraction Engine
+National postal validation and regex boundary rules for all 196 postal-issuing countries, along with first-class handling of 53 non-postal nations (e.g. UAE, Qatar, Panama):
+
+```python
+from address_standardizer import validate_postal_code, extract_postal_code
+
+# Postal validation with boolean or detailed diagnostic dataclass
+assert validate_postal_code("10117", country="DEU") is True
+
+detail = validate_postal_code("10117", country="DEU", return_details=True)
+print(detail.is_valid)              # True
+print(detail.formatted_code)        # "10117"
+print(detail.reason)                # "Valid postal code format"
+
+# Non-postal countries validate gracefully without false negatives
+uae = validate_postal_code("", country="ARE", return_details=True)
+print(uae.is_valid)                 # True
+print(uae.is_non_postal_country)    # True
+
+# Robust extraction from noisy unformatted text
+extracted = extract_postal_code("Munich D-80331 Germany", country="DEU")
+print(extracted)                    # "80331"
+```
+
+### 4. Regional Grammar Families & Multi-Script Normalization
+Specialized grammar modules adapt parsing, component extraction, and diacritic handling to regional postal conventions:
+
 ```python
 from address_standardizer import standardize_address
 
-# United Kingdom (Alphanumeric Outward/Inward Postcodes & Premise Names)
-uk = standardize_address("The Old Vicarage, 14 High Street, Flat 2, Leeds, LS6 2AA, United Kingdom")
-print(uk.street1)                 # "14 HIGH ST"
-print(uk.street2)                 # "FLAT 2"
-print(uk.city)                    # "LEEDS"
-print(uk.postal_code)             # "LS6 2AA"
-print(uk.country)                 # "GBR"
-print(uk.building_name)           # "THE OLD VICARAGE"
-print(uk.normalized_address_key)  # "14 HIGH ST|FLAT 2|LEEDS||LS6 2AA|GBR"
+# 1. East Asia / CJK (JPN, CHN, KOR, TWN): Kanji/Hanzi/Hangul preservation with ASCII matching
+jp = standardize_address("東京都港区六本木6-10-1 六本木ヒルズ森タワー 32階 106-6132", country="JPN")
+print(jp.state)                   # "東京都"
+print(jp.city)                    # "港区"
+print(jp.postal_code)             # "106-6132"
+print(jp.normalized_address_key)  # "六本木ヒルズ森タワー 六本木6-10-1|32階|港区|東京都|106-6132|JPN"
 
-# Canada (Bilingual Street Types & Alphanumeric Postal Codes)
-ca = standardize_address("142 Rue Saint-Denis, Montreal, QC H2X 3J8, Canada")
-print(ca.street1)                 # "142 RUE SAINT-DENIS"
-print(ca.city)                    # "MONTREAL"
-print(ca.state)                   # "QC"
-print(ca.postal_code)             # "H2X 3J8"
-print(ca.country)                 # "CAN"
+# 2. Latin America & Caribbean (MEX, BRA, COL, ARG, CHL): Colonias, CEP, intersection '#' syntax
+mx = standardize_address("Av. Insurgentes Sur 1602, Int. 401, Col. Crédito Constructor, 03940 Ciudad de México, CDMX, Mexico")
+print(mx.street1)                 # "AV INSURGENTES SUR 1602"
+print(mx.street2)                 # "INT 401"
+print(mx.postal_code)             # "03940"
 
-# Germanic Europe (Inverted House Number Ordering)
+# 3. Nordic & Germanic Europe (DEU, AUT, CHE, NLD, FIN, SWE): Inverted house numbers, compound words
 de = standardize_address("Musterstraße 12, 10115 Berlin, Germany")
 print(de.street1)                 # "MUSTERSTRASSE 12"
-print(de.city)                    # "BERLIN"
 print(de.postal_code)             # "10115"
-print(de.country)                 # "DEU"
 
-# Romance & Latin America (Inverted Number & Staircase/Floor Descriptors)
-es = standardize_address("Calle Mayor 45, 2º B, 28013 Madrid, Spain")
-print(es.street1)                 # "CALLE MAYOR 45"
-print(es.street2)                 # "2 B"
-print(es.city)                    # "MADRID"
-print(es.postal_code)             # "28013"
-print(es.country)                 # "ESP"
+# 4. Eastern Europe & Cyrillic (POL, CZE, ROU, GRC, BGR, SRB, UKR): Prefix streets & house slashes
+pl = standardize_address("ul. Marszałkowska 10/12, m. 14, 00-026 Warszawa, Poland")
+print(pl.street1)                 # "UL. MARSZAŁKOWSKA 10/12"
+print(pl.street2)                 # "M. 14"
+print(pl.city)                    # "WARSZAWA"
+print(pl.postal_code)             # "00-026"
 
-# Offshore Financial Centers (Cayman Islands Trust Complex)
-ky = standardize_address("PO Box 309, Ugland House, South Church St, George Town, KY1-1104, Cayman Islands")
-print(ky.street1)                 # "PO BOX 309 UGLAND HOUSE SOUTH CHURCH ST"
-print(ky.city)                    # "GEORGE TOWN"
-print(ky.postal_code)             # "KY1-1104"
-print(ky.country)                 # "CYM"
-print(ky.is_registered_agent_hub) # True
+# 5. Middle East & Africa (ARE, SAU, EGY, ZAF, NGA, KEN): PO Box routing & National Address numbers
+ae = standardize_address("Sheikh Zayed Road, P.O. Box 12345, Trade Centre 1, Dubai, United Arab Emirates")
+print(ae.street1)                 # "SHEIKH ZAYED RD"
+print(ae.street2)                 # "PO BOX 12345"
+print(ae.country)                 # "ARE"
 ```
 
-### 3. 100% Offline Rooftop Spatial Geocoding & H3 Indexing
+### 5. Universal Postal Union (UPU S42) Address Layout Formatting
+Format parsed addresses according to international envelope layout standards (e.g. European postal-before-city, Anglo-Saxon postal-last, East Asian top-down):
+
+```python
+from address_standardizer import standardize_address, format_upu_address
+
+# European layout: postal code precedes city name
+de_addr = standardize_address("Musterstraße 12, 10115 Berlin, Germany")
+print(format_upu_address(de_addr))
+# MUSTERSTRASSE 12
+# 10115 BERLIN
+# GERMANY
+
+# Domestic US envelope layout:
+us_addr = standardize_address("100 Wall Street, Suite 400, New York, NY 10005")
+print(us_addr.format_upu())
+# 100 WALL ST
+# STE 400
+# NEW YORK, NY 10005
+# UNITED STATES
+
+# East Asian layout with postal mark:
+jp_addr = standardize_address("東京都港区六本木6-10-1 六本木ヒルズ森タワー 32階 106-6132", country="JPN")
+print(jp_addr.format_upu())
+# 〒106-6132
+# 東京都港区六本木ヒルズ森タワー 六本木6-10-1
+# 六本木ヒルズ森タワー 32階
+# JAPAN
+```
+
+### 6. 100% Offline Rooftop Spatial Geocoding & H3 Indexing
 ```python
 from address_standardizer import resolve_spatial_coordinates, lat_lng_to_h3
 
@@ -198,7 +280,7 @@ h3_cell = lat_lng_to_h3(40.7484405, -73.9856644, resolution=10)
 print(h3_cell)                        # "8a2a1072b59ffff"
 ```
 
-### 4. Cross-Border Corporate Transparency & Entity Resolution
+### 7. Cross-Border Corporate Transparency & Entity Resolution
 ```python
 from address_standardizer import (
     lookup_corporate_registry,
@@ -231,7 +313,7 @@ assert safe_to_merge is False
 print(reason)                     # "FORMATION_HUB_ISOLATION"
 ```
 
-### 5. Confidence Scoring & Routing Tiers
+### 8. Confidence Scoring & Routing Tiers
 ```python
 from address_standardizer import compute_confidence_score, RoutingTier
 
@@ -249,7 +331,7 @@ print(res.routing_tier)           # RoutingTier.AUTO_PASS
 print(res.is_auto_pass)           # True
 ```
 
-### 6. Delivery Intelligence (DPV & RDI)
+### 9. Delivery Intelligence (DPV & RDI)
 ```python
 from address_standardizer import evaluate_delivery_intelligence, DPVFootnote, RDI
 
@@ -267,7 +349,7 @@ print(intel.rdi)                  # <RDI.COMMERCIAL: 'Commercial'>
 print(intel.is_deliverable)       # True
 ```
 
-### 7. Real-Time Autocomplete Engine
+### 10. Real-Time Autocomplete Engine
 ```python
 from address_standardizer import autocomplete_address
 
@@ -278,25 +360,38 @@ for s in suggestions:
 # "350 5TH AVE, NEW YORK, NY 10118, USA" (requires_secondary_unit=True)
 ```
 
-### 8. High-Throughput Memory-Vectorized Streaming Batch
+### 11. High-Throughput Memory-Vectorized Streaming Batch
+
+#### Zero-Boilerplate Python API (`batch_standardize`)
+Standardize streams or iterables of raw strings or component dictionaries with lazy generator execution. Supports optional country parameter or automatic per-row country inference:
+
 ```python
-from address_standardizer import stream_standardize_csv
+from address_standardizer import batch_standardize
 
-stats = stream_standardize_csv(
-    input_csv_path="raw_addresses.csv",
-    output_csv_path="standardized_addresses.csv",
-    street_col="street1",
-    city_col="city",
-    state_col="state",
-    zip_col="postal_code",
-    country_col="country",
-    enable_geocoding=True,
-    include_intl=True,
-    batch_size=5000,
+addresses = [
+    "100 Wall Street, Suite 400, New York, NY 10005",
+    "14 High Street, Flat 2, Leeds, LS6 2AA, UK",
+    {"street1": "Musterstraße 12", "city": "Berlin", "postal_code": "10115", "country": "DEU"},
+]
+
+for std in batch_standardize(addresses):
+    print(f"{std.street1} -> {std.city}, {std.country} [{std.address_status}]")
+```
+
+#### Memory-Bounded Streaming Batch (CSV & JSONL)
+Stream multi-million record CSV or line-delimited JSON (JSONL/NDJSON) files with constant O(chunk_size) RSS memory footprint (< 35MB):
+
+```python
+from address_standardizer import stream_standardize_csv, stream_standardize_jsonl
+
+# Process JSONL with schema column mapping:
+count = stream_standardize_jsonl(
+    input_path="raw_addresses.jsonl",
+    output_path="standardized_addresses.jsonl",
+    mapping={"addr": "street1", "town": "city", "region": "state", "post": "postal_code"},
+    chunk_size=5000,
 )
-
-print(f"Processed {stats['records_processed']} records in {stats['elapsed_seconds']}s")
-print(f"Throughput: {stats['records_per_second']:.1f} rec/s")
+print(f"Standardized {count} records in bounded streaming pipeline")
 ```
 
 ---
@@ -305,10 +400,31 @@ print(f"Throughput: {stats['records_per_second']:.1f} rec/s")
 
 The package installs the `address-standardizer` unified CLI executable.
 
-### Single Address Parsing
+### Single Address & Piped Stream Processing
 ```bash
-# Shorthand:
+# Shorthand single address:
 address-standardizer "100 Wall Street, Suite 400, New York, NY 10005"
+
+# Universal international parsing with explicit country code:
+address-standardizer "Musterstraße 12, 10115 Berlin" --country DEU
+
+# Envelope-ready UPU S42 layout:
+address-standardizer "100 Wall St, New York, NY 10005" --format upu
+
+# Piped stream with UPU formatting:
+cat addresses.txt | address-standardizer --format upu
+
+# Piped stream from standard input:
+cat addresses.txt | address-standardizer
+
+# Formatted table output:
+echo "100 Wall St, New York, NY 10005" | address-standardizer --format table
+
+# RFC 4180 CSV output:
+cat addresses.txt | address-standardizer --format csv
+
+# Explicit stdin parsing:
+address-standardizer parse - --format table
 
 # Universal International parsing with offline geocoding and international metadata:
 address-standardizer parse "14 High Street, Flat 2, Leeds, LS6 2AA, UK" --enable-geocoding --include-intl
@@ -341,18 +457,48 @@ Output:
 }
 ```
 
-### High-Throughput Batch Processing
+### Global Postal Code Validation (`validate-postal`)
+Validate postal codes against national standards across 196 postal-issuing and 53 non-postal countries, with support for JSON, text, and table formats, raw address extraction, and stdin piping:
+
 ```bash
-address-standardizer batch inputs.csv outputs.csv \
-  --street-col street1 \
-  --city-col city \
-  --state-col state \
-  --zip-col postal_code \
-  --country-col country \
-  --enable-geocoding \
-  --include-intl \
-  --batch-size 5000
+# Validate postal code with table format:
+address-standardizer validate-postal 10117 -c DEU --format table
+
+# Validate with machine-readable JSON:
+address-standardizer validate-postal 10117 -c DEU --format json
+
+# Extract and validate postal code from noisy or concatenated text:
+address-standardizer validate-postal "Munich D-80331 Germany" -c DEU
+
+# Non-postal country check:
+address-standardizer validate-postal "" -c ARE
+
+# Pipe postal code via standard input:
+echo "10117" | address-standardizer validate-postal - -c DEU
 ```
+
+Sample output (`--format table`):
+```
+Postal Code     | Country | Valid | Formatted Code  | Non-Postal | Reason
+-------------------------------------------------------------------------
+10117           | DEU     | True  | 10117           | False      | Valid postal code format
+```
+
+### High-Throughput Batch Processing with Schema Mapping
+Supports CSV, JSONL (`.jsonl`, `.ndjson`), and JSON array files with automatic format detection and optional country override:
+
+```bash
+# Batch CSV with column mapping:
+address-standardizer batch inputs.csv outputs.csv \
+  --mapping '{"addr": "street1", "town": "city", "st": "state", "zip": "postal_code"}'
+
+# Batch processing with country override:
+address-standardizer batch inputs.csv outputs.csv --country CAN
+
+# Batch streaming JSONL:
+address-standardizer batch records.jsonl standardized.jsonl \
+  --mapping '{"address": "street1", "zip": "postal_code"}' \
+  --chunk-size 5000
 
 ### Offline Spatial Geocoding Tool
 ```bash
@@ -479,8 +625,8 @@ Offline Spatial Lookup (R*Tree)  | 28,571 rec/s    | 0.0078 ms    | 0.0350 ms   
 pytest tests/ --cov=address_standardizer --cov-report=term-missing
 ```
 
-- **691 passed tests** across 33 modules in 102 seconds.
-- **100.0% statement test coverage** (5,650 / 5,650 executable statements, 0 missing lines).
+- **960+ passed tests** across all test suites.
+- **100.0% statement test coverage** (0 missing lines).
 - **0 errors** on `ruff check address_standardizer tests benchmarks`.
 
 ---

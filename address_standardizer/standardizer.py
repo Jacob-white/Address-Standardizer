@@ -137,9 +137,15 @@ def normalize_country_code(
             country_cand = COUNTRY_MAP[c_clean_alphanumeric]
         elif len(c_clean_alphanumeric) == 3 and c_clean_alphanumeric.isascii() and c_clean_alphanumeric.isalpha():
             country_cand = c_clean_alphanumeric
+        else:
+            from address_standardizer.international.countries import CountryRegistry
+
+            info = CountryRegistry.get(country_raw)
+            if info:
+                country_cand = info.alpha3
 
     # If country is explicitly non-US, return it immediately
-    if country_cand and country_cand not in ("USA", ""):
+    if country_cand and country_cand not in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM", ""):
         return country_cand
 
     # Check state indicator
@@ -154,6 +160,9 @@ def normalize_country_code(
     # If state is explicitly a US state, then country is USA
     if is_valid_us_state:
         return "USA"
+
+    if country_cand in ("PRI", "GUM", "VIR", "MNP", "ASM"):
+        return country_cand
 
     # International metro check: When state is absent or not a US state,
     # check city against global metros to prevent erroneous USA defaulting
@@ -186,12 +195,33 @@ def normalize_country_code(
         if m_sz and m_sz.group(1).upper() in FROZEN_US_STATE_CODES:
             return "USA"
 
-        # Check country map in raw street components (ignoring US state abbreviations)
+        # Check if address ends with a US state code/name (or US state before country)
+        # BEFORE scanning raw components against COUNTRY_MAP to prevent domestic namesake cities
+        # (e.g. Lebanon NH, Mexico ME, Brazil IN, Paris TX, London OH, Berlin CT)
+        # from being hijacked by sovereign country names.
+        raw_parts = [p.strip() for p in raw_street.split(",") if p.strip()]
+        if raw_parts:
+            last_clean = RE_NON_ALPHANUMERIC.sub("", raw_parts[-1]).strip().upper()
+            if last_clean in ("USA", "US", "UNITED STATES", "UNITED STATES OF AMERICA"):
+                if len(raw_parts) >= 2:
+                    prev_clean = RE_NON_ALPHANUMERIC.sub("", raw_parts[-2]).strip().upper()
+                    if prev_clean in FROZEN_US_STATE_CODES or prev_clean in US_STATES:
+                        return "USA"
+            elif last_clean in FROZEN_US_STATE_CODES or last_clean in US_STATES:
+                return "USA"
+            else:
+                subwords = raw_parts[-1].split()
+                if subwords:
+                    sub_last = RE_NON_ALPHANUMERIC.sub("", subwords[-1]).strip().upper()
+                    if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
+                        return "USA"
+
+        # Check country map in raw street components (ignoring US state abbreviations and numbers)
         for part in raw_street.split(","):
             p_clean = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()
             p_clean = " ".join(p_clean.split())
             p_alphanumeric = RE_NON_ALPHANUMERIC.sub("", part).strip().upper()
-            if p_alphanumeric in FROZEN_US_STATE_CODES:
+            if p_alphanumeric in FROZEN_US_STATE_CODES or p_alphanumeric.isdigit():
                 continue
             if p_clean in COUNTRY_MAP and COUNTRY_MAP[p_clean] != "USA":
                 return COUNTRY_MAP[p_clean]
@@ -204,7 +234,7 @@ def normalize_country_code(
             if two_w in COUNTRY_MAP and COUNTRY_MAP[two_w] != "USA":
                 return COUNTRY_MAP[two_w]
         if raw_words and raw_words[-1] in COUNTRY_MAP and COUNTRY_MAP[raw_words[-1]] != "USA":
-            if len(raw_words[-1]) > 2 or raw_words[-1] not in FROZEN_US_STATE_CODES:
+            if (len(raw_words[-1]) > 2 or raw_words[-1] not in FROZEN_US_STATE_CODES) and not raw_words[-1].isdigit():
                 return COUNTRY_MAP[raw_words[-1]]
 
         # Check global metros in raw street SECOND
@@ -395,7 +425,7 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
     # Check for Military Unit Box
     m_mil = RE_MILITARY_UNIT_BOX.search(clean_addr)
     if m_mil:
-        st1_mil = f"{m_mil.group(1).upper()} {m_mil.group(2).upper()}"
+        st1_mil = f"{' '.join(m_mil.group(1).upper().split())} {' '.join(m_mil.group(2).upper().split())}"
         return st1_mil, "", True
 
     # Check for PO Box
@@ -596,7 +626,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
     # Check for Military Unit Box
     m_mil = RE_MILITARY_UNIT_BOX.search(clean_input)
     if m_mil:
-        st1_mil = f"{m_mil.group(1).upper()} {m_mil.group(2).upper()}"
+        st1_mil = f"{' '.join(m_mil.group(1).upper().split())} {' '.join(m_mil.group(2).upper().split())}"
         m_sz = RE_STATE_ZIP.search(clean_input.upper())
         p_st = m_sz.group(1) if m_sz else ""
         p_zp = m_sz.group(2) if m_sz else ""
@@ -1109,6 +1139,7 @@ def standardize_address(
     is_vacant: Optional[bool] = None,
     enable_fuzzy: bool = True,
     enable_geocoding: bool = False,
+    use_cache: bool = True,
     **kwargs: Any,
 ) -> StandardizedAddress:
     """
@@ -1117,12 +1148,12 @@ def standardize_address(
     and flags registered agent hubs and private residences.
     """
     raw_dict = {
-        "street1": street1,
-        "street2": street2,
-        "city": city,
-        "state": state,
-        "postal_code": postal_code,
-        "country": country,
+        "street1": str(street1) if street1 is not None else "",
+        "street2": str(street2) if street2 is not None else "",
+        "city": str(city) if city is not None else "",
+        "state": str(state) if state is not None else "",
+        "postal_code": str(postal_code) if postal_code is not None else "",
+        "country": str(country) if country is not None else "",
         "is_vacant": is_vacant if is_vacant is not None else kwargs.get("vacant"),
         "enable_fuzzy": enable_fuzzy,
         "enable_geocoding": enable_geocoding,
@@ -1130,7 +1161,7 @@ def standardize_address(
 
     cache = get_default_cache()
     cache_key = None
-    if cache.is_enabled():
+    if use_cache and cache.is_enabled():
         cache_key = make_cache_key(
             street1,
             street2,
@@ -1146,12 +1177,12 @@ def standardize_address(
             return copy.copy(cached)
 
     # Tier 0: Pre-Flight Sanity & Unicode NFKC Normalization
-    s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', street1)).strip() if street1 else ""
-    s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', street2)).strip() if street2 else ""
-    city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', city)).strip() if city else ""
-    state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', state)).strip() if state else ""
-    postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', postal_code)).strip() if postal_code else ""
-    country_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', country)).strip() if country else ""
+    s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(street1))).strip() if street1 is not None else ""
+    s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(street2))).strip() if street2 is not None else ""
+    city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(city))).strip() if city is not None else ""
+    state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(state))).strip() if state is not None else ""
+    postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(postal_code))).strip() if postal_code is not None else ""
+    country_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(country))).strip() if country is not None else ""
 
     raw_components = [v for v in [s1_raw, s2_raw, city_raw, state_raw, postal_raw, country_raw] if v]
     raw_street_address = ", ".join(raw_components)
