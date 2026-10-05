@@ -235,8 +235,9 @@ def standardize_record(
 
         # Tier 2 Deterministic Rule Matrix
         s1_clean = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
+        s2_clean = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_raw, postal_code=postal_raw) if s2_raw else s2_raw
         norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
-            s1_clean, s2_raw, enable_fuzzy=kwargs.get("enable_fuzzy", True), city_raw=city_raw
+            s1_clean, s2_clean, enable_fuzzy=kwargs.get("enable_fuzzy", True), city_raw=city_raw
         )
         if not city_raw and p_city:
             city_raw = p_city

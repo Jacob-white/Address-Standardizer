@@ -33,7 +33,7 @@ RE_CANONICAL_COMMA = re.compile(
 )
 
 # State and ZIP matching
-RE_STATE_ZIP = re.compile(r"\b([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b", re.IGNORECASE)
+RE_STATE_ZIP = re.compile(r"\b([A-Z]{2})(?:,\s*|\s+)(\d{5}(?:-\d{4})?)\b", re.IGNORECASE)
 RE_TERMINAL_ZIP = re.compile(r"\b(\d{5})(?:-(\d{4}))?\b$")
 
 # PO Box

@@ -1539,5 +1539,47 @@ class TestRuleBasedFallbackAndEdgeCases:
         assert res_walnut.address_status == "standardized"
         assert res_walnut.confidence_score >= 0.95
 
+    def test_country_resolution_us_state_code_collisions(self):
+        # US addresses with comma before state/zip must resolve to USA, not foreign countries (e.g. CO!=COL, DE!=DEU, CA!=CAN)
+        assert normalize_country_code("", "", "", raw_street="100 Main St, Denver, CO, 80202") == "USA"
+        assert normalize_country_code("", "", "", raw_street="200 Market St, Philadelphia, PA, 19104") == "USA"
+        assert normalize_country_code("", "", "", raw_street="1209 Orange St, Wilmington, DE, 19801") == "USA"
+        assert normalize_country_code("", "", "", raw_street="100 Michigan Ave, Chicago, IL, 60601") == "USA"
+        assert normalize_country_code("", "", "", raw_street="1212 Broadway Plaza, Walnut Creek, CA, 94596, United States") == "USA"
+
+    def test_landmark_name_city_prefix_handling(self):
+        # Municipal-only inputs with Spanish prefixes (La Jolla, La Habra, etc.) must not become street1="LA"
+        res_jolla = standardize_address("LA JOLLA, CA, United States")
+        assert res_jolla.street1 == ""
+        assert res_jolla.city == "LA JOLLA"
+        assert res_jolla.state == "CA"
+        assert res_jolla.address_status == "parse_failed"
+
+        res_habra = standardize_address("LA HABRA, CA, United States")
+        assert res_habra.street1 == ""
+        assert res_habra.city == "LA HABRA"
+        assert res_habra.state == "CA"
+        assert res_habra.address_status == "parse_failed"
+
+        # Real address in La Jolla is parsed cleanly
+        res_real = standardize_address("100 Girard Ave, La Jolla, CA 92037")
+        assert res_real.street1 == "100 GIRARD AVE"
+        assert res_real.city == "LA JOLLA"
+        assert res_real.state == "CA"
+        assert res_real.postal_code == "92037"
+
+    def test_secondary_unit_redundant_city_stripping(self):
+        # Secondary units containing redundant trailing city names are cleaned
+        res = standardize_address(
+            street1="1735 Market St",
+            street2="38th Fl Philadelphia",
+            city="Philadelphia",
+            state="PA",
+            postal_code="19103"
+        )
+        assert res.street1 == "1735 MARKET ST"
+        assert res.street2 == "FL 38"
+        assert res.city == "PHILADELPHIA"
+
 
 

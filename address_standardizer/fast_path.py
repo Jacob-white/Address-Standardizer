@@ -285,10 +285,12 @@ def fast_path_parse(
         if not state_code:
             return None
 
-        # Clean redundant city/state/zip if present at end of s1_raw
+        # Clean redundant city/state/zip if present at end of s1_raw or s2_raw
         s1_raw = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_code, postal_code=zip_raw)
         if not s1_raw:
             return None
+        if s2_raw:
+            s2_raw = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_code, postal_code=zip_raw)
 
         # Validate ZIP5
         zip_clean = zip_raw.strip()

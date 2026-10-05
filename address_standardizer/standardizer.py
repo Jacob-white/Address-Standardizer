@@ -183,14 +183,16 @@ def normalize_country_code(
         if RE_CAN_POSTCODE.search(st_clean) or st_clean.endswith(", CANADA") or st_clean.endswith(" CANADA"):
             return "CAN"
         m_sz = RE_STATE_ZIP.search(st_clean)
-        if m_sz and m_sz.group(1) in FROZEN_US_STATE_CODES:
+        if m_sz and m_sz.group(1).upper() in FROZEN_US_STATE_CODES:
             return "USA"
 
-        # Check country map in raw street FIRST
+        # Check country map in raw street components (ignoring US state abbreviations)
         for part in raw_street.split(","):
             p_clean = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()
             p_clean = " ".join(p_clean.split())
             p_alphanumeric = RE_NON_ALPHANUMERIC.sub("", part).strip().upper()
+            if p_alphanumeric in FROZEN_US_STATE_CODES:
+                continue
             if p_clean in COUNTRY_MAP and COUNTRY_MAP[p_clean] != "USA":
                 return COUNTRY_MAP[p_clean]
             if p_alphanumeric in COUNTRY_MAP and COUNTRY_MAP[p_alphanumeric] != "USA":
@@ -202,7 +204,8 @@ def normalize_country_code(
             if two_w in COUNTRY_MAP and COUNTRY_MAP[two_w] != "USA":
                 return COUNTRY_MAP[two_w]
         if raw_words and raw_words[-1] in COUNTRY_MAP and COUNTRY_MAP[raw_words[-1]] != "USA":
-            return COUNTRY_MAP[raw_words[-1]]
+            if len(raw_words[-1]) > 2 or raw_words[-1] not in FROZEN_US_STATE_CODES:
+                return COUNTRY_MAP[raw_words[-1]]
 
         # Check global metros in raw street SECOND
         for part in raw_street.split(","):
@@ -836,6 +839,14 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
         elif label in ("CountryName", "Recipient", "NotAddress"):
             i += 1
             continue
+        elif label == "LandmarkName":
+            # If preceding PlaceName/StateName or no street number present, it is a city prefix like 'LA' in 'LA JOLLA'
+            if i + 1 < len(parsed) and parsed[i + 1][1] in ("PlaceName", "StateName", "LandmarkName"):
+                city_parts.append(clean)
+            elif not any(lbl == "AddressNumber" for _, lbl in parsed):
+                city_parts.append(clean)
+            else:
+                building_parts.append(clean)
         else:
             street_parts.append(clean)
         i += 1
@@ -898,6 +909,8 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
     s2_clean = (street2_raw or "").strip()
     if city_raw:
         s1_clean = clean_redundant_street_tail(s1_clean, city=city_raw)
+        if s2_clean:
+            s2_clean = clean_redundant_street_tail(s2_clean, city=city_raw)
 
     # Check if street1 has physical street and street2 has PO Box (Dual-Address line)
     m_s1_po = RE_PO_BOX.search(s1_clean)
@@ -1218,8 +1231,9 @@ def standardize_address(
     if is_us:
         # US Pipeline (USPS Pub 28)
         s1_clean = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
+        s2_clean = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_raw, postal_code=postal_raw) if s2_raw else s2_raw
         norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
-            s1_clean, s2_raw, enable_fuzzy=enable_fuzzy, city_raw=city_raw
+            s1_clean, s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw
         )
         if not city_raw and p_city:
             city_raw = p_city
