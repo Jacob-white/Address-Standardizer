@@ -398,3 +398,103 @@ def test_offshore_financial_hub_postal_normalization():
         assert isinstance(res, PostalValidationResult)
         assert res.is_valid is True
         assert res.formatted_code == "IM1 1AA"
+
+
+def test_international_po_box_promotion_when_thoroughfare_empty():
+    """Verify that international addresses with standalone PO Box or Apartado are standardized cleanly
+    and promoted to street1 instead of failing with parse_failed."""
+    # Cayman Islands PO Box
+    res_cym = standardize_address(
+        street1="PO Box 309",
+        city="George Town",
+        country="CYM",
+    )
+    assert res_cym.address_status == "standardized"
+    assert res_cym.street1 == "PO BOX 309"
+    assert res_cym.street2 == ""
+    assert res_cym.city == "GEORGE TOWN"
+    assert res_cym.country_iso3 == "CYM"
+    assert res_cym.normalized_address_key == "PO BOX 309||GEORGE TOWN|||CYM"
+
+    # Canada PO Box
+    res_can = standardize_address(
+        street1="PO Box 456",
+        city="Toronto",
+        state="ON",
+        postal_code="M5H 1J9",
+        country="CAN",
+    )
+    assert res_can.address_status == "standardized"
+    assert res_can.street1 == "PO BOX 456"
+    assert res_can.street2 == ""
+    assert res_can.city == "TORONTO"
+    assert res_can.state == "ON"
+    assert res_can.postal_code == "M5H 1J9"
+    assert res_can.country_iso3 == "CAN"
+    assert res_can.normalized_address_key == "PO BOX 456||TORONTO|ON|M5H 1J9|CAN"
+
+    # British Virgin Islands PO Box
+    res_vgb = standardize_address(
+        street1="P.O. Box 71",
+        city="Road Town",
+        country="VGB",
+    )
+    assert res_vgb.address_status == "standardized"
+    assert res_vgb.street1 == "PO BOX 71"
+    assert res_vgb.street2 == ""
+    assert res_vgb.city == "ROAD TOWN"
+    assert res_vgb.country_iso3 == "VGB"
+
+
+def test_country_detection_does_not_hijack_domestic_street_names():
+    """Verify that US addresses containing street names that collide with 1-word global metros
+    (Hamilton Ave, Valencia St, David St, Douglas Rd, Aberdeen Dr, Martinez Way) do NOT get hijacked."""
+    # Comma-delimited address strings
+    cases = [
+        "100 Hamilton Avenue, Palo Alto",
+        "500 Valencia Street, San Francisco",
+        "100 David Street, Springfield",
+        "100 Douglas Road, Miami",
+        "200 Aberdeen Drive, Chapel Hill",
+        "300 Martinez Way, Los Angeles",
+    ]
+    for addr in cases:
+        det = CountryRegistry.detect_country(addr)
+        assert det is None or det.alpha3 == "USA", f"Expected None/USA for {addr}, got {det.alpha3 if det else None}"
+
+    # Verify standardizer parses them as domestic USA addresses
+    res_ham = standardize_address(
+        street1="100 Hamilton Avenue",
+        city="Palo Alto",
+        state="CA",
+        postal_code="94301",
+    )
+    assert res_ham.country_iso3 == "USA"
+    assert res_ham.address_status == "standardized"
+    assert res_ham.street1 == "100 HAMILTON AVE"
+
+    res_val = standardize_address(
+        street1="500 Valencia Street",
+        city="San Francisco",
+        state="CA",
+        postal_code="94110",
+    )
+    assert res_val.country_iso3 == "USA"
+    assert res_val.address_status == "standardized"
+    assert res_val.street1 == "500 VALENCIA ST"
+
+
+def test_expanded_commercial_complex_premises():
+    """Verify expanded commercial landmark/complex keywords (Galleria, Exchange, Wharf, Pier, etc.)."""
+    res_gal = standardize_address(
+        street1="Galleria Financial Center, Suite 500",
+        city="Houston",
+        state="TX",
+        postal_code="77056",
+    )
+    assert res_gal.address_status == "standardized"
+    assert res_gal.routing_tier == "FUZZY_REVIEW"
+    assert res_gal.street1 == "GALLERIA FINANCIAL CENTER"
+    assert res_gal.street2 == "STE 500"
+    assert res_gal.normalized_address_key == "GALLERIA FINANCIAL CENTER|STE 500|HOUSTON|TX|77056|USA"
+

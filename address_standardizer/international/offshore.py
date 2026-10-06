@@ -225,9 +225,18 @@ class OffshoreGrammar(CountryGrammar):
             st1_base = self._normalize_street_tokens(street_line)
 
         if st2_base and not unit_number:
-            s2_p = st2_base.split(maxsplit=1)
-            unit_type = s2_p[0]
-            unit_number = s2_p[1] if len(s2_p) > 1 else None
+            m_box_s2 = RE_OFFSHORE_PO_BOX.search(st2_base)
+            m_apdo_s2 = RE_APARTADO.search(st2_base)
+            if m_box_s2:
+                unit_type = "PO BOX"
+                unit_number = m_box_s2.group(1).upper()
+            elif m_apdo_s2:
+                unit_type = "APARTADO"
+                unit_number = m_apdo_s2.group(1).upper()
+            else:
+                s2_p = st2_base.split(maxsplit=1)
+                unit_type = s2_p[0]
+                unit_number = s2_p[1] if len(s2_p) > 1 else None
 
         # Check PO Box in st1_base
         m_box_in = RE_OFFSHORE_PO_BOX.search(st1_base)
@@ -259,10 +268,6 @@ class OffshoreGrammar(CountryGrammar):
         else:
             final_street_name = st_name
             final_building_name = building_name
-            if not final_street_name and not final_building_name and unit_type in ("PO BOX", "APARTADO"):
-                final_street_name = f"{unit_type} {unit_number}".strip() if unit_number else unit_type
-                unit_type = None
-                unit_number = None
 
         norm_postal = self.normalize_postal_code(postal_raw)
         norm_city = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", city_raw).strip().upper())

@@ -2717,7 +2717,7 @@ class CountryRegistry:
                         return cand
 
         # Check Global Metros
-        from address_standardizer.tables import GLOBAL_METRO_TO_COUNTRY
+        from address_standardizer.tables import GLOBAL_METRO_TO_COUNTRY, STREET_SUFFIXES
 
         for p in parts:
             p_clean = re.sub(r"[^a-zA-Z0-9\s]", " ", p).strip().upper()
@@ -2725,13 +2725,20 @@ class CountryRegistry:
             if p_clean in GLOBAL_METRO_TO_COUNTRY:
                 return cls.get(GLOBAL_METRO_TO_COUNTRY[p_clean])
 
-        t_clean = re.sub(r"[^a-zA-Z0-9\s]", " ", t).upper()
-        t_words = t_clean.split()
-        for n in (3, 2, 1):
-            for i in range(len(t_words) - n + 1):
-                cand = " ".join(t_words[i:i+n])
-                if cand in GLOBAL_METRO_TO_COUNTRY:
-                    return cls.get(GLOBAL_METRO_TO_COUNTRY[cand])
+        # If comma-delimited, check subsequent segments (parts[1:]) rather than thoroughfare
+        target_parts = parts[1:] if len(parts) > 1 else parts
+        for p in target_parts:
+            p_clean = re.sub(r"[^a-zA-Z0-9\s]", " ", p).upper()
+            p_words = p_clean.split()
+            for n in (3, 2, 1):
+                for i in range(len(p_words) - n, -1, -1):
+                    cand = " ".join(p_words[i:i+n])
+                    if cand in GLOBAL_METRO_TO_COUNTRY:
+                        if n == 1:
+                            # If followed by street suffix, it is a street name, not a municipality
+                            if i + 1 < len(p_words) and (p_words[i+1] in STREET_SUFFIXES or p_words[i+1] in STREET_SUFFIXES.values()):
+                                continue
+                        return cls.get(GLOBAL_METRO_TO_COUNTRY[cand])
 
         return None
 

@@ -1470,6 +1470,11 @@ def standardize_address(
         if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
             norm_s1 = ""
 
+        # If thoroughfare (street1) is empty but secondary delivery line / PO Box exists, promote it
+        if not norm_s1 and norm_s2:
+            norm_s1 = norm_s2
+            norm_s2 = ""
+
         # Minimum viable check: requires valid non-empty street line
         if not norm_s1:
             status = "parse_failed"
