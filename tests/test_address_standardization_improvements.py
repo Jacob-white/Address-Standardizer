@@ -1,4 +1,3 @@
-import pytest
 from address_standardizer import standardize_address
 from address_standardizer.international.countries import CountryRegistry
 from address_standardizer.international.postal import (
@@ -497,4 +496,178 @@ def test_expanded_commercial_complex_premises():
     assert res_gal.street1 == "GALLERIA FINANCIAL CENTER"
     assert res_gal.street2 == "STE 500"
     assert res_gal.normalized_address_key == "GALLERIA FINANCIAL CENTER|STE 500|HOUSTON|TX|77056|USA"
+
+
+def test_locality_only_standardization_and_regional_keys():
+    """Verify locality-only records produce regional keys and FUZZY_REVIEW tier when allow_locality=True."""
+    from address_standardizer import generate_normalized_address_key, generate_building_key
+
+    # Naples, FL
+    res_naples = standardize_address("NAPLES, FL", allow_locality=True)
+    assert res_naples.is_locality_only is True
+    assert res_naples.is_city_level is True
+    assert res_naples.address_status == "locality_only"
+    assert res_naples.city == "NAPLES"
+    assert res_naples.state == "FL"
+    assert res_naples.normalized_address_key == "||NAPLES|FL||USA"
+    assert res_naples.building_key == "||NAPLES|FL||USA"
+    assert res_naples.routing_tier == "FUZZY_REVIEW"
+    assert res_naples.confidence_score == 0.875
+    assert "NO_STREET_NUMBER" in res_naples.failure_reason_codes
+    assert "WARN_LOCALITY_ONLY" in res_naples.failure_reason_codes
+
+    # Charlotte, NC
+    res_char = standardize_address("CHARLOTTE, NC", allow_locality=True)
+    assert res_char.is_locality_only is True
+    assert res_char.normalized_address_key == "||CHARLOTTE|NC||USA"
+
+    # Greenwich, CT with ZIP
+    res_green = standardize_address("GREENWICH, CT 06830", allow_locality=True)
+    assert res_green.is_locality_only is True
+    assert res_green.normalized_address_key == "||GREENWICH|CT|06830|USA"
+
+    # International locality-only (Paris, France)
+    res_paris = standardize_address(city="Paris", country="FRA", allow_locality=True)
+    assert res_paris.is_locality_only is True
+    assert res_paris.city == "PARIS"
+    assert res_paris.country_iso3 == "FRA"
+    assert res_paris.normalized_address_key == "||PARIS|||FRA"
+
+    # Key generation helpers with allow_locality=True
+    key = generate_normalized_address_key(city="Charlotte", state="NC", allow_locality=True)
+    assert key == "||CHARLOTTE|NC||USA"
+    b_key = generate_building_key(city="Charlotte", state="NC", allow_locality=True)
+    assert b_key == "||CHARLOTTE|NC||USA"
+
+    # Locality-only addresses when street1 matches city
+    res_philly = standardize_address(street1="Philadelphia", city="Philadelphia", state="PA", allow_locality=True)
+    assert res_philly.is_locality_only is True
+    assert res_philly.normalized_address_key == "||PHILADELPHIA|PA||USA"
+
+    res_london = standardize_address(street1="London", city="London", country="GBR", allow_locality=True)
+    assert res_london.is_locality_only is True
+    assert res_london.normalized_address_key == "||LONDON|||GBR"
+
+    # LocalityOnlyStatus contract invariants: matches locality_only and city_level, NEVER parse_failed
+    from address_standardizer.models import AddressStatus
+    assert res_naples.address_status == "locality_only"
+    assert res_naples.address_status == "city_level"
+    assert res_naples.address_status == AddressStatus.LOCALITY_ONLY
+    assert res_naples.address_status == AddressStatus.CITY_LEVEL
+    assert res_naples.address_status != "parse_failed"
+    assert not (res_naples.address_status == "parse_failed")
+    assert "parse_failed" != res_naples.address_status
+    assert res_naples.address_status != "standardized"
+
+    # Backward compatibility: default allow_locality=False fails cleanly
+    res_default = standardize_address("NAPLES, FL")
+    assert res_default.address_status == "parse_failed"
+    assert res_default.normalized_address_key is None
+    assert res_default.confidence_score == 0.0
+
+
+def test_repetitive_cyclic_string_cleaning():
+    """Verify cycle-detection pre-cleaner collapses concatenated loops and repeated n-grams while preserving geographic reduplications."""
+    from address_standardizer._patterns import clean_repetitive_cycles
+
+    # Whole address repeated
+    c1 = clean_repetitive_cycles("CALLE 75 8-77 OF.301 CALLE 75 8-77 OF.301")
+    assert c1 == "CALLE 75 8-77 OF.301"
+
+    # Repeated token run (r >= 3)
+    c2 = clean_repetitive_cycles("STE 4075 4075 4075")
+    assert c2 == "STE 4075"
+
+    # Comma chunk repetition
+    c3 = clean_repetitive_cycles("100 MAIN ST, 100 MAIN ST")
+    assert c3 == "100 MAIN ST"
+
+    # Preserved geographic reduplications (must NOT collapse)
+    assert clean_repetitive_cycles("100 Walla Walla Way") == "100 Walla Walla Way"
+    assert clean_repetitive_cycles("100 Baden Baden St") == "100 Baden Baden St"
+    assert clean_repetitive_cycles("Pago Pago, AS 96799") == "Pago Pago, AS 96799"
+    assert clean_repetitive_cycles("WALLAWALLA, WA") == "WALLAWALLA, WA"
+    assert clean_repetitive_cycles("PAWPAW, MI") == "PAWPAW, MI"
+
+    # Preserved valid numeric house numbers and postal codes
+    assert clean_repetitive_cycles("121212 Main St") == "121212 Main St"
+    assert clean_repetitive_cycles("101010 Elm St") == "101010 Elm St"
+    assert clean_repetitive_cycles("121212") == "121212"
+
+    # Full standardizer pipeline cleans repeating cycles before parsing
+    res = standardize_address("100 Main St, 100 Main St, New York, NY 10001")
+    assert res.address_status == "standardized"
+    assert res.street1 == "100 MAIN ST"
+
+
+def test_bare_commercial_premises_and_expanded_hubs():
+    """Verify bare commercial premises followed by units and cataloged hubs are standardized."""
+    # Waterfront, Floor 12
+    res_wf = standardize_address("Waterfront, Floor 12, Jersey City, NJ 07302")
+    assert res_wf.address_status == "standardized"
+    assert res_wf.street1 == "WATERFRONT"
+    assert res_wf.street2 == "FL 12"
+    assert res_wf.city == "JERSEY CITY"
+
+    # Devonshire, Suite 400
+    res_dev = standardize_address("Devonshire, Suite 400, Boston, MA 02109")
+    assert res_dev.address_status == "standardized"
+    assert res_dev.street1 == "DEVONSHIRE"
+    assert res_dev.street2 == "STE 400"
+    assert res_dev.city == "BOSTON"
+
+
+def test_queens_hyphenated_and_fractional_numbers_and_multitier():
+    """Verify Queens borough hyphenated numbers, fractional house numbers, and multi-tier secondary designations."""
+    # Queens hyphenated
+    res_queens = standardize_address("123-45 84th Rd, Jamaica, NY 11435")
+    assert res_queens.address_status == "standardized"
+    assert res_queens.street1 == "123-45 84TH RD"
+    assert res_queens.city == "JAMAICA"
+
+    # Fractional house number
+    res_frac = standardize_address("123 1/2 Main St, Buffalo, NY 14201")
+    assert res_frac.address_status == "standardized"
+    assert res_frac.street1 == "123 1/2 MAIN ST"
+    assert res_frac.city == "BUFFALO"
+
+    # Multi-tier secondary units
+    res_multi = standardize_address("100 Main St, Building 4, Floor 3, Suite 200, New York, NY 10001")
+    assert res_multi.address_status == "standardized"
+    assert res_multi.street1 == "100 MAIN ST"
+    assert "BLDG 4" in res_multi.street2
+    assert "FL 3" in res_multi.street2
+    assert "STE 200" in res_multi.street2
+
+
+def test_native_rust_core_availability_and_dispatch():
+    """Verify that native Rust PyO3 core is compiled, active, and dispatches correctly."""
+    from address_standardizer._native_dispatch import is_native_available, get_active_engine
+    import _address_standardizer_rs
+
+    assert is_native_available() is True
+    engine = get_active_engine()
+    assert engine is not None
+    assert engine is _address_standardizer_rs
+
+    # Engine properties and capabilities
+    assert _address_standardizer_rs.is_native() is True
+    assert _address_standardizer_rs.get_engine_name() == "Rust_PyO3"
+    caps = _address_standardizer_rs.get_capabilities()
+    assert caps["is_native"] is True
+    assert caps["engine"] == "Rust_PyO3"
+
+    # Native soundex computation
+    snd = _address_standardizer_rs.compute_soundex("MAIN")
+    assert snd == "M500"
+
+    # Parity across native, pure python core, and dispatch for key generation with allow_locality=True
+    from address_standardizer import _pure_python_core, _native_dispatch
+    k_rs = _address_standardizer_rs.generate_keys(city="Charlotte", state="NC", allow_locality=True)
+    k_py = _pure_python_core.generate_keys(city="Charlotte", state="NC", allow_locality=True)
+    k_disp = _native_dispatch.generate_keys_dispatch(city="Charlotte", state="NC", allow_locality=True)
+
+    assert k_rs == ("||CHARLOTTE|NC||USA", "||CHARLOTTE|NC||USA", None)
+    assert k_py == k_rs
+    assert k_disp == k_rs
 

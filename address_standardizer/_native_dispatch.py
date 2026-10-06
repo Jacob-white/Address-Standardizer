@@ -19,16 +19,21 @@ _NATIVE_MODULE: Optional[Any] = None
 _NATIVE_AVAILABLE: bool = False
 _FORCE_PURE_PYTHON: bool = False
 
-try:
-    import _address_standardizer_rs as _native_ext
+def _init_native():
+    global _NATIVE_MODULE, _NATIVE_AVAILABLE
+    try:
+        import _address_standardizer_rs as _native_ext
 
-    _NATIVE_MODULE = _native_ext
-    _NATIVE_AVAILABLE = True
-    logger.debug("Native compiled acceleration loaded (_address_standardizer_rs).")
-except (ImportError, ModuleNotFoundError):
-    _NATIVE_MODULE = None
-    _NATIVE_AVAILABLE = False
-    logger.info("Native compiled core unavailable; operating via pure Python fallback.")
+        _NATIVE_MODULE = _native_ext
+        _NATIVE_AVAILABLE = True
+        logger.debug("Native compiled acceleration loaded (_address_standardizer_rs).")
+    except (ImportError, ModuleNotFoundError):
+        _NATIVE_MODULE = None
+        _NATIVE_AVAILABLE = False
+        logger.info("Native compiled core unavailable; operating via pure Python fallback.")
+
+
+_init_native()
 
 
 def is_native_available() -> bool:
@@ -87,16 +92,9 @@ def override_engine_for_testing(mock_engine: Optional[Any]) -> None:
 
 def reset_engine() -> None:
     """Reset engine state to system autodetected defaults."""
-    global _FORCE_PURE_PYTHON, _NATIVE_MODULE, _NATIVE_AVAILABLE
+    global _FORCE_PURE_PYTHON
     _FORCE_PURE_PYTHON = False
-    try:
-        import _address_standardizer_rs as _native_ext
-
-        _NATIVE_MODULE = _native_ext
-        _NATIVE_AVAILABLE = True
-    except (ImportError, ModuleNotFoundError):
-        _NATIVE_MODULE = None
-        _NATIVE_AVAILABLE = False
+    _init_native()
 
 
 def standardize_record_dispatch(
@@ -154,6 +152,8 @@ def generate_keys_dispatch(
     state: Optional[str] = None,
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
+    allow_locality: bool = False,
+    **kwargs: Any,
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Dispatches deterministic entity key generation to active engine."""
     engine = get_active_engine()
@@ -164,4 +164,6 @@ def generate_keys_dispatch(
         state=state,
         postal_code=postal_code,
         country=country,
+        allow_locality=allow_locality,
+        **kwargs,
     )

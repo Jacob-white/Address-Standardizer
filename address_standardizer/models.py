@@ -34,6 +34,32 @@ class SpatialResolutionResult:
 
 
 
+class AddressStatus:
+    STANDARDIZED = "standardized"
+    PENDING = "pending"
+    PARSE_FAILED = "parse_failed"
+    MANUAL_OVERRIDE = "manual_override"
+    LOCALITY_ONLY = "locality_only"
+    CITY_LEVEL = "city_level"
+
+
+class LocalityOnlyStatus(str):
+    """String status representing locality-only / city-level standardization."""
+
+    def __eq__(self, other):
+        if isinstance(other, str):
+            o = other.lower()
+            if o in ("locality_only", "city_level"):
+                return True
+        return super().__eq__(other)
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+    def __hash__(self):
+        return hash("locality_only")
+
+
 @dataclass
 class StandardizedAddress:
     """Standardized representation of a physical or mailing address."""
@@ -81,6 +107,8 @@ class StandardizedAddress:
             self._spatial_result: Optional[SpatialResolutionResult] = None
         if not hasattr(self, "_country_iso3"):
             self._country_iso3: str = getattr(self, "country", "USA") or "USA"
+        if not hasattr(self, "_is_locality_only"):
+            self._is_locality_only: bool = self.address_status in ("locality_only", "city_level")
 
     @property
     def confidence_score(self) -> Optional[float]:
@@ -205,6 +233,22 @@ class StandardizedAddress:
     def country_iso3(self, value: str):
         self._country_iso3 = value
 
+    @property
+    def is_locality_only(self) -> bool:
+        return self.address_status in ("locality_only", "city_level") or getattr(self, "_is_locality_only", False)
+
+    @is_locality_only.setter
+    def is_locality_only(self, value: bool):
+        self._is_locality_only = bool(value)
+
+    @property
+    def is_city_level(self) -> bool:
+        return self.is_locality_only
+
+    @is_city_level.setter
+    def is_city_level(self, value: bool):
+        self._is_locality_only = bool(value)
+
     def as_dict(self, include_metadata: bool = False) -> Dict[str, Any]:
         d = {
             "street1": self.street1,
@@ -223,6 +267,8 @@ class StandardizedAddress:
             "is_registered_agent_hub": self.is_registered_agent_hub,
         }
         if include_metadata:
+            d["is_locality_only"] = self.is_locality_only
+            d["is_city_level"] = self.is_city_level
             d["dependent_locality"] = self.dependent_locality
             d["building_name"] = self.building_name
             d["confidence_score"] = self.confidence_score

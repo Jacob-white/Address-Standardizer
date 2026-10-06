@@ -23,7 +23,7 @@ from address_standardizer._patterns import (
     RE_SEC_UNIT,
     RE_PO_BOX,
     RE_QUEENS_BOROUGH,
-    RE_FRACTIONAL_HOUSE,
+    RE_NUMBER_HYPHEN_NUMBER,
     RE_NUMBERED_STREET,
     RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
     RE_ATTACHED_SUFFIX_BARE_UNIT,
@@ -35,6 +35,7 @@ from address_standardizer._patterns import (
     get_fuzzy_directional,
     RE_TERMINAL_COUNTRY,
     clean_redundant_street_tail,
+    clean_repetitive_cycles,
 )
 from address_standardizer.phonetics import generate_phonetic_address_key
 
@@ -66,23 +67,27 @@ def _fast_num_to_ordinal(n: int) -> str:
 
 
 def _normalize_fast_sec_unit(sec_raw: str) -> Optional[str]:
-    """Normalizes a clean secondary unit string like 'Suite 400' -> 'STE 400'."""
+    """Normalizes a clean secondary unit string like 'Suite 400' -> 'STE 400' or multi-tier 'Building 4, Floor 3, Suite 200'."""
     sec_clean = sec_raw.strip().upper()
     if not sec_clean:
         return ""
     from address_standardizer.standardizer import _standardize_secondary_unit
-    m = RE_SEC_UNIT.search(sec_clean)
-    if m:
-        if m.group(1):
-            stype = SECONDARY_UNITS.get(m.group(1).upper(), m.group(1).upper())
-            sval = m.group(2).upper()
-            return _standardize_secondary_unit(f"{stype} {sval}")
-        elif m.group(3):
-            return _standardize_secondary_unit(f"STE {m.group(3).upper()}")
-        elif m.group(4):
-            stype = SECONDARY_UNITS.get(m.group(4).upper(), m.group(4).upper())
-            sval = m.group(5).upper() if m.group(5) else ""
-            return _standardize_secondary_unit(f"{stype} {sval}".strip())
+    matches = list(RE_SEC_UNIT.finditer(sec_clean))
+    if matches:
+        sec_parts = []
+        for m in matches:
+            if m.group(1):
+                stype = SECONDARY_UNITS.get(m.group(1).upper(), m.group(1).upper())
+                sval = m.group(2).upper()
+                sec_parts.append(f"{stype} {sval}")
+            elif m.group(3):
+                sec_parts.append(f"STE {m.group(3).upper()}")
+            elif m.group(4):
+                stype = SECONDARY_UNITS.get(m.group(4).upper(), m.group(4).upper())
+                sval = m.group(5).upper() if m.group(5) else ""
+                sec_parts.append(f"{stype} {sval}".strip())
+        res = " ".join(sec_parts).strip()
+        return _standardize_secondary_unit(res)
     res = _standardize_secondary_unit(sec_clean)
     if res and res != sec_clean:
         return res
@@ -107,39 +112,48 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
     phrase_upper = RE_ATTACHED_SUFFIX_EXPLICIT_UNIT.sub(r"\1 \2 \3", phrase_upper)
     phrase_upper = RE_ATTACHED_SUFFIX_BARE_UNIT.sub(r"\1 APT \2", phrase_upper)
 
-    # Edge-case checks: if PO Box, Queens hyphen, rural route, fractional, or complex: fallback
-    if RE_PO_BOX.search(phrase_upper) or RE_QUEENS_BOROUGH.match(phrase_upper) or RE_FRACTIONAL_HOUSE.match(phrase_upper):
+    # Edge-case checks: if PO Box or rural route: fallback
+    if RE_PO_BOX.search(phrase_upper):
         return None
 
-    # Check for secondary unit inside phrase
+    # Check for multi-tier secondary unit inside phrase
     sec_unit = ""
-    m_sec = RE_SEC_UNIT.search(phrase_upper)
-    if m_sec:
-        if m_sec.group(1):
-            stype = SECONDARY_UNITS.get(m_sec.group(1).upper(), m_sec.group(1).upper())
-            sval = m_sec.group(2).lstrip("#-").upper()
-            sec_unit = f"{stype} {sval}"
-        elif m_sec.group(3):
-            sec_unit = f"STE {m_sec.group(3).lstrip('#-').upper()}"
-        elif m_sec.group(4):
-            stype = SECONDARY_UNITS.get(m_sec.group(4).upper(), m_sec.group(4).upper())
-            sval = m_sec.group(5).lstrip("#-").upper() if m_sec.group(5) else ""
-            sec_unit = f"{stype} {sval}".strip()
-        phrase_upper = phrase_upper[:m_sec.start()] + phrase_upper[m_sec.end():]
-        phrase_upper = phrase_upper.strip(" ,.-")
+    matches = list(RE_SEC_UNIT.finditer(phrase_upper))
+    if matches:
+        sec_parts = []
+        for m in matches:
+            if m.group(1):
+                stype = SECONDARY_UNITS.get(m.group(1).upper(), m.group(1).upper())
+                sval = m.group(2).lstrip("#-").upper()
+                sec_parts.append(f"{stype} {sval}")
+            elif m.group(3):
+                sec_parts.append(f"STE {m.group(3).lstrip('#-').upper()}")
+            elif m.group(4):
+                stype = SECONDARY_UNITS.get(m.group(4).upper(), m.group(4).upper())
+                sval = m.group(5).lstrip("#-").upper() if m.group(5) else ""
+                sec_parts.append(f"{stype} {sval}".strip())
+        sec_cand = " ".join(sec_parts).strip()
         from address_standardizer.standardizer import _standardize_secondary_unit
-        sec_unit = _standardize_secondary_unit(sec_unit)
+        sec_unit = _standardize_secondary_unit(sec_cand)
+        phrase_upper = RE_SEC_UNIT.sub(" ", phrase_upper).strip(" ,.-")
 
     tokens = [t.strip(" ,.-") for t in phrase_upper.split() if t.strip(" ,.-")]
     if len(tokens) < 2:
         return None
 
-    # Token 0 must contain house number
     house_num = tokens[0]
-    if not (house_num.isdigit() or (len(house_num) > 1 and house_num[:-1].isdigit() and house_num[-1].isalpha())):
+    rem_tokens = tokens[1:]
+
+    # Queens hyphen, hyphenated number, or fractional number -> delegate to Tier 2
+    if (
+        RE_NUMBER_HYPHEN_NUMBER.match(house_num)
+        or RE_QUEENS_BOROUGH.match(phrase_upper)
+        or (len(tokens) > 1 and tokens[1] in ("1/2", "1/4", "3/4"))
+    ):
         return None
 
-    rem_tokens = tokens[1:]
+    if not (house_num.isdigit() or (len(house_num) > 1 and house_num[:-1].isdigit() and house_num[-1].isalpha())):
+        return None
 
     # Route prefixes (e.g. County Road, CR, Route) -> delegate to Tier 2
     if rem_tokens[0] in ROUTE_PREFIXES or (len(rem_tokens) > 1 and f"{rem_tokens[0]} {rem_tokens[1]}" in ROUTE_PREFIXES):
@@ -270,6 +284,9 @@ def fast_path_parse(
 
     s1_raw = re.sub(r"[\r\n\t]+", " ", (street1 or "")).strip()
     s2_raw = re.sub(r"[\r\n\t]+", " ", (street2 or "")).strip()
+    s1_raw = clean_repetitive_cycles(s1_raw)
+    if s2_raw:
+        s2_raw = clean_repetitive_cycles(s2_raw)
     city_raw = re.sub(r"[\r\n\t]+", " ", (city or "")).strip()
     state_raw = re.sub(r"[\r\n\t]+", " ", (state or "")).strip()
     zip_raw = re.sub(r"[\r\n\t]+", " ", (postal_code or "")).strip()

@@ -9,6 +9,8 @@ Zero-external-C-dependency execution engine providing:
 """
 
 import logging
+import os
+import re
 import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -20,6 +22,7 @@ from address_standardizer._patterns import (
     RE_TERMINAL_COUNTRY,
     RE_LEGACY_CORRUPTIONS,
     clean_redundant_street_tail,
+    clean_repetitive_cycles,
 )
 from address_standardizer.fast_path import (
     fast_path_parse,
@@ -28,7 +31,7 @@ from address_standardizer.international import (
     CountryGrammarRegistry,
     fold_to_ascii_key,
 )
-from address_standardizer.models import StandardizedAddress
+from address_standardizer.models import StandardizedAddress, LocalityOnlyStatus
 from address_standardizer.phonetics import (
     compute_soundex as _base_soundex,
     generate_phonetic_address_key as _base_phonetic_key,
@@ -70,6 +73,8 @@ def generate_keys(
     state: Optional[str] = None,
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
+    allow_locality: bool = False,
+    **kwargs: Any,
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Derives deterministic normalized_address_key, building_key, and phonetic_key."""
     std = standardize_record(
@@ -79,7 +84,9 @@ def generate_keys(
         state=state,
         postal_code=postal_code,
         country=country,
+        allow_locality=allow_locality,
         finalize=False,
+        **kwargs,
     )
     return std.normalized_address_key, std.building_key, std.phonetic_key
 
@@ -115,6 +122,7 @@ def standardize_record(
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
     finalize: bool = True,
+    allow_locality: bool = False,
     **kwargs: Any,
 ) -> StandardizedAddress:
     """
@@ -123,8 +131,14 @@ def standardize_record(
     When finalize=True, computes confidence score, delivery intelligence, corporate risk, and spatial coordinates.
     When finalize=False, executes ultra-fast core normalization (> 10,000 rec/s).
     """
+    if not allow_locality:
+        allow_locality = bool(
+            kwargs.get("allow_locality_only")
+            or kwargs.get("allow_city_level")
+            or kwargs.get("allow_locality")
+            or os.environ.get("ADDRESS_STANDARDIZER_ALLOW_LOCALITY") == "1"
+        )
     # 1. Tier 0: Pre-flight sanitization
-    import re
     s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(street1))).strip() if street1 is not None else ""
     s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(street2))).strip() if street2 is not None else ""
     city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize("NFKC", str(city))).strip() if city is not None else ""
@@ -197,9 +211,11 @@ def standardize_record(
             )
         return garbage_std
 
-    # Pre-clean legacy baked-in ETL artifacts (e.g. "10005TH UNITED ESTS", "UNITED ESTS")
+    # Pre-clean repetitive cycles and legacy baked-in ETL artifacts
+    s1_raw = clean_repetitive_cycles(s1_raw)
     s1_raw = RE_LEGACY_CORRUPTIONS.sub("", s1_raw).strip(" ,.-")
     if s2_raw:
+        s2_raw = clean_repetitive_cycles(s2_raw)
         s2_raw = RE_LEGACY_CORRUPTIONS.sub("", s2_raw).strip(" ,.-")
 
     # 2. Country detection
@@ -293,12 +309,23 @@ def standardize_record(
         if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
             norm_s1 = ""
 
-        # Minimum viable check: requires valid non-empty street line
+        # Minimum viable check: requires valid non-empty street line or locality-only record
+        has_locality = bool(norm_city or norm_state or zip5)
         if not norm_s1:
-            status = "parse_failed"
-            key = None
-            b_key = None
-            p_key = None
+            if allow_locality and has_locality:
+                status = LocalityOnlyStatus("locality_only")
+                k_city = fold_to_ascii_key(norm_city)
+                k_state = fold_to_ascii_key(norm_state)
+                k_post = fold_to_ascii_key(zip5)
+                k_country = fold_to_ascii_key(country_iso) or "USA"
+                key = f"||{k_city}|{k_state}|{k_post}|{k_country}"
+                b_key = f"||{k_city}|{k_state}|{k_post}|{k_country}"
+                p_key = None
+            else:
+                status = "parse_failed"
+                key = None
+                b_key = None
+                p_key = None
         else:
             status = "standardized"
             k_s1 = fold_to_ascii_key(norm_s1)
@@ -396,12 +423,23 @@ def standardize_record(
     if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
         norm_s1 = ""
 
-    # Minimum viable check: requires valid non-empty street line
+    # Minimum viable check: requires valid non-empty street line or locality-only record
+    has_locality = bool(norm_city or norm_state or norm_postal)
     if not norm_s1:
-        status = "parse_failed"
-        key = None
-        b_key = None
-        p_key = None
+        if allow_locality and has_locality:
+            status = LocalityOnlyStatus("locality_only")
+            k_city = fold_to_ascii_key(norm_city)
+            k_state = fold_to_ascii_key(norm_state)
+            k_post = fold_to_ascii_key(norm_postal)
+            k_country = fold_to_ascii_key(country_iso)
+            key = f"||{k_city}|{k_state}|{k_post}|{k_country}"
+            b_key = f"||{k_city}|{k_state}|{k_post}|{k_country}"
+            p_key = None
+        else:
+            status = "parse_failed"
+            key = None
+            b_key = None
+            p_key = None
     else:
         status = "standardized"
         k_s1 = fold_to_ascii_key(norm_s1)

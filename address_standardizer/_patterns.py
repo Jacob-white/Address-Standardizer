@@ -330,3 +330,100 @@ def get_fuzzy_directional(token: str) -> Optional[str]:
             if is_edit_distance_leq1(tok_clean, canonical):
                 return abbr
     return None
+
+
+def clean_repetitive_cycles(s: str) -> str:
+    """
+    Detects and collapses looping concatenated substrings, repeated token n-grams,
+    and concatenated cycle artifacts before address parsing.
+    Examples:
+      - 'CALLE 75 8-77 OF.301 CALLE 75 8-77 OF.301' -> 'CALLE 75 8-77 OF.301'
+      - 'STE 4075 4075 4075' -> 'STE 4075'
+      - '100 MAIN ST, 100 MAIN ST' -> '100 MAIN ST'
+    """
+    if not s or len(s) < 4:
+        return s
+
+    curr = s.strip()
+
+    # 1. Comma / Semicolon chunk repetition: "A, A, A" -> "A"
+    for delim in (",", ";"):
+        if delim in curr:
+            chunks = [c.strip() for c in curr.split(delim) if c.strip()]
+            if len(chunks) >= 2:
+                if all(c.upper() == chunks[0].upper() for c in chunks):
+                    curr = chunks[0]
+                    break
+                for clen in range(1, len(chunks) // 2 + 1):
+                    if len(chunks) % clen == 0:
+                        pattern = [c.upper() for c in chunks[:clen]]
+                        repeated = True
+                        for idx in range(clen, len(chunks), clen):
+                            if [c.upper() for c in chunks[idx:idx + clen]] != pattern:
+                                repeated = False
+                                break
+                        if repeated:
+                            curr = f" {delim} ".join(chunks[:clen])
+                            break
+
+    # 2. Token-level cycle detection on whitespace-separated words
+    tokens = curr.split()
+    if len(tokens) >= 2:
+        # Check whole-token repetition e.g. "CALLE 75 8-77 OF.301 CALLE 75 8-77 OF.301"
+        n_toks = len(tokens)
+        collapsed = False
+        for k in range(1, n_toks // 2 + 1):
+            if k == 1 and n_toks == 2 and tokens[0].isalpha() and tokens[0].upper() == tokens[1].upper():
+                continue
+            chunk = [t.upper().strip(" ,.-") for t in tokens[:k]]
+            repeats = 1
+            idx = k
+            while idx + k <= n_toks:
+                if [t.upper().strip(" ,.-") for t in tokens[idx:idx + k]] == chunk:
+                    repeats += 1
+                    idx += k
+                else:
+                    break
+            rem = [t.upper().strip(" ,.-") for t in tokens[idx:]]
+            min_repeats = 3 if k == 1 else 2
+            if repeats >= min_repeats and (not rem or rem == chunk[:len(rem)]):
+                tokens = tokens[:k]
+                curr = " ".join(tokens)
+                collapsed = True
+                break
+
+        if not collapsed:
+            # Check internal repeated runs of length k (e.g., 'STE 4075 4075 4075' -> 'STE 4075')
+            new_tokens = []
+            i = 0
+            while i < len(tokens):
+                found_rep = False
+                for k in range(1, (len(tokens) - i) // 2 + 1):
+                    chunk = [t.upper().strip(" ,.-") for t in tokens[i:i + k]]
+                    r = 1
+                    j = i + k
+                    while j + k <= len(tokens):
+                        if [t.upper().strip(" ,.-") for t in tokens[j:j + k]] == chunk:
+                            r += 1
+                            j += k
+                        else:
+                            break
+                    rem = [t.upper().strip(" ,.-") for t in tokens[j:]]
+                    has_partial = bool(rem and rem == chunk[:len(rem)])
+                    min_r = 3 if k == 1 else 2
+                    if r >= min_r:
+                        new_tokens.extend(tokens[i:i + k])
+                        i = j + (len(rem) if has_partial else 0)
+                        found_rep = True
+                        break
+                if not found_rep:
+                    new_tokens.append(tokens[i])
+                    i += 1
+            tokens = new_tokens
+            curr = " ".join(tokens)
+
+    return curr
+
+
+collapse_cyclic_patterns = clean_repetitive_cycles
+clean_cyclic_repetitions = clean_repetitive_cycles

@@ -51,3 +51,5 @@ htmlcov/
 # Antigravity / Agent state
 .agents/
 
+# Rust / Cargo build artifacts
+target/

@@ -45,6 +45,8 @@ WARN_CMRA_DETECTED = "WARN_CMRA_DETECTED"
 WARN_MISSING_SECONDARY_UNIT = "WARN_MISSING_SECONDARY_UNIT"
 WARN_VACANT_DELIVERY_POINT = "WARN_VACANT_DELIVERY_POINT"
 WARN_LANDMARK_CAMPUS_PREMISE = "WARN_LANDMARK_CAMPUS_PREMISE"
+WARN_LOCALITY_ONLY = "WARN_LOCALITY_ONLY"
+NO_STREET_NUMBER = "NO_STREET_NUMBER"
 ERR_PARSE_FAILED = "ERR_PARSE_FAILED"
 ERR_EMPTY_ADDRESS = "ERR_EMPTY_ADDRESS"
 ERR_EMPTY_STREET = "ERR_EMPTY_STREET"
@@ -121,6 +123,42 @@ class ConfidenceScorer:
         raw_combined = f"{raw_s1} {raw_s2}".strip().upper()
 
         reason_codes: List[str] = []
+
+        # 0. Check for locality-only / city-level addresses
+        is_locality = getattr(std_address, "is_locality_only", False) or getattr(std_address, "address_status", "") in ("locality_only", "city_level")
+        if is_locality:
+            reason_codes.append(NO_STREET_NUMBER)
+            reason_codes.append(WARN_LOCALITY_ONLY)
+
+            if getattr(std_address, "is_registered_agent_hub", False):
+                reason_codes.append(WARN_CRA_HUB_DETECTED)
+            if getattr(std_address, "is_private_residence", False):
+                reason_codes.append(WARN_RESIDENTIAL_COMM)
+            if getattr(std_address, "is_cmra", False):
+                reason_codes.append(WARN_CMRA_DETECTED)
+            if getattr(std_address, "is_vacant", False):
+                reason_codes.append(WARN_VACANT_DELIVERY_POINT)
+
+            s_parse = 0.85
+            s_ref = 0.90 if (std_address.state or std_address.postal_code) else 0.70
+            s_geo = 0.90 if (std_address.postal_code or std_address.state) else 0.70
+            s_cross = 0.85
+            composite = round(
+                self.WEIGHT_PARSE * s_parse
+                + self.WEIGHT_REF * s_ref
+                + self.WEIGHT_GEO * s_geo
+                + self.WEIGHT_CROSS * s_cross,
+                4,
+            )
+            return ConfidenceResult(
+                composite_score=composite,
+                routing_tier=RoutingTier.FUZZY_REVIEW,
+                s_parse=round(s_parse, 4),
+                s_ref_match=round(s_ref, 4),
+                s_geo=round(s_geo, 4),
+                s_cross_field=round(s_cross, 4),
+                failure_reason_codes=reason_codes,
+            )
 
         # 0. Check for empty street or empty/parse_failed addresses
         raw_s1_val = raw.get("street1")

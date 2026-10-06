@@ -23,7 +23,7 @@ try:
 except ImportError:
     usaddress = None
 
-from address_standardizer.models import StandardizedAddress
+from address_standardizer.models import StandardizedAddress, LocalityOnlyStatus
 from address_standardizer.confidence import (
     RoutingTier,
     compute_confidence_score,
@@ -44,6 +44,8 @@ from address_standardizer.tables import (
     COMPOUND_ORDINALS,
     ZIP3_TO_STATE,
     GLOBAL_METRO_TO_COUNTRY,
+    LANDMARK_CAMPUS_KEYWORDS,
+    CATALOGED_COMMERCIAL_HUBS,
 )
 from address_standardizer._patterns import (
     RE_CLEAN_TOKEN,
@@ -66,6 +68,7 @@ from address_standardizer._patterns import (
     RE_TERMINAL_COUNTRY,
     RE_LEGACY_CORRUPTIONS,
     clean_redundant_street_tail,
+    clean_repetitive_cycles,
     RE_HIGHWAY_CONTRACT,
     RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
     RE_ATTACHED_SUFFIX_BARE_UNIT,
@@ -250,6 +253,8 @@ def normalize_country_code(
             p_alphanumeric = RE_NON_ALPHANUMERIC.sub("", part).strip().upper()
             if p_alphanumeric in FROZEN_US_STATE_CODES or p_alphanumeric.isdigit():
                 continue
+            if p_alphanumeric in STREET_SUFFIXES or p_alphanumeric in STREET_SUFFIXES.values():
+                continue
             if p_clean in COUNTRY_MAP and COUNTRY_MAP[p_clean] != "USA":
                 return COUNTRY_MAP[p_clean]
             if p_alphanumeric in COUNTRY_MAP and COUNTRY_MAP[p_alphanumeric] != "USA":
@@ -261,7 +266,12 @@ def normalize_country_code(
             if two_w in COUNTRY_MAP and COUNTRY_MAP[two_w] != "USA":
                 return COUNTRY_MAP[two_w]
         if raw_words and raw_words[-1] in COUNTRY_MAP and COUNTRY_MAP[raw_words[-1]] != "USA":
-            if (len(raw_words[-1]) > 2 or raw_words[-1] not in FROZEN_US_STATE_CODES) and not raw_words[-1].isdigit():
+            if (
+                (len(raw_words[-1]) > 2 or raw_words[-1] not in FROZEN_US_STATE_CODES)
+                and not raw_words[-1].isdigit()
+                and raw_words[-1] not in STREET_SUFFIXES
+                and raw_words[-1] not in STREET_SUFFIXES.values()
+            ):
                 return COUNTRY_MAP[raw_words[-1]]
 
         # Check global metros in raw street SECOND
@@ -331,7 +341,8 @@ def is_registered_agent_hub_address(
 
 
 def _pre_normalize_address_string(text: str) -> str:
-    """Pre-normalizes glued punctuation, symbols, and formatting."""
+    """Pre-normalizes glued punctuation, symbols, formatting, and repetitive cycles."""
+    text = clean_repetitive_cycles(text)
     # Split glued hashtags: 'Main St#101' -> 'Main St # 101'
     text = RE_GLUED_HASH.sub(" # ", text)
     # Split glued unit prefixes: 'Apt.4B' -> 'Apt 4B'
@@ -372,6 +383,8 @@ def _standardize_secondary_unit(sec: str) -> str:
             tokens.append("STE")
         elif t in ("FLOOR", "FLR"):
             tokens.append("FL")
+        elif t in ("APARTMENT", "APPT"):
+            tokens.append("APT")
         else:
             tokens.append(t)
 
@@ -476,22 +489,27 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
         sec_unit = f"PMB {m_pmb.group(1).upper()}"
         clean_addr = clean_addr[:m_pmb.start()] + clean_addr[m_pmb.end():]
 
-    # Secondary unit extraction
-    m_sec = RE_SEC_UNIT.search(clean_addr)
-    if m_sec:
-        sec_cand = ""
-        if m_sec.group(1):
-            sec_type = SECONDARY_UNITS.get(m_sec.group(1).upper(), m_sec.group(1).upper())
-            sec_val = m_sec.group(2).upper()
-            sec_cand = f"{sec_type} {sec_val}"
-        elif m_sec.group(3):
-            sec_cand = f"STE {m_sec.group(3).upper()}"
-        elif m_sec.group(4):
-            sec_type = SECONDARY_UNITS.get(m_sec.group(4).upper(), m_sec.group(4).upper())
-            sec_val = m_sec.group(5).upper() if m_sec.group(5) else ""
-            sec_cand = f"{sec_type} {sec_val}".strip()
-        sec_unit = f"{sec_unit} {sec_cand}".strip() if sec_unit else sec_cand
-        clean_addr = clean_addr[:m_sec.start()] + clean_addr[m_sec.end():]
+    # Secondary unit extraction (multi-tier support)
+    sec_parts = []
+    matches = list(RE_SEC_UNIT.finditer(clean_addr))
+    if matches:
+        for m_sec in matches:
+            if m_sec.group(1):
+                sec_type = SECONDARY_UNITS.get(m_sec.group(1).upper(), m_sec.group(1).upper())
+                sec_val = m_sec.group(2).lstrip("#-").upper()
+                sec_parts.append(f"{sec_type} {sec_val}")
+            elif m_sec.group(3):
+                sec_parts.append(f"STE {m_sec.group(3).lstrip('#-').upper()}")
+            elif m_sec.group(4):
+                sec_type = SECONDARY_UNITS.get(m_sec.group(4).upper(), m_sec.group(4).upper())
+                sec_val = m_sec.group(5).lstrip("#-").upper() if m_sec.group(5) else ""
+                sec_parts.append(f"{sec_type} {sec_val}".strip())
+        clean_addr = RE_SEC_UNIT.sub(" ", clean_addr).strip()
+    if sec_parts:
+        extracted_sec = " ".join(sec_parts).strip()
+        sec_unit = f"{sec_unit} {extracted_sec}".strip() if sec_unit else extracted_sec
+    if sec_unit:
+        sec_unit = _standardize_secondary_unit(sec_unit)
 
     clean_addr = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", clean_addr)).strip().upper()
     if not clean_addr:
@@ -962,6 +980,18 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
         b_name = " ".join(building_parts).strip()
         st2 = f"{b_name} {st2}".strip() if st2 else b_name
 
+    # Bare commercial premise followed by secondary units or cataloged commercial hubs
+    if not st1 and st2 and city_parts:
+        st1 = " ".join(city_parts).strip()
+        city_parts = []
+        if not city_raw and not (p_st or p_zp):
+            p_city = ""
+    elif not st1 and city_parts and " ".join(city_parts).upper() in CATALOGED_COMMERCIAL_HUBS:
+        st1 = " ".join(city_parts).strip()
+        city_parts = []
+        if not city_raw and not (p_st or p_zp):
+            p_city = ""
+
     st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
     st2 = _standardize_secondary_unit(st2)
 
@@ -978,17 +1008,24 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                     st2 = rb_st2
         elif clean_input:
             # address_str contained city/state/zip, but clean_input remains
-            # Check if clean_input contains landmark campus keywords and is not just the city name
-            from address_standardizer.tables import LANDMARK_CAMPUS_KEYWORDS
+            # Check if clean_input contains landmark campus keywords or commercial hubs and is not just the city name
             clean_words = set(re.findall(r"\b[A-Z0-9]+\b", clean_input.upper()))
             norm_pc = re.sub(r"[^A-Z0-9]", "", p_city.upper()) if p_city else ""
             norm_ci = re.sub(r"[^A-Z0-9]", "", clean_input.upper())
-            if bool(clean_words & LANDMARK_CAMPUS_KEYWORDS) and norm_ci != norm_pc:
+            is_hub = (
+                bool(clean_words & LANDMARK_CAMPUS_KEYWORDS)
+                or clean_input.upper().strip() in CATALOGED_COMMERCIAL_HUBS
+                or any(hub in clean_input.upper() for hub in CATALOGED_COMMERCIAL_HUBS)
+            )
+            if is_hub and norm_ci != norm_pc:
                 rb_st1, rb_st2, ok = _rule_based_us_street_parse(clean_input, enable_fuzzy=enable_fuzzy)
                 if rb_st1:
                     st1 = rb_st1
                     if not st2 and rb_st2:
                         st2 = rb_st2
+
+    if st1 and st2 and re.sub(r"[^\w]", "", st1.upper()) == re.sub(r"[^\w]", "", st2.upper()):
+        st2 = ""
 
     # Ultimate fallback to rule-based parser if empty
     if not st1 and not st2 and not (p_city or p_state or p_zip):
@@ -1105,6 +1142,8 @@ def generate_building_key(
     state: Optional[str] = None,
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
+    allow_locality: bool = False,
+    **kwargs: Any,
 ) -> Optional[str]:
     """
     Derives deterministic building-level matching key (omits secondary units):
@@ -1117,6 +1156,8 @@ def generate_building_key(
         state=state,
         postal_code=postal_code,
         country=country,
+        allow_locality=allow_locality,
+        **kwargs,
     )
     return std.building_key
 
@@ -1128,6 +1169,8 @@ def generate_normalized_address_key(
     state: Optional[str] = None,
     postal_code: Optional[str] = None,
     country: Optional[str] = None,
+    allow_locality: bool = False,
+    **kwargs: Any,
 ) -> Optional[str]:
     """
     Derives deterministic matching key:
@@ -1141,6 +1184,8 @@ def generate_normalized_address_key(
         state=state,
         postal_code=postal_code,
         country=country,
+        allow_locality=allow_locality,
+        **kwargs,
     )
     return std.normalized_address_key
 
@@ -1207,6 +1252,7 @@ def standardize_address(
     enable_fuzzy: bool = True,
     enable_geocoding: bool = False,
     use_cache: bool = True,
+    allow_locality: bool = False,
     **kwargs: Any,
 ) -> StandardizedAddress:
     """
@@ -1214,6 +1260,13 @@ def standardize_address(
     Generates deterministic normalized_address_key, building_key, phonetic_key,
     and flags registered agent hubs and private residences.
     """
+    import os
+    allow_locality = allow_locality or bool(
+        kwargs.get("allow_locality_only")
+        or kwargs.get("allow_city_level")
+        or kwargs.get("allow_locality")
+        or os.environ.get("ADDRESS_STANDARDIZER_ALLOW_LOCALITY") == "1"
+    )
     raw_dict = {
         "street1": str(street1) if street1 is not None else "",
         "street2": str(street2) if street2 is not None else "",
@@ -1224,6 +1277,7 @@ def standardize_address(
         "is_vacant": is_vacant if is_vacant is not None else kwargs.get("vacant"),
         "enable_fuzzy": enable_fuzzy,
         "enable_geocoding": enable_geocoding,
+        "allow_locality": allow_locality,
     }
 
     cache = get_default_cache()
@@ -1238,6 +1292,7 @@ def standardize_address(
             country,
             enable_fuzzy=enable_fuzzy,
             enable_geocoding=enable_geocoding,
+            allow_locality=allow_locality,
         )
         cached = cache.get(cache_key)
         if cached is not None:
@@ -1246,6 +1301,9 @@ def standardize_address(
     # Tier 0: Pre-Flight Sanity & Unicode NFKC Normalization
     s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(street1))).strip() if street1 is not None else ""
     s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(street2))).strip() if street2 is not None else ""
+    s1_raw = clean_repetitive_cycles(s1_raw)
+    if s2_raw:
+        s2_raw = clean_repetitive_cycles(s2_raw)
     city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(city))).strip() if city is not None else ""
     state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(state))).strip() if state is not None else ""
     postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(postal_code))).strip() if postal_code is not None else ""
@@ -1379,12 +1437,23 @@ def standardize_address(
         if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
             norm_s1 = ""
 
-        # Minimum viable check: requires valid non-empty street line
+        # Minimum viable check: requires valid non-empty street line or locality-only record
+        has_locality = bool(norm_city or norm_state or zip5)
         if not norm_s1:
-            status = "parse_failed"
-            key = None
-            b_key = None
-            p_key = None
+            if allow_locality and has_locality:
+                status = LocalityOnlyStatus("locality_only")
+                k_city = fold_to_ascii_key(norm_city)
+                k_state = fold_to_ascii_key(norm_state)
+                k_post = fold_to_ascii_key(zip5)
+                k_country = fold_to_ascii_key(country_iso) or "USA"
+                key = f"||{k_city}|{k_state}|{k_post}|{k_country}"
+                b_key = f"||{k_city}|{k_state}|{k_post}|{k_country}"
+                p_key = None
+            else:
+                status = "parse_failed"
+                key = None
+                b_key = None
+                p_key = None
         else:
             status = "standardized"
             k_s1 = fold_to_ascii_key(norm_s1)
@@ -1475,12 +1544,23 @@ def standardize_address(
             norm_s1 = norm_s2
             norm_s2 = ""
 
-        # Minimum viable check: requires valid non-empty street line
+        # Minimum viable check: requires valid non-empty street line or locality-only record
+        has_locality = bool(norm_city or norm_state or norm_postal)
         if not norm_s1:
-            status = "parse_failed"
-            key = None
-            b_key = None
-            p_key = None
+            if allow_locality and has_locality:
+                status = LocalityOnlyStatus("locality_only")
+                k_city = fold_to_ascii_key(norm_city)
+                k_state = fold_to_ascii_key(norm_state)
+                k_post = fold_to_ascii_key(norm_postal)
+                k_country = fold_to_ascii_key(country_iso)
+                key = f"||{k_city}|{k_state}|{k_post}|{k_country}"
+                b_key = f"||{k_city}|{k_state}|{k_post}|{k_country}"
+                p_key = None
+            else:
+                status = "parse_failed"
+                key = None
+                b_key = None
+                p_key = None
         else:
             status = "standardized"
             k_s1 = fold_to_ascii_key(norm_s1)

@@ -17,9 +17,12 @@ class TestNativeDispatchFallback:
     """Tests default pure Python fallback operation when native extension is absent."""
 
     def setup_method(self):
+        self._patcher = patch.dict(sys.modules, {"_address_standardizer_rs": None})
+        self._patcher.start()
         _native_dispatch.reset_engine()
 
     def teardown_method(self):
+        self._patcher.stop()
         _native_dispatch.reset_engine()
 
     def test_default_pure_python_state(self):
@@ -92,9 +95,12 @@ class TestNativeDispatchWithMockExtension:
     """Tests native module injection, mock routing, and override mechanisms."""
 
     def setup_method(self):
+        self._patcher = patch.dict(sys.modules, {"_address_standardizer_rs": None})
+        self._patcher.start()
         _native_dispatch.reset_engine()
 
     def teardown_method(self):
+        self._patcher.stop()
         _native_dispatch.reset_engine()
 
     def test_mock_native_module_injection_and_dispatch(self):
@@ -183,5 +189,7 @@ class TestNativeDispatchWithMockExtension:
             assert _native_dispatch.is_using_native() is True
 
         # Restore module state
-        importlib.reload(_native_dispatch)
-        assert _native_dispatch.is_native_available() is False
+        with patch.dict(sys.modules, {"_address_standardizer_rs": None}):
+            importlib.reload(_native_dispatch)
+            assert _native_dispatch.is_native_available() is False
+        _native_dispatch.reset_engine()

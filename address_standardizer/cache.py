@@ -25,6 +25,8 @@ def make_cache_key(
     country: Optional[str] = None,
     enable_fuzzy: bool = True,
     enable_geocoding: bool = False,
+    allow_locality: bool = False,
+    **kwargs: Any,
 ) -> str:
     """Computes a normalized cache key from input address components."""
     parts = [
@@ -39,6 +41,8 @@ def make_cache_key(
         parts.append("NO_FUZZY")
     if enable_geocoding:
         parts.append("GEOCODE")
+    if allow_locality:
+        parts.append("ALLOW_LOCALITY")
     return "|".join(parts)
 
 
