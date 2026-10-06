@@ -8,5 +8,5 @@ name = "_address_standardizer_rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.20", features = ["extension-module"] }
+pyo3 = { version = "0.29", features = ["extension-module"] }
 aho-corasick = "1.1"
