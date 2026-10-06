@@ -195,7 +195,6 @@ class CountryGrammar(abc.ABC):
             raw_tokens.append(postal_code)
         if country:
             raw_tokens.append(country)
-
         metadata = {
             "street1": street1 or "",
             "street2": street2 or "",
@@ -251,22 +250,28 @@ class UniversalInternationalGrammar(CountryGrammar):
                 parts_comma = parts_comma[:-1]
 
             if len(parts_comma) >= 3:
+                from address_standardizer.international.countries import CountryRegistry
+                has_pc = CountryRegistry.has_postal_codes(country_iso)
                 if RE_PO_BOX.search(parts_comma[1]):
                     norm_s1 = parts_comma[0].upper()
                     m_box = RE_PO_BOX.search(parts_comma[1])
                     norm_s2 = f"PO BOX {m_box.group(1).upper()}" if m_box else parts_comma[1].upper()
                     city_raw = parts_comma[2]
-                    if len(parts_comma) >= 4:
+                    if len(parts_comma) >= 4 and has_pc:
                         postal_raw = parts_comma[3]
                 elif (
                     "75 FORT" in parts_comma[1].upper()
                     or "CHURCH" in parts_comma[1].upper()
                     or (len(parts_comma) >= 4 and parts_comma[2].upper() in GLOBAL_METRO_TO_COUNTRY)
+                    or (
+                        self.extract_premise_and_thoroughfare(parts_comma[1])[1] is not None
+                        and self.extract_premise_and_thoroughfare(parts_comma[0])[1] is None
+                    )
                 ):
                     norm_s1 = "75 FORT ST" if "75 FORT" in parts_comma[1].upper() else parts_comma[1].upper()
                     norm_s2 = parts_comma[0].upper()
                     city_raw = parts_comma[2]
-                    if len(parts_comma) >= 4:
+                    if len(parts_comma) >= 4 and has_pc:
                         postal_raw = parts_comma[3]
                 else:
                     norm_s1_base, norm_s2_base = split_intl_secondary_unit(parts_comma[0], "")
@@ -278,9 +283,12 @@ class UniversalInternationalGrammar(CountryGrammar):
                         m_can = RE_CAN_PROV_POSTAL.match(rem_loc.upper())
                         if m_can:
                             state_raw = m_can.group(1)
-                            postal_raw = m_can.group(2)
-                        else:
+                            if has_pc:
+                                postal_raw = m_can.group(2)
+                        elif has_pc:
                             postal_raw = rem_loc
+                        else:
+                            state_raw = rem_loc
             elif len(parts_comma) == 2:
                 m_can = RE_CAN_PROV_POSTAL.match(parts_comma[1].upper())
                 m_can_post = RE_CAN_POSTCODE.match(parts_comma[1].upper())
@@ -413,14 +421,37 @@ class CountryGrammarRegistry:
         if country_cand in ("PRI", "GUM", "VIR", "MNP", "ASM"):
             return country_cand
 
+        is_foreign_indicator = (
+            state_raw in ("US", "USA", "", None)
+            or postal_raw in ("00000", "", None)
+            or (raw_street and any(ind in raw_street.upper() for ind in ("(FRGN)", "(FOREIGN)", " FRGN", " OVERSEAS")))
+        )
+
         if city_raw:
             c_clean = RE_NON_ALPHANUMERIC.sub(" ", city_raw).strip().upper()
             c_clean = " ".join(c_clean.split())
-            if c_clean in GLOBAL_METRO_TO_COUNTRY:
-                return GLOBAL_METRO_TO_COUNTRY[c_clean]
-            c_unaccent = fold_to_ascii_key(c_clean)
-            if c_unaccent in GLOBAL_METRO_TO_COUNTRY:
-                return GLOBAL_METRO_TO_COUNTRY[c_unaccent]
+            candidates = [c_clean]
+            c_no_num = re.sub(r"\s+\d+.*$", "", c_clean).strip()
+            if c_no_num and c_no_num != c_clean:
+                candidates.append(c_no_num)
+            c_no_lead = re.sub(r"^\d+\s+", "", c_clean).strip()
+            if c_no_lead and c_no_lead != c_clean:
+                candidates.append(c_no_lead)
+            if "," in city_raw:
+                for part in city_raw.split(","):
+                    p_c = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()
+                    p_c = " ".join(p_c.split())
+                    if p_c:
+                        candidates.append(p_c)
+
+            for cand in candidates:
+                if cand in GLOBAL_METRO_TO_COUNTRY:
+                    if not is_valid_us_state or is_foreign_indicator:
+                        return GLOBAL_METRO_TO_COUNTRY[cand]
+                cand_unaccent = fold_to_ascii_key(cand)
+                if cand_unaccent in GLOBAL_METRO_TO_COUNTRY:
+                    if not is_valid_us_state or is_foreign_indicator:
+                        return GLOBAL_METRO_TO_COUNTRY[cand_unaccent]
 
         if postal_raw:
             p_clean = postal_raw.strip().upper()

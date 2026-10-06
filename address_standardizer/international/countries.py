@@ -998,7 +998,7 @@ _COUNTRY_DATA: Tuple[CountryInfo, ...] = (
         name='Hong Kong',
         native_names=('香港', 'Hong Kong'),
         aliases=('HK', 'HKG', 'Hong Kong', 'Hong Kong SAR', 'Hong Kong Special Administrative Region of China'),
-        has_postal_codes=True,
+        has_postal_codes=False,
         region='Asia',
     ),
     CountryInfo(
@@ -1388,7 +1388,7 @@ _COUNTRY_DATA: Tuple[CountryInfo, ...] = (
         name='Macao',
         native_names=('澳門', 'Macau', 'Macao'),
         aliases=('MO', 'MAC', 'Macau', 'Macao', 'Macao SAR', 'Macao Special Administrative Region of China'),
-        has_postal_codes=True,
+        has_postal_codes=False,
         region='Asia',
     ),
     CountryInfo(
@@ -2719,15 +2719,19 @@ class CountryRegistry:
         # Check Global Metros
         from address_standardizer.tables import GLOBAL_METRO_TO_COUNTRY
 
+        for p in parts:
+            p_clean = re.sub(r"[^a-zA-Z0-9\s]", " ", p).strip().upper()
+            p_clean = " ".join(p_clean.split())
+            if p_clean in GLOBAL_METRO_TO_COUNTRY:
+                return cls.get(GLOBAL_METRO_TO_COUNTRY[p_clean])
+
         t_clean = re.sub(r"[^a-zA-Z0-9\s]", " ", t).upper()
         t_words = t_clean.split()
-        for word in reversed(t_words):
-            if word in GLOBAL_METRO_TO_COUNTRY:
-                return cls.get(GLOBAL_METRO_TO_COUNTRY[word])
-        for i in range(len(t_words) - 1):
-            two = f"{t_words[i]} {t_words[i+1]}"
-            if two in GLOBAL_METRO_TO_COUNTRY:
-                return cls.get(GLOBAL_METRO_TO_COUNTRY[two])
+        for n in (3, 2, 1):
+            for i in range(len(t_words) - n + 1):
+                cand = " ".join(t_words[i:i+n])
+                if cand in GLOBAL_METRO_TO_COUNTRY:
+                    return cls.get(GLOBAL_METRO_TO_COUNTRY[cand])
 
         return None
 

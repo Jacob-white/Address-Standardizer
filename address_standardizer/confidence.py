@@ -21,6 +21,7 @@ from address_standardizer.tables import (
     ZIP3_TO_STATE,
     METRO_ZIP3_CENTROIDS,
     STATE_CENTROIDS,
+    LANDMARK_CAMPUS_KEYWORDS,
 )
 
 
@@ -43,6 +44,7 @@ WARN_TYPO_HEALED = "WARN_TYPO_HEALED"
 WARN_CMRA_DETECTED = "WARN_CMRA_DETECTED"
 WARN_MISSING_SECONDARY_UNIT = "WARN_MISSING_SECONDARY_UNIT"
 WARN_VACANT_DELIVERY_POINT = "WARN_VACANT_DELIVERY_POINT"
+WARN_LANDMARK_CAMPUS_PREMISE = "WARN_LANDMARK_CAMPUS_PREMISE"
 ERR_PARSE_FAILED = "ERR_PARSE_FAILED"
 ERR_EMPTY_ADDRESS = "ERR_EMPTY_ADDRESS"
 ERR_EMPTY_STREET = "ERR_EMPTY_STREET"
@@ -153,6 +155,7 @@ class ConfidenceScorer:
         # 1. S_parse: Parsing Quality (0.0 to 1.0)
         s_parse = 1.0
         has_dual_address = False
+        is_landmark_campus = False
         if std_address.is_us:
             # Check for leading house number if street1 present
             st1 = std_address.street1.strip()
@@ -165,8 +168,15 @@ class ConfidenceScorer:
                 first_tok = tokens[0] if tokens else ""
                 has_num = any(ch.isdigit() for ch in first_tok) or first_tok.upper() in WORD_NUMBERS
                 if not has_num:
-                    s_parse -= 0.35
-                    reason_codes.append(ERR_MISSING_HOUSE_NUM)
+                    st1_tokens = set(re.findall(r"\b[A-Z0-9]+\b", st1.upper()))
+                    raw_tokens = set(re.findall(r"\b[A-Z0-9]+\b", raw_combined.upper()))
+                    if bool((st1_tokens | raw_tokens) & LANDMARK_CAMPUS_KEYWORDS):
+                        is_landmark_campus = True
+                        s_parse -= 0.15
+                        reason_codes.append(WARN_LANDMARK_CAMPUS_PREMISE)
+                    else:
+                        s_parse -= 0.35
+                        reason_codes.append(ERR_MISSING_HOUSE_NUM)
 
             # Check for dual address lines in raw input
             if ("PO BOX" in raw_combined or "P.O. BOX" in raw_combined or "P O BOX" in raw_combined) and (
@@ -229,6 +239,7 @@ class ConfidenceScorer:
                     or any(name in st1 for name in PROPER_THOROUGHFARES_NO_SUFFIX)
                     or any(t in STREET_SUFFIXES.values() or t in STREET_SUFFIXES for t in st1_tokens[1:])
                     or any(t in ["WAY", "WALK", "MALL", "LOOP", "PASS", "ROW", "RUN"] for t in st1_tokens)
+                    or any(t in LANDMARK_CAMPUS_KEYWORDS for t in st1_tokens)
                 )
                 if not has_valid_suf:
                     s_ref -= 0.20
@@ -344,6 +355,11 @@ class ConfidenceScorer:
             or std_address.address_status == "parse_failed"
         ):
             routing_tier = RoutingTier.MANUAL_STEWARDSHIP
+        elif is_landmark_campus:
+            if composite >= self.TIER_FUZZY_REVIEW_THRESHOLD:
+                routing_tier = RoutingTier.FUZZY_REVIEW
+            else:
+                routing_tier = RoutingTier.MANUAL_STEWARDSHIP
         elif composite >= self.TIER_AUTO_PASS_THRESHOLD and not any(
             c.startswith("ERR_") for c in reason_codes
         ):

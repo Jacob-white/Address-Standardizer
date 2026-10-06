@@ -10,6 +10,7 @@ from address_standardizer._patterns import (
     RE_NON_ALPHANUMERIC,
     RE_PO_BOX,
     RE_WHITESPACE,
+    clean_redundant_street_tail,
 )
 from address_standardizer.international.base import (
     CountryGrammar,
@@ -193,6 +194,7 @@ class CanadaGrammar(CountryGrammar):
 
         unit_type: Optional[str] = None
         unit_number: Optional[str] = None
+
         street_line = s1_raw
 
         # Handle comma-delimited single string when city_raw is empty
@@ -219,6 +221,22 @@ class CanadaGrammar(CountryGrammar):
                     street_line = ", ".join(parts_comma[:-1])
             elif len(parts_comma) == 1:
                 street_line = parts_comma[0]
+
+        # Extract trailing postal code and province from street_line if not provided
+        if not postal_raw and street_line:
+            m_tail_pc = re.search(r"(?:,\s*|\s+)([A-CEGHJ-NPR-TVXY]\d[A-CEGHJ-NPR-TV-Z]\s*\d[A-CEGHJ-NPR-TV-Z]\d)\s*$", street_line, re.IGNORECASE)
+            if m_tail_pc:
+                postal_raw = m_tail_pc.group(1)
+
+        if not state_raw and street_line:
+            m_tail_prov = re.search(r"(?:,\s*|\s+)([A-Z]{2})\s*(?:[A-CEGHJ-NPR-TVXY]\d[A-CEGHJ-NPR-TV-Z]\s*\d[A-CEGHJ-NPR-TV-Z]\d)?\s*$", street_line, re.IGNORECASE)
+            if m_tail_prov and m_tail_prov.group(1).upper() in CANADIAN_PROVINCES:
+                state_raw = m_tail_prov.group(1).upper()
+
+        # Clean redundant city, province, country, and postal code from street_line and s2_raw
+        street_line = clean_redundant_street_tail(street_line, city=city_raw, state=state_raw, postal_code=postal_raw)
+        if s2_raw:
+            s2_raw = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
 
         st1_base, st2_base = split_intl_secondary_unit(street_line, s2_raw)
         if st2_base:

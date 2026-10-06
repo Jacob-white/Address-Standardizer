@@ -89,12 +89,12 @@ class TestCountryRegistryAdversarial:
 
     def test_non_postal_countries_catalog(self):
         """Verify explicit cataloging of non-postal jurisdictions."""
-        known_non_postal = ["ARE", "QAT", "BHS", "PAN", "SYC", "COM", "DJI", "ERI", "GMB", "STP", "TUV", "VUT", "SLB"]
+        known_non_postal = ["ARE", "QAT", "BHS", "PAN", "SYC", "COM", "DJI", "ERI", "GMB", "STP", "TUV", "VUT", "SLB", "HKG", "MAC"]
         for alpha3 in known_non_postal:
             assert CountryRegistry.has_postal_codes(alpha3) is False, f"{alpha3} should be non-postal"
 
         non_postal_all = [c for c in CountryRegistry.all_countries() if not c.has_postal_codes]
-        assert len(non_postal_all) == 53, f"Expected 53 non-postal countries, found {len(non_postal_all)}"
+        assert len(non_postal_all) == 55, f"Expected 55 non-postal countries, found {len(non_postal_all)}"
 
     def test_domestic_namesake_collision_with_zip(self):
         """Verify domestic US namesake cities with ZIP resolve strictly to USA."""

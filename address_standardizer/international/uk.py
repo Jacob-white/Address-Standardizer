@@ -228,6 +228,10 @@ class UKGrammar(CountryGrammar):
         if not raw_code:
             return ""
         clean = " ".join(raw_code.strip().upper().split())
+        # Strip permitted country / jurisdiction prefixes (e.g. "GB-JE2 3RP", "UK-GY1 1AA")
+        clean = re.sub(r"^(?:GB|UK|JEY|GGY|IMN)[-\s]+", "", clean, flags=re.IGNORECASE)
+        # Normalize hyphenated area codes (e.g. "JE-2 3RP" -> "JE2 3RP")
+        clean = re.sub(r"^(JE|GY|IM)-(\d)", r"\1\2", clean, flags=re.IGNORECASE)
         m = RE_UK_POSTCODE_EXACT.match(clean)
         if m:
             outward = m.group(1).upper()

@@ -15,7 +15,7 @@ from address_standardizer.international.base import (
 from address_standardizer.international.diacritics import normalize_to_canonical_unicode
 from address_standardizer.tables import COUNTRY_MAP, DIRECTIONALS, STREET_SUFFIXES
 
-RE_CYM_POSTCODE = re.compile(r"^(KY\d-\d{4})$", re.IGNORECASE)
+RE_CYM_POSTCODE = re.compile(r"^(?:CYM[- ]*)?(?:KY([1-3])?[- ]*)?(\d{4})$", re.IGNORECASE)
 RE_VGB_POSTCODE = re.compile(r"^(VG\d{4})$", re.IGNORECASE)
 RE_BMU_POSTCODE = re.compile(r"^([A-Z]{2})\s*([A-Z0-9]{2})$", re.IGNORECASE)
 
@@ -69,7 +69,8 @@ class OffshoreGrammar(CountryGrammar):
         clean = " ".join(raw_code.strip().upper().split())
         m_cym = RE_CYM_POSTCODE.match(clean)
         if m_cym:
-            return m_cym.group(1).upper()
+            sec = m_cym.group(1) or "1"
+            return f"KY{sec}-{m_cym.group(2)}"
         m_vgb = RE_VGB_POSTCODE.match(clean)
         if m_vgb:
             return m_vgb.group(1).upper()
@@ -258,6 +259,10 @@ class OffshoreGrammar(CountryGrammar):
         else:
             final_street_name = st_name
             final_building_name = building_name
+            if not final_street_name and not final_building_name and unit_type in ("PO BOX", "APARTADO"):
+                final_street_name = f"{unit_type} {unit_number}".strip() if unit_number else unit_type
+                unit_type = None
+                unit_number = None
 
         norm_postal = self.normalize_postal_code(postal_raw)
         norm_city = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", city_raw).strip().upper())

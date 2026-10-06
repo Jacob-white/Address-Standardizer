@@ -18,6 +18,7 @@ from address_standardizer._patterns import (
     RE_NON_ALPHANUMERIC,
     RE_WHITESPACE,
     RE_TERMINAL_COUNTRY,
+    RE_LEGACY_CORRUPTIONS,
     clean_redundant_street_tail,
 )
 from address_standardizer.fast_path import (
@@ -196,6 +197,11 @@ def standardize_record(
             )
         return garbage_std
 
+    # Pre-clean legacy baked-in ETL artifacts (e.g. "10005TH UNITED ESTS", "UNITED ESTS")
+    s1_raw = RE_LEGACY_CORRUPTIONS.sub("", s1_raw).strip(" ,.-")
+    if s2_raw:
+        s2_raw = RE_LEGACY_CORRUPTIONS.sub("", s2_raw).strip(" ,.-")
+
     # 2. Country detection
     country_iso = normalize_country_code(
         country_raw,
@@ -287,6 +293,7 @@ def standardize_record(
         if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
             norm_s1 = ""
 
+        # Minimum viable check: requires valid non-empty street line
         if not norm_s1:
             status = "parse_failed"
             key = None
@@ -341,6 +348,10 @@ def standardize_record(
         return std_us
 
     # 4. International Path
+    if state_raw in ("US", "USA"):
+        state_raw = ""
+    if postal_raw == "00000":
+        postal_raw = ""
     norm_s1 = ""
     norm_s2 = ""
     dep_loc = None
@@ -385,6 +396,7 @@ def standardize_record(
     if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
         norm_s1 = ""
 
+    # Minimum viable check: requires valid non-empty street line
     if not norm_s1:
         status = "parse_failed"
         key = None

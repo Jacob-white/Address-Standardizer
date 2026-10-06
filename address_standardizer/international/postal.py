@@ -163,9 +163,29 @@ def _format_ireland(code: str) -> str:
 
 def _format_cayman(code: str) -> str:
     """Canonical Cayman Islands format: KY1-1104."""
-    clean = re.sub(r"[\s\-]", "", code).upper()
+    clean = re.sub(r"[^\dA-Za-z]", "", code).upper()
+    if clean.startswith("CYM"):
+        clean = clean[3:]
+    m = re.match(r"^KY([123])(\d{4})$", clean)
+    if m:
+        return f"KY{m.group(1)}-{m.group(2)}"
+    m2 = re.match(r"^KY(\d{4})$", clean)
+    if m2:
+        return f"KY1-{m2.group(1)}"
+    if len(clean) == 4 and clean.isdigit():
+        return f"KY1-{clean}"
     if clean.startswith("KY") and len(clean) == 7:
         return f"{clean[:3]}-{clean[3:]}"
+    return clean
+
+
+def _format_vgb(code: str) -> str:
+    """Canonical British Virgin Islands format: VG1110."""
+    clean = re.sub(r"[^\dA-Za-z]", "", code).upper()
+    if clean.startswith("VG"):
+        return clean
+    if len(clean) == 4 and clean.isdigit():
+        return f"VG{clean}"
     return clean
 
 
@@ -299,7 +319,7 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "BRB": _rule("BRB", r"^BB\d{5}$", 7, 7, allows_alnum=True, desc="BB + 5 digits", example="BB11000"),
     "CUB": _rule("CUB", r"^(?:CP\s*)?\d{5}$", 5, 5, desc="5 digits", example="10100"),
     "CUW": _rule("CUW", r"^\d{4}$", 4, 4, desc="4 digits", example="1234"),
-    "CYM": _rule("CYM", r"^KY\d-\d{4}$", 7, 7, allows_alnum=True, format_fn=_format_cayman, desc="KY + digit + hyphen + 4 digits", example="KY1-1104"),
+    "CYM": _rule("CYM", r"^(?:KY[1-3]?[- ]?)?\d{4}$", 4, 7, allows_alnum=True, format_fn=_format_cayman, prefixes=("CYM-", "CYM ", "CYM", "KY-", "KY "), desc="KY1-xxxx or 4 digits", example="KY1-1104"),
     "DOM": _rule("DOM", r"^\d{5}$", 5, 5, desc="5 digits", example="10101"),
     "GLP": _rule("GLP", r"^971\d{2}$", 5, 5, desc="5 digits (971xx)", example="97100"),
     "HTI": _rule("HTI", r"^\d{4}$", 4, 4, desc="4 digits", example="6110"),
@@ -312,7 +332,13 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "TCA": _rule("TCA", r"^TKCA\s*1ZZ$", 7, 7, allows_alnum=True, desc="TKCA 1ZZ", example="TKCA 1ZZ"),
     "TTO": _rule("TTO", r"^\d{6}$", 6, 6, desc="6 digits", example="100110"),
     "VCT": _rule("VCT", r"^VC\d{4}$", 6, 6, allows_alnum=True, desc="VC + 4 digits", example="VC0100"),
-    "VGB": _rule("VGB", r"^VG\d{4}$", 6, 6, allows_alnum=True, desc="VG + 4 digits", example="VG1110"),
+    "VGB": _rule(
+        "VGB", r"^(?:VG\s*)?\d{4}$", 4, 6,
+        allows_alnum=True,
+        format_fn=_format_vgb,
+        prefixes=("BVI-", "BVI ", "BVI", "VG-", "VG "),
+        desc="VG + 4 digits", example="VG1110",
+    ),
 
     # Central & South America
     "ARG": _rule("ARG", r"^(?:\d{4}|[A-Z]\d{4}[A-Z]{3})$", 4, 8, allows_alnum=True, desc="4 digits or CPA 8 chars", example="C1024CWN"),
@@ -389,9 +415,24 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "VAT": _rule("VAT", r"^(?:VA-?)?00120$", 5, 7, allows_alnum=True, prefixes=("VA-", "VAT-"), desc="00120", example="00120"),
     "LIE": _rule("LIE", r"^\d{4}$", 4, 4, prefixes=("FL-", "LIE-"), desc="4 digits (948x-949x)", example="9490"),
     "GIB": _rule("GIB", r"^GX11\s*1AA$", 7, 7, allows_alnum=True, desc="GX11 1AA", example="GX11 1AA"),
-    "GGY": _rule("GGY", r"^GY\d[A-Z0-9]?\s*\d[A-Z]{2}$", 6, 7, allows_alnum=True, format_fn=_format_uk, desc="GY + UK format", example="GY1 1AA"),
-    "JEY": _rule("JEY", r"^JE\d[A-Z0-9]?\s*\d[A-Z]{2}$", 6, 7, allows_alnum=True, format_fn=_format_uk, desc="JE + UK format", example="JE1 1AA"),
-    "IMN": _rule("IMN", r"^IM\d[A-Z0-9]?\s*\d[A-Z]{2}$", 6, 7, allows_alnum=True, format_fn=_format_uk, desc="IM + UK format", example="IM1 1AA"),
+    "GGY": _rule(
+        "GGY", r"^GY\d[A-Z0-9]?\s*\d[A-Z]{2}$", 6, 7,
+        allows_alnum=True, format_fn=_format_uk,
+        prefixes=("GB-", "GB ", "GB", "UK-", "UK ", "UK", "GGY-", "GGY ", "GGY"),
+        desc="GY + UK format", example="GY1 1AA",
+    ),
+    "JEY": _rule(
+        "JEY", r"^JE\d[A-Z0-9]?\s*\d[A-Z]{2}$", 6, 7,
+        allows_alnum=True, format_fn=_format_uk,
+        prefixes=("GB-", "GB ", "GB", "UK-", "UK ", "UK", "JEY-", "JEY ", "JEY"),
+        desc="JE + UK format", example="JE1 1AA",
+    ),
+    "IMN": _rule(
+        "IMN", r"^IM\d[A-Z0-9]?\s*\d[A-Z]{2}$", 6, 7,
+        allows_alnum=True, format_fn=_format_uk,
+        prefixes=("GB-", "GB ", "GB", "UK-", "UK ", "UK", "IMN-", "IMN ", "IMN"),
+        desc="IM + UK format", example="IM1 1AA",
+    ),
     "ALA": _rule("ALA", r"^(?:AX-?)?22\d{3}$", 5, 7, allows_alnum=True, desc="5 digits (22xxx)", example="22100"),
     "FRO": _rule("FRO", r"^(?:FO-?)?\d{3}$", 3, 5, allows_alnum=True, prefixes=("FO-", "FRO-"), desc="3 digits", example="100"),
     "GRL": _rule("GRL", r"^39\d{2}$", 4, 4, desc="4 digits (39xx)", example="3900"),
@@ -403,7 +444,11 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "KOR": _rule("KOR", r"^\d{5}$|^\d{3}-?\d{3}$", 5, 6, format_fn=_format_korea, desc="5 digits or 6 digits", example="03186"),
     "TWN": _rule("TWN", r"^\d{3}(?:-?\d{2,3})?$", 3, 6, desc="3, 5, or 6 digits", example="100-01"),
     "IND": _rule("IND", r"^[1-9]\d{5}$", 6, 6, desc="6 digits", example="110001"),
-    "SGP": _rule("SGP", r"^\d{6}$", 6, 6, desc="6 digits", example="049909"),
+    "SGP": _rule(
+        "SGP", r"^\d{6}$", 6, 6,
+        prefixes=("SGP-", "SGP ", "SGP", "SG-", "SG ", "SG", "S-", "S ", "S"),
+        desc="6 digits", example="049909",
+    ),
     "MYS": _rule("MYS", r"^\d{5}$", 5, 5, desc="5 digits", example="50450"),
     "THA": _rule("THA", r"^\d{5}$", 5, 5, desc="5 digits", example="10100"),
     "IDN": _rule("IDN", r"^\d{5}$", 5, 5, desc="5 digits", example="10110"),
@@ -440,11 +485,23 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "BRN": _rule("BRN", r"^[A-Z]{2}\d{4}$", 6, 6, allows_alnum=True, desc="2 letters + 4 digits", example="BA1234"),
     "MDV": _rule("MDV", r"^\d{4,5}$", 4, 5, desc="4 or 5 digits", example="20026"),
     "BTN": _rule("BTN", r"^\d{5}$", 5, 5, desc="5 digits", example="11001"),
-    "HKG": _rule("HKG", r"^999077$", 6, 6, desc="China Post routing code", example="999077"),
-    "MAC": _rule("MAC", r"^999078$", 6, 6, desc="China Post routing code", example="999078"),
 
     # Oceania
-    "AUS": _rule("AUS", r"^\d{4}$", 4, 4, desc="4 digits", example="2000"),
+    "AUS": _rule(
+        "AUS", r"^\d{4}$", 4, 4,
+        prefixes=(
+            "AUS-", "AUS ", "AUS", "AU-", "AU ", "AU",
+            "NSW-", "NSW ", "NSW",
+            "VIC-", "VIC ", "VIC",
+            "QLD-", "QLD ", "QLD",
+            "SA-", "SA ", "SA",
+            "WA-", "WA ", "WA",
+            "TAS-", "TAS ", "TAS",
+            "ACT-", "ACT ", "ACT",
+            "NT-", "NT ", "NT",
+        ),
+        desc="4 digits", example="2000",
+    ),
     "NZL": _rule("NZL", r"^\d{4}$", 4, 4, desc="4 digits", example="6011"),
     "PNG": _rule("PNG", r"^\d{3}$", 3, 3, desc="3 digits", example="111"),
     "CCK": _rule("CCK", r"^6799$", 4, 4, desc="4 digits (6799)", example="6799"),
@@ -498,6 +555,14 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "ATF": _rule("ATF", r"^984\d{2}$", 5, 5, desc="5 digits (984xx)", example="98400"),
     "BVT": _rule("BVT", r"^7447$", 4, 4, desc="4 digits (7447)", example="7447"),
     "IOT": _rule("IOT", r"^BBND\s*1ZZ$", 7, 7, allows_alnum=True, desc="BBND 1ZZ", example="BBND 1ZZ"),
+}
+
+
+DEPRECATED_POSTAL_RULES: Dict[str, PostalRule] = {
+    # Hong Kong and Macao do not use domestic postal codes.
+    # China Post routing codes 999077/999078 are deprecated in favor of non-postal nation status.
+    "HKG": _rule("HKG", r"^999077$", 6, 6, desc="China Post routing code (deprecated)", example="999077"),
+    "MAC": _rule("MAC", r"^999078$", 6, 6, desc="China Post routing code (deprecated)", example="999078"),
 }
 
 
@@ -582,13 +647,32 @@ def validate_postal_code(
         )
         return res if return_details else True
 
-    # Strip permitted external country prefix (e.g. "D-10115" -> "10115")
+    # Strip permitted external country / jurisdiction prefix (e.g. "D-10115" -> "10115", "NSW 2000" -> "2000", "S238880" -> "238880")
     check_code = raw_pc
     if rule.allowed_prefixes:
-        for pfx in rule.allowed_prefixes:
+        for pfx in sorted(rule.allowed_prefixes, key=len, reverse=True):
             if check_code.upper().startswith(pfx.upper()):
-                check_code = check_code[len(pfx):].strip()
+                check_code = check_code[len(pfx):].strip().lstrip("-").strip()
                 break
+
+    # Jurisdictional normalization before regex validation
+    if c_info.alpha3 == "VGB":
+        # British Virgin Islands: normalize "VG 1110" -> "VG1110"
+        check_code = re.sub(r"^VG\s+(\d{4})$", r"VG\1", check_code, flags=re.IGNORECASE)
+    elif c_info.alpha3 == "CYM":
+        # Cayman Islands: normalize "KY 1104", "KY-1104", "KY1 1104", "1104", "CYM 1104"
+        check_code = re.sub(r"^KY\s+(\d{4})$", r"KY1-\1", check_code, flags=re.IGNORECASE)
+        check_code = re.sub(r"^KY-(\d{4})$", r"KY1-\1", check_code, flags=re.IGNORECASE)
+        check_code = re.sub(r"^KY([1-3])\s+(\d{4})$", r"KY\1-\2", check_code, flags=re.IGNORECASE)
+        check_code = re.sub(r"^KY([1-3])(\d{4})$", r"KY\1-\2", check_code, flags=re.IGNORECASE)
+        if re.match(r"^\d{4}$", check_code):
+            check_code = f"KY1-{check_code}"
+    elif c_info.alpha3 == "JEY":
+        check_code = re.sub(r"^JE-(\d)", r"JE\1", check_code, flags=re.IGNORECASE)
+    elif c_info.alpha3 == "GGY":
+        check_code = re.sub(r"^GY-(\d)", r"GY\1", check_code, flags=re.IGNORECASE)
+    elif c_info.alpha3 == "IMN":
+        check_code = re.sub(r"^IM-(\d)", r"IM\1", check_code, flags=re.IGNORECASE)
 
     # Character validity checks
     if not rule.allows_alphanumeric:
@@ -808,6 +892,62 @@ def _extract_for_country(text: str, c_info: CountryInfo) -> Optional[str]:
         m = re.search(r"\b([A-Z]\d{4}[A-Z]{3})\b", text)
         if m:
             res = validate_postal_code(m.group(1), "ARG", return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
+        return None
+
+    # Singapore
+    if alpha3 == "SGP":
+        m_sg = re.search(r"\b(?:SGP|SG|S)\s*(\d{6})\b", text, re.IGNORECASE)
+        if m_sg:
+            res = validate_postal_code(m_sg.group(0), "SGP", return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
+        matches_sg = list(re.finditer(r"\b(\d{6})\b", text))
+        for m in reversed(matches_sg):
+            res = validate_postal_code(m.group(1), "SGP", return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
+        return None
+
+    # Australia
+    if alpha3 == "AUS":
+        m_au = re.search(r"\b(?:NSW|VIC|QLD|SA|WA|TAS|ACT|NT|AU|AUS)\s*(\d{4})\b", text, re.IGNORECASE)
+        if m_au:
+            res = validate_postal_code(m_au.group(0), "AUS", return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
+        matches_au = list(re.finditer(r"\b(\d{4})\b", text))
+        for m in reversed(matches_au):
+            res = validate_postal_code(m.group(1), "AUS", return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
+        return None
+
+    # British Virgin Islands
+    if alpha3 == "VGB":
+        m_vg = re.search(r"\b(?:BVI[- ]*)?(?:VG[- ]*|\bBVI[- ]*)(\d{4})\b", text, re.IGNORECASE)
+        if m_vg:
+            res = validate_postal_code(m_vg.group(0), "VGB", return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
+        matches_vg = list(re.finditer(r"\b(\d{4})\b", text))
+        for m in reversed(matches_vg):
+            res = validate_postal_code(m.group(1), "VGB", return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
+        return None
+
+    # Cayman Islands
+    if alpha3 == "CYM":
+        m_ky = re.search(r"\b(?:CYM[- ]*)?(?:KY[1-3]?[- ]*)(\d{4})\b", text, re.IGNORECASE)
+        if m_ky:
+            res = validate_postal_code(m_ky.group(0), "CYM", return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
+        matches_ky = list(re.finditer(r"\b(\d{4})\b", text))
+        for m in reversed(matches_ky):
+            res = validate_postal_code(m.group(1), "CYM", return_details=True)
             if isinstance(res, PostalValidationResult) and res.is_valid:
                 return res.formatted_code
         return None

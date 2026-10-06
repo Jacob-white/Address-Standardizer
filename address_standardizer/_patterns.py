@@ -71,7 +71,13 @@ RE_CAN_POSTCODE = re.compile(r"\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b", re.IGNORECASE)
 
 # Sovereign Country Terminal Pattern
 RE_TERMINAL_COUNTRY = re.compile(
-    r"(?:,\s*|\s+)(?:UNITED\s+STATES(?:\s+OF\s+AMERICA)?|U\.S\.A\.|USA|CAYMAN\s+ISLANDS|UNITED\s+KINGDOM|GREAT\s+BRITAIN|CANADA)\.?\s*$",
+    r"(?:,\s*|\s+)(?:UNITED\s+STATES(?:\s+OF\s+AMERICA)?|U\.S\.A\.|USA|CAYMAN\s+ISLANDS|UNITED\s+KINGDOM|GREAT\s+BRITAIN|CANADA|CAN)\.?\s*$",
+    re.IGNORECASE,
+)
+
+# Legacy ETL Artifacts (e.g. "10005TH UNITED ESTS", "UNITED ESTS")
+RE_LEGACY_CORRUPTIONS = re.compile(
+    r"\b\d{4,5}(?:ST|ND|RD|TH)?\s+UNITED\s+ESTS\b|\bUNITED\s+ESTS\b",
     re.IGNORECASE,
 )
 
@@ -235,41 +241,71 @@ def clean_redundant_street_tail(
     postal_code: Optional[str] = None,
 ) -> str:
     """
-    Strips terminal sovereign country tokens and redundant trailing city, state,
-    and postal codes that were already provided in separate fields or concatenated.
+    Strips terminal sovereign country tokens, legacy corruptions, and redundant
+    trailing city, state, and postal codes that were already provided in separate fields or concatenated.
     """
     if not s:
         return ""
     curr = s.strip()
 
-    # 1. Strip terminal sovereign country
-    curr = RE_TERMINAL_COUNTRY.sub("", curr).rstrip(" ,.-")
+    # Pre-clean legacy artifacts
+    curr = RE_LEGACY_CORRUPTIONS.sub("", curr).rstrip(" ,.-")
 
-    # 2. Strip matching postal code if at end
-    if postal_code:
-        zip_clean = postal_code.strip()
-        if zip_clean and curr.endswith(zip_clean):
-            curr = curr[:-len(zip_clean)].rstrip(" ,.-")
-        elif len(zip_clean) >= 5 and curr.endswith(zip_clean[:5]):
-            curr = curr[:-5].rstrip(" ,.-")
+    for _ in range(4):
+        prev = curr
 
-    # 3. Strip matching state if at end
-    if state:
-        st_clean = state.strip().upper()
-        if st_clean:
-            m_st = re.search(r"(?:,\s*|\s+)" + re.escape(st_clean) + r"$", curr, re.IGNORECASE)
-            if m_st:
-                curr = curr[:m_st.start()].rstrip(" ,.-")
+        # 1. Strip terminal sovereign country
+        curr = RE_TERMINAL_COUNTRY.sub("", curr).rstrip(" ,.-")
 
-    # 4. Strip matching city if at end or exact match
-    if city:
-        city_clean = city.strip().upper()
-        if city_clean:
-            m_city = re.search(r"(?:,\s*|\s+)" + re.escape(city_clean) + r"$", curr, re.IGNORECASE)
-            if m_city:
-                curr = curr[:m_city.start()].rstrip(" ,.-")
-            if curr.upper() == city_clean:
-                curr = ""
+        # 2. Strip matching postal code if at end
+        if postal_code:
+            zip_clean = postal_code.strip()
+            zip_nospace = zip_clean.replace(" ", "")
+            if zip_clean and curr.upper().endswith(zip_clean.upper()):
+                curr = curr[:-len(zip_clean)].rstrip(" ,.-")
+            elif zip_nospace and curr.upper().endswith(zip_nospace.upper()):
+                curr = curr[:-len(zip_nospace)].rstrip(" ,.-")
+            elif len(zip_clean) >= 5 and curr.upper().endswith(zip_clean[:5].upper()):
+                curr = curr[:-5].rstrip(" ,.-")
+        else:
+            m_can_tail = re.search(r"(?:,\s*|\s+)([A-CEGHJ-NPR-TVXY]\d[A-CEGHJ-NPR-TV-Z]\s*\d[A-CEGHJ-NPR-TV-Z]\d)\s*$", curr, re.IGNORECASE)
+            if m_can_tail:
+                curr = curr[:m_can_tail.start()].rstrip(" ,.-")
+
+        # 3. Strip matching state / province if at end
+        if state:
+            st_clean = state.strip().upper()
+            if st_clean:
+                st_variants = [re.escape(st_clean)]
+                try:
+                    from address_standardizer.tables import CANADIAN_PROVINCES, US_STATES
+                    for k, v in CANADIAN_PROVINCES.items():
+                        if k == st_clean or v == st_clean:
+                            st_variants.append(re.escape(k))
+                            st_variants.append(re.escape(v))
+                    for k, v in US_STATES.items():
+                        if k == st_clean or v == st_clean:
+                            st_variants.append(re.escape(k))
+                            st_variants.append(re.escape(v))
+                except ImportError:
+                    pass
+                st_pat = "|".join(set(st_variants))
+                m_st = re.search(r"(?:,\s*|\s+)(?:" + st_pat + r")$", curr, re.IGNORECASE)
+                if m_st:
+                    curr = curr[:m_st.start()].rstrip(" ,.-")
+
+        # 4. Strip matching city if at end or exact match
+        if city:
+            city_clean = city.strip().upper()
+            if city_clean:
+                m_city = re.search(r"(?:,\s*|\s+)" + re.escape(city_clean) + r"$", curr, re.IGNORECASE)
+                if m_city:
+                    curr = curr[:m_city.start()].rstrip(" ,.-")
+                if curr.upper() == city_clean:
+                    curr = ""
+
+        if curr == prev:
+            break
 
     return curr
 

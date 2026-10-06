@@ -33,7 +33,7 @@ class TestPostalCatalogCoverage:
         """Every country with has_postal_codes=True in CountryRegistry must have a rule."""
         all_countries = CountryRegistry.all_countries()
         postal_countries = [c for c in all_countries if c.has_postal_codes]
-        assert len(postal_countries) == 196
+        assert len(postal_countries) == 194
 
         missing = [c.alpha3 for c in postal_countries if c.alpha3 not in POSTAL_RULES]
         assert not missing, f"Missing postal rules for: {missing}"
