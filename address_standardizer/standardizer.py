@@ -69,6 +69,9 @@ from address_standardizer._patterns import (
     RE_LEGACY_CORRUPTIONS,
     clean_redundant_street_tail,
     clean_repetitive_cycles,
+    parse_intersection_address,
+    is_city_noise_in_street1,
+    clean_rooftop_address,
     RE_HIGHWAY_CONTRACT,
     RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
     RE_ATTACHED_SUFFIX_BARE_UNIT,
@@ -1298,16 +1301,74 @@ def standardize_address(
         if cached is not None:
             return copy.copy(cached)
 
-    # Tier 0: Pre-Flight Sanity & Unicode NFKC Normalization
-    s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(street1))).strip() if street1 is not None else ""
-    s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(street2))).strip() if street2 is not None else ""
+    # Tier 0: Pre-Flight Sanity, Multiline Bleed Recovery, & Unicode NFKC Normalization
+    s1_in = str(street1).strip() if street1 is not None else ""
+    s2_in = str(street2).strip() if street2 is not None else ""
+    city_in = str(city).strip() if city is not None else ""
+    state_in = str(state).strip() if state is not None else ""
+    postal_in = str(postal_code).strip() if postal_code is not None else ""
+    country_in = str(country).strip() if country is not None else ""
+
+    # Embedded Newline / Multiline Field Bleed Cleaner
+    s1_lines_u = [line.strip().upper() for line in re.split(r"[\r\n]+", s1_in) if line.strip()]
+    if "\n" in city_in or "\r" in city_in:
+        c_lines = [line.strip() for line in re.split(r"[\r\n]+", city_in) if line.strip()]
+        if len(c_lines) > 1:
+            cleaned_city_parts = []
+            for cline in c_lines:
+                cline_u = cline.upper()
+                if (
+                    re.match(r"^(?:(?:TH|ST|ND|RD|\d+(?:TH|ST|ND|RD)?)\s+(?:FLOOR|FL)|SUITE|STE|APT|UNIT|ROOM|RM|BLDG|BUILDING)\b", cline_u)
+                    or cline_u.endswith((" FLOOR", " FL", " STE", " SUITE"))
+                ):
+                    if not s2_in:
+                        s2_in = cline
+                    elif cline_u not in s2_in.upper():
+                        s2_in = f"{s2_in} {cline}".strip()
+                elif cline_u in ("OFFICE", "MAIN OFFICE", "BRANCH OFFICE", "HOME OFFICE"):
+                    pass
+                elif cline_u in s1_lines_u:
+                    pass
+                else:
+                    cleaned_city_parts.append(cline)
+            if cleaned_city_parts:
+                city_in = " ".join(cleaned_city_parts)
+
+    city_in = re.sub(r"\s+(?:OFFICE|BRANCH\s+OFFICE|MAIN\s+OFFICE)$", "", city_in, flags=re.IGNORECASE).strip()
+
+    if "\n" in s1_in or "\r" in s1_in:
+        s1_lines = [line.strip() for line in re.split(r"[\r\n]+", s1_in) if line.strip()]
+        if len(s1_lines) > 1:
+            cleaned_s1_parts = []
+            for sline in s1_lines:
+                sline_u = sline.upper()
+                if re.match(r"^(?:(?:TH|ST|ND|RD|\d+(?:TH|ST|ND|RD)?)\s+(?:FLOOR|FL)|SUITE|STE|APT|UNIT|ROOM|RM)\b", sline_u):
+                    if not s2_in:
+                        s2_in = sline
+                    elif sline_u not in s2_in.upper():
+                        s2_in = f"{s2_in} {sline}".strip()
+                elif re.search(r"\bOFFICE\b", sline_u) and any(word in sline_u for word in (city_in.upper(), "OFFICE", "BRANCH", "MAIN")):
+                    pass
+                else:
+                    cleaned_s1_parts.append(sline)
+            if cleaned_s1_parts:
+                s1_in = " ".join(cleaned_s1_parts)
+            else:
+                s1_in = ""
+
+    # Municipal Prefix / City Acronym Noise Filter in street1
+    if is_city_noise_in_street1(s1_in, city_in, state_in):
+        s1_in = ""
+
+    s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', s1_in)).strip()
+    s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', s2_in)).strip()
     s1_raw = clean_repetitive_cycles(s1_raw)
     if s2_raw:
         s2_raw = clean_repetitive_cycles(s2_raw)
-    city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(city))).strip() if city is not None else ""
-    state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(state))).strip() if state is not None else ""
-    postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(postal_code))).strip() if postal_code is not None else ""
-    country_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(country))).strip() if country is not None else ""
+    city_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', city_in)).strip()
+    state_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', state_in)).strip()
+    postal_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', postal_in)).strip()
+    country_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', country_in)).strip()
 
     raw_components = [v for v in [s1_raw, s2_raw, city_raw, state_raw, postal_raw, country_raw] if v]
     raw_street_address = ", ".join(raw_components)
@@ -1328,6 +1389,7 @@ def standardize_address(
             building_key=None,
             phonetic_key=None,
             is_registered_agent_hub=False,
+            rooftop_address=None,
         )
         empty_std.country_iso3 = "USA"
         return _finalize_standardized_address(empty_std, raw_dict, cache_key, enable_geocoding=enable_geocoding)
@@ -1347,6 +1409,7 @@ def standardize_address(
             building_key=None,
             phonetic_key=None,
             is_registered_agent_hub=False,
+            rooftop_address=None,
         )
         garbage_std.country_iso3 = "USA"
         return _finalize_standardized_address(garbage_std, raw_dict, cache_key, enable_geocoding=enable_geocoding)
@@ -1393,9 +1456,22 @@ def standardize_address(
         # US Pipeline (USPS Pub 28)
         s1_clean = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
         s2_clean = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_raw, postal_code=postal_raw) if s2_raw else s2_raw
-        norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
-            s1_clean, s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw
-        )
+        if not s1_clean:
+            norm_s1 = ""
+            norm_s2 = _standardize_secondary_unit(s2_clean) if s2_clean else ""
+            success = True
+            p_city = p_state = p_zip = None
+        else:
+            intersection_line = parse_intersection_address(s1_clean)
+            if intersection_line:
+                norm_s1 = intersection_line
+                norm_s2 = s2_clean or ""
+                success = True
+                p_city = p_state = p_zip = None
+            else:
+                norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
+                    s1_clean, s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw
+                )
         if not city_raw and p_city:
             city_raw = p_city
         if not state_raw and p_state:
@@ -1479,6 +1555,8 @@ def standardize_address(
                 raw_street=raw_street_address,
             )
 
+        rooftop_addr = None if (is_priv or not norm_s1 or status != "standardized") else clean_rooftop_address(norm_s1)
+
         std_us = StandardizedAddress(
             street1=norm_s1,
             street2=norm_s2,
@@ -1494,6 +1572,7 @@ def standardize_address(
             building_key=b_key,
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
+            rooftop_address=rooftop_addr,
         )
         std_us.country_iso3 = country_iso
         return _finalize_standardized_address(std_us, raw_dict, cache_key, enable_geocoding=enable_geocoding)
@@ -1586,6 +1665,8 @@ def standardize_address(
                 raw_street=raw_street_address,
             )
 
+        rooftop_addr = None if (is_priv or not norm_s1 or status != "standardized") else clean_rooftop_address(norm_s1)
+
         std_intl = StandardizedAddress(
             street1=norm_s1,
             street2=norm_s2,
@@ -1603,6 +1684,7 @@ def standardize_address(
             is_registered_agent_hub=is_hub,
             dependent_locality=dep_loc,
             building_name=bldg_name,
+            rooftop_address=rooftop_addr,
         )
         std_intl.country_iso3 = country_iso
         return _finalize_standardized_address(std_intl, raw_dict, cache_key, enable_geocoding=enable_geocoding)

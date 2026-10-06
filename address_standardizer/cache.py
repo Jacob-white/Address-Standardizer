@@ -188,6 +188,7 @@ class SQLiteCache:
                             building_key=data.get("building_key"),
                             phonetic_key=data.get("phonetic_key"),
                             is_registered_agent_hub=data.get("is_registered_agent_hub", False),
+                            rooftop_address=data.get("rooftop_address"),
                         )
                         std.confidence_score = data.get("confidence_score")
                         std.routing_tier = data.get("routing_tier")

@@ -79,8 +79,15 @@ class StandardizedAddress:
     is_registered_agent_hub: bool = False
     dependent_locality: Optional[str] = None
     building_name: Optional[str] = None
+    rooftop_address: Optional[str] = None
 
     def __post_init__(self):
+        if getattr(self, "rooftop_address", None) is None:
+            if self.is_private_residence or self.address_status in ("locality_only", "city_level", "parse_failed"):
+                self.rooftop_address = None
+            else:
+                from address_standardizer._patterns import clean_rooftop_address
+                self.rooftop_address = clean_rooftop_address(self.street1)
         if not hasattr(self, "_confidence_score"):
             self._confidence_score: Optional[float] = None
         if not hasattr(self, "_routing_tier"):
@@ -249,7 +256,25 @@ class StandardizedAddress:
     def is_city_level(self, value: bool):
         self._is_locality_only = bool(value)
 
-    def as_dict(self, include_metadata: bool = False) -> Dict[str, Any]:
+    @property
+    def full_rooftop_address(self) -> Optional[str]:
+        """Single-line formatted rooftop address (excludes secondary units like suite, apt, fl)."""
+        if not self.rooftop_address:
+            return None
+        parts = [self.rooftop_address]
+        if self.city:
+            parts.append(self.city)
+        if self.state and self.postal_code:
+            parts.append(f"{self.state} {self.postal_code}")
+        elif self.state:
+            parts.append(self.state)
+        elif self.postal_code:
+            parts.append(self.postal_code)
+        if self.country and self.country not in ("USA", "US"):
+            parts.append(self.country)
+        return ", ".join(parts)
+
+    def as_dict(self, include_metadata: bool = False, include_rooftop: bool = False) -> Dict[str, Any]:
         d = {
             "street1": self.street1,
             "street2": self.street2,
@@ -266,7 +291,12 @@ class StandardizedAddress:
             "is_private_residence": self.is_private_residence,
             "is_registered_agent_hub": self.is_registered_agent_hub,
         }
+        if include_rooftop:
+            d["rooftop_address"] = self.rooftop_address
+            d["full_rooftop_address"] = self.full_rooftop_address
         if include_metadata:
+            d["rooftop_address"] = self.rooftop_address
+            d["full_rooftop_address"] = self.full_rooftop_address
             d["is_locality_only"] = self.is_locality_only
             d["is_city_level"] = self.is_city_level
             d["dependent_locality"] = self.dependent_locality

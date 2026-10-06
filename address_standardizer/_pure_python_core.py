@@ -23,6 +23,7 @@ from address_standardizer._patterns import (
     RE_LEGACY_CORRUPTIONS,
     clean_redundant_street_tail,
     clean_repetitive_cycles,
+    clean_rooftop_address,
 )
 from address_standardizer.fast_path import (
     fast_path_parse,
@@ -33,8 +34,8 @@ from address_standardizer.international import (
 )
 from address_standardizer.models import StandardizedAddress, LocalityOnlyStatus
 from address_standardizer.phonetics import (
-    compute_soundex as _base_soundex,
-    generate_phonetic_address_key as _base_phonetic_key,
+    _pure_compute_soundex as _base_soundex,
+    _pure_generate_phonetic_address_key as _base_phonetic_key,
 )
 from address_standardizer.registry import is_registered_agent_hub_address
 from address_standardizer.standardizer import (
@@ -179,6 +180,7 @@ def standardize_record(
             building_key=None,
             phonetic_key=None,
             is_registered_agent_hub=False,
+            rooftop_address=None,
         )
         empty_std.country_iso3 = "USA"
         if finalize:
@@ -203,6 +205,7 @@ def standardize_record(
             building_key=None,
             phonetic_key=None,
             is_registered_agent_hub=False,
+            rooftop_address=None,
         )
         garbage_std.country_iso3 = "USA"
         if finalize:
@@ -351,6 +354,8 @@ def standardize_record(
                 raw_street=raw_street_address,
             )
 
+        rooftop_addr = None if (is_priv or not norm_s1 or status != "standardized") else clean_rooftop_address(norm_s1)
+
         std_us = StandardizedAddress(
             street1=norm_s1,
             street2=norm_s2,
@@ -366,6 +371,7 @@ def standardize_record(
             building_key=b_key,
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
+            rooftop_address=rooftop_addr,
         )
         std_us.country_iso3 = country_iso
         if finalize:
@@ -465,6 +471,8 @@ def standardize_record(
             raw_street=raw_street_address,
         )
 
+    rooftop_addr = None if (is_priv or not norm_s1 or status != "standardized") else clean_rooftop_address(norm_s1)
+
     std_intl = StandardizedAddress(
         street1=norm_s1,
         street2=norm_s2,
@@ -482,6 +490,7 @@ def standardize_record(
         is_registered_agent_hub=is_hub,
         dependent_locality=dep_loc,
         building_name=bldg_name,
+        rooftop_address=rooftop_addr,
     )
     std_intl.country_iso3 = country_iso
     if finalize:

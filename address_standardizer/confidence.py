@@ -200,8 +200,9 @@ class ConfidenceScorer:
             is_po_box = st1.startswith("PO BOX")
             is_rural = st1.startswith("RR ") or st1.startswith("HC ")
             is_priv = std_address.is_private_residence or st1 == "PRIVATE RESIDENCE"
+            is_intersection = " & " in st1 or " / " in st1
 
-            if st1 and not (is_po_box or is_rural or is_priv):
+            if st1 and not (is_po_box or is_rural or is_priv or is_intersection):
                 tokens = st1.split()
                 first_tok = tokens[0] if tokens else ""
                 has_num = any(ch.isdigit() for ch in first_tok) or first_tok.upper() in WORD_NUMBERS

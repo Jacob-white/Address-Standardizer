@@ -20,6 +20,7 @@ from address_standardizer.standardizer import (
     num_to_ordinal,
     _split_international_secondary_unit,
 )
+from address_standardizer._patterns import clean_rooftop_address
 from address_standardizer.international import (
     CountryInfo,
     CountryRegistry,
@@ -130,6 +131,7 @@ __version__ = "3.2.0"
 __all__ = [
     "StandardizedAddress",
     "standardize_address",
+    "clean_rooftop_address",
     "generate_normalized_address_key",
     "generate_building_key",
     "generate_phonetic_address_key",

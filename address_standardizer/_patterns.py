@@ -6,12 +6,14 @@ re.compile overhead and accelerate token validation.
 """
 
 import re
+import unicodedata
 from typing import Optional
 from address_standardizer.tables import (
     DIRECTIONALS,
     STREET_SUFFIXES,
     SECONDARY_UNITS,
     US_STATES,
+    WORD_ORDINALS,
 )
 
 # ---------------------------------------------------------------------------
@@ -369,6 +371,16 @@ def clean_repetitive_cycles(s: str) -> str:
     # 2. Token-level cycle detection on whitespace-separated words
     tokens = curr.split()
     if len(tokens) >= 2:
+        def _is_prefix_seq(rem_seq: list, chunk_seq: list) -> bool:
+            if not rem_seq:
+                return True
+            if len(rem_seq) > len(chunk_seq):
+                return False
+            for idx_p in range(len(rem_seq) - 1):
+                if rem_seq[idx_p] != chunk_seq[idx_p]:
+                    return False
+            return chunk_seq[len(rem_seq) - 1].startswith(rem_seq[-1])
+
         # Check whole-token repetition e.g. "CALLE 75 8-77 OF.301 CALLE 75 8-77 OF.301"
         n_toks = len(tokens)
         collapsed = False
@@ -386,7 +398,7 @@ def clean_repetitive_cycles(s: str) -> str:
                     break
             rem = [t.upper().strip(" ,.-") for t in tokens[idx:]]
             min_repeats = 3 if k == 1 else 2
-            if repeats >= min_repeats and (not rem or rem == chunk[:len(rem)]):
+            if repeats >= min_repeats and (not rem or _is_prefix_seq(rem, chunk)):
                 tokens = tokens[:k]
                 curr = " ".join(tokens)
                 collapsed = True
@@ -409,7 +421,7 @@ def clean_repetitive_cycles(s: str) -> str:
                         else:
                             break
                     rem = [t.upper().strip(" ,.-") for t in tokens[j:]]
-                    has_partial = bool(rem and rem == chunk[:len(rem)])
+                    has_partial = bool(rem and _is_prefix_seq(rem, chunk))
                     min_r = 3 if k == 1 else 2
                     if r >= min_r:
                         new_tokens.extend(tokens[i:i + k])
@@ -427,3 +439,272 @@ def clean_repetitive_cycles(s: str) -> str:
 
 collapse_cyclic_patterns = clean_repetitive_cycles
 clean_cyclic_repetitions = clean_repetitive_cycles
+
+# ---------------------------------------------------------------------------
+# Intersection & Cross-Street Grammar
+# ---------------------------------------------------------------------------
+
+PLURAL_STREET_SUFFIXES = {
+    "STREETS": "ST", "STS": "ST",
+    "AVENUES": "AVE", "AVES": "AVE",
+    "ROADS": "RD", "RDS": "RD",
+    "BOULEVARDS": "BLVD", "BLVDS": "BLVD",
+    "HIGHWAYS": "HWY", "HWYS": "HWY",
+    "LANES": "LN", "LNS": "LN",
+    "WAYS": "WAY",
+    "DRIVES": "DR", "DRS": "DR",
+    "COURTS": "CT", "CTS": "CT",
+    "PLACES": "PL", "PLS": "PL",
+}
+
+RE_CORNER_PREFIX = re.compile(
+    r"^(?:CORNER\s+OF|INTERSECTION\s+OF|AT\s+THE\s+CORNER\s+OF|CNR\s+OF|NEAR\s+THE\s+CORNER\s+OF)\s+",
+    re.IGNORECASE,
+)
+RE_ROUTE_PAIR = re.compile(
+    r"^(?:ROUTES?|RTES?|HWYS?|STATE\s+ROUTES?|STATE\s+HWYS?)\s+([A-Z0-9\-]+)\s+(?:AND|&|\/)\s+([A-Z0-9\-]+)$",
+    re.IGNORECASE,
+)
+RE_INTERSECTION_SPLIT = re.compile(r"\s+(?:AND|&|@|\/|AT)\s+", re.IGNORECASE)
+
+
+def _normalize_intersection_branch(branch: str) -> str:
+    tokens = branch.split()
+    res = []
+    for tok in tokens:
+        clean = tok.upper().strip(".,")
+        if clean in WORD_ORDINALS:
+            res.append(WORD_ORDINALS[clean])
+        elif clean in STREET_SUFFIXES:
+            res.append(STREET_SUFFIXES[clean])
+        elif clean in DIRECTIONALS:
+            res.append(DIRECTIONALS[clean])
+        elif clean in ("ROUTE", "ROUTES", "RTE", "RTES"):
+            res.append("RT")
+        elif clean in ("HIGHWAY", "HIGHWAYS"):
+            res.append("HWY")
+        else:
+            res.append(clean)
+    return " ".join(res)
+
+
+def parse_intersection_address(s: str) -> Optional[str]:
+    """
+    Parses and canonicalizes cross-street and intersection addresses.
+    Examples:
+      - 'Cherry And Fourth Streets' -> 'CHERRY ST & 4TH ST'
+      - 'Routes 60 And 155' -> 'RT 60 & RT 155'
+      - 'Main And Franklin Streets' -> 'MAIN ST & FRANKLIN ST'
+      - 'Ranch Road 12 And River Road' -> 'RANCH RD 12 & RIVER RD'
+      - 'Corner of 5th Ave and 42nd St' -> '5TH AVE & 42ND ST'
+    """
+    if not s or len(s.strip()) < 5:
+        return None
+    raw = s.strip()
+    raw = RE_CORNER_PREFIX.sub("", raw).strip()
+
+    # Route pairs: e.g. 'Routes 60 And 155'
+    m_rt = RE_ROUTE_PAIR.match(raw)
+    if m_rt:
+        return f"RT {m_rt.group(1)} & RT {m_rt.group(2)}".upper()
+
+    # Split on intersection delimiter
+    m_split = re.search(r"\s+(AND|&|@|\/|AT)\s+", raw, re.IGNORECASE)
+    if m_split:
+        delim = m_split.group(1).upper()
+        p1 = raw[:m_split.start()].strip()
+        p2 = raw[m_split.end():].strip()
+        if not p1 or not p2:
+            return None
+        # Avoid false positives like secondary units
+        if p1.upper().startswith(("SUITE", "STE", "APT", "UNIT", "FLOOR", "FL")):
+            return None
+        if p2.upper().startswith(("SUITE", "STE", "APT", "UNIT", "FLOOR", "FL")):
+            return None
+
+        # Exclude commercial development / campus premises like "The Village at Thornblade"
+        if delim in ("AT", "@"):
+            COMPLEX_PREMISES = {"VILLAGE", "SHOPS", "COMMONS", "CENTER", "ESTATES", "LANDING", "GALLERIA", "PROMENADE", "MARKETPLACE", "RESIDENCES", "TOWERS"}
+            if bool(set(p1.upper().split()) & COMPLEX_PREMISES):
+                return None
+
+        # Check for plural suffix on second part: e.g. 'Cherry and Fourth Streets'
+        p2_tokens = p2.split()
+        if p2_tokens and p2_tokens[-1].upper().rstrip(".,") in PLURAL_STREET_SUFFIXES:
+            suf_raw = p2_tokens[-1].upper().rstrip(".,")
+            shared_suf = PLURAL_STREET_SUFFIXES[suf_raw]
+            p2_base = " ".join(p2_tokens[:-1])
+            # Check if p1 also needs the shared suffix
+            p1_tokens = p1.split()
+            if (
+                p1_tokens
+                and p1_tokens[-1].upper().rstrip(".,") not in STREET_SUFFIXES
+                and p1_tokens[-1].upper().rstrip(".,") not in FROZEN_STREET_SUFFIX_VALUES
+            ):
+                p1_clean = f"{p1} {shared_suf}"
+            else:
+                p1_clean = p1
+            p2_clean = f"{p2_base} {shared_suf}" if p2_base else p2
+            b1 = _normalize_intersection_branch(p1_clean)
+            b2 = _normalize_intersection_branch(p2_clean)
+            return f"{b1} & {b2}"
+
+        def _has_street_evidence(part_str: str) -> bool:
+            toks = [t.upper().strip(".,") for t in part_str.split()]
+            return any(
+                t in STREET_SUFFIXES
+                or t in FROZEN_STREET_SUFFIX_VALUES
+                or t in ("ROAD", "RD", "ST", "STREET", "AVE", "AVENUE", "BLVD", "HWY", "ROUTE", "RTE", "WAY", "LN", "LANE", "DR", "DRIVE")
+                for t in toks
+            )
+
+        if delim in ("AT", "@"):
+            # When delimiter is 'at' or '@', both sides must have street evidence
+            if _has_street_evidence(p1) and _has_street_evidence(p2):
+                b1 = _normalize_intersection_branch(p1)
+                b2 = _normalize_intersection_branch(p2)
+                return f"{b1} & {b2}"
+        else:
+            if _has_street_evidence(p1) or _has_street_evidence(p2):
+                b1 = _normalize_intersection_branch(p1)
+                b2 = _normalize_intersection_branch(p2)
+                return f"{b1} & {b2}"
+
+    return None
+
+
+KNOWN_METRO_ACRONYMS = frozenset({
+    "LA", "NYC", "SF", "CHI", "PHX", "MIA", "INDY", "MT", "SD", "DC", "BOS", "ATL", "DFW", "MSP", "PDX"
+})
+
+
+def is_city_noise_in_street1(s1: Optional[str], city: Optional[str], state: Optional[str]) -> bool:
+    """
+    Identifies non-numeric municipal prefixes, acronyms, or city names mistakenly entered
+    into the street1 address field.
+    Examples:
+      - 'LA' / 'LA JOLLA' -> True
+      - 'S BND IN' / 'SOUTH BEND' -> True
+      - 'MT' / 'MT VERNON' -> True
+      - 'HALF MOON' / 'HALF MOON BAY' -> True
+      - 'OLD BRG NJ' / 'OLD BRIDGE' -> True
+      - '100 MAIN ST' / 'NEW YORK' -> False
+    """
+    if not s1:
+        return False
+    s1_clean = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', str(s1))).strip()
+    s1_clean = RE_LEGACY_CORRUPTIONS.sub("", s1_clean).strip(" ,.-")
+    if not s1_clean:
+        return True
+
+    # If it contains any digits, it has a house number / building number - NOT city noise!
+    if any(c.isdigit() for c in s1_clean):
+        return False
+
+    s1_upper = s1_clean.upper()
+    city_upper = (city or "").strip().upper()
+    state_upper = (state or "").strip().upper()
+
+    # Don't false-positive on PO boxes, rural routes, or intersections
+    if (
+        s1_upper.startswith(("PO BOX", "P.O.", "POB", "RR ", "HC ", "PRIVATE RESIDENCE"))
+        or " & " in s1_upper
+        or " AND " in s1_upper
+    ):
+        return False
+
+    # Check if s1 is a bare street suffix only (e.g. "BLVD", "ST", "AVE")
+    if s1_upper in ("BLVD", "ST", "AVE", "RD", "DR", "LN", "CT", "WAY", "HWY", "ROUTE"):
+        return True
+
+    # 1. Exact match with city or state
+    if city_upper and s1_upper == city_upper:
+        return True
+    if state_upper and s1_upper == state_upper:
+        return True
+
+    # 2. Known metro acronyms / abbreviations without street numbers
+    if s1_upper in KNOWN_METRO_ACRONYMS:
+        return True
+
+    # 3. Prefix of multi-word city (e.g. "HALF MOON" for "HALF MOON BAY", "RANCHO PALOS" for "RANCHO PALOS VERDES")
+    if city_upper and city_upper.startswith(s1_upper) and len(s1_upper) >= 2:
+        return True
+
+    # 4. Acronym or abbreviation ending with the state code (e.g. "S BND IN", "OLD BRG NJ", "N SMITHFIELD RI", "CHADDS FRD PA")
+    tokens = s1_upper.split()
+    if len(tokens) >= 2 and state_upper and tokens[-1] == state_upper:
+        prefix_words = " ".join(tokens[:-1])
+        if prefix_words in city_upper or all(ch in city_upper for ch in prefix_words.replace(" ", "")):
+            return True
+
+    # 5. City consonants / abbreviation match (e.g. "CHADDS FRD" for "CHADDS FORD", "S BND" for "SOUTH BEND")
+    if city_upper:
+        city_no_vowels = re.sub(r"[AEIOU\s]", "", city_upper)
+        s1_no_vowels = re.sub(r"[AEIOU\s]", "", s1_upper)
+        if s1_no_vowels and s1_no_vowels == city_no_vowels:
+            return True
+
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Rooftop Physical Street Line Cleaner (Excludes Suite, Apt, Floor, etc.)
+# ---------------------------------------------------------------------------
+
+RE_ROOFTOP_SEC = re.compile(
+    r"(?:,?\s+(?:#\s*([A-Z0-9\-]+)|(APT|APARTMENT|STE|SUITE|FL|FLOOR|FLR|UNIT|RM|ROOM|DEPT|DEPARTMENT|BLDG|BUILDING|PH|PENTHOUSE|BSMT|BASEMENT|MEZZ|MEZZANINE|OFC|OFFICE|SPC|SPACE|TRLR|TRAILER|LOT|LEVEL|LVL|LBBY|LOBBY|LOWR|LOWER|UPPR|UPPER|FRNT|FRONT|REAR|SIDE|SLIP|STP|STOP|HNGR|HANGAR|KEY|PIER|FLAT)\b(?:\s*([A-Z0-9\-#]+))?|(\d+(?:ST|ND|RD|TH))\s+(FL|FLOOR|FLR)\b.*))$",
+    re.IGNORECASE,
+)
+RE_PO_BOX_PREFIX = re.compile(r"^(?:P\.?\s*O\.?\s*BOX|POB|BOX|RR|HC)\b", re.IGNORECASE)
+
+
+def clean_rooftop_address(street_line: Optional[str]) -> Optional[str]:
+    """
+    Derives clean physical rooftop address line by excluding secondary units
+    such as Suite, Apt, Floor, Unit, Bldg, Room, Dept, etc.
+    Returns None for empty addresses, locality-only, private residences, or PO boxes.
+    """
+    if not street_line or not str(street_line).strip():
+        return None
+    val = str(street_line).strip()
+    val_upper = val.upper()
+    if val_upper in ("PRIVATE RESIDENCE", "CONFIDENTIAL", "RESIDENTIAL", "PERSONAL RESIDENCE"):
+        return None
+    if RE_PO_BOX_PREFIX.search(val_upper):
+        return None
+
+    # Fast-path check: if none of the secondary indicator substrings are present, return immediately
+    if not any(
+        kw in val_upper
+        for kw in (
+            "#", "STE", "SUITE", "APT", "FL", "UNIT", "RM", "ROOM",
+            "BLDG", "DEPT", "PH", "BSMT", "MEZZ", "OFC", "SPC", "LOT",
+            "LEVEL", "FLAT", "FRNT", "REAR", "SIDE", "SLIP", "HNGR", "PIER"
+        )
+    ):
+        return val
+
+    # Iteratively strip trailing secondary units (e.g., 'BLDG 4 STE 200')
+    for _ in range(3):
+        m = RE_ROOFTOP_SEC.search(val)
+        if m:
+            cand_id = (m.group(1) or m.group(3) or "").upper()
+            sec_type = (m.group(2) or m.group(5) or "").upper()
+            # If the candidate identifier is actually a street suffix or directional, it is NOT a unit
+            if cand_id and (cand_id in STREET_SUFFIXES or cand_id in DIRECTIONALS):
+                break
+            # If bare unit word with no identifier, verify it is not part of a street name
+            if not cand_id:
+                if sec_type in ("BUILDING", "BLDG", "OFFICE", "OFC", "LEVEL", "LOT", "SPACE", "SPC"):
+                    pre = val[:m.start()].strip()
+                    tokens = pre.split()
+                    if not ("," in val[m.start()-2:m.start()+1] or (len(tokens) >= 2 and tokens[-1] in STREET_SUFFIXES)):
+                        break
+            val = val[:m.start()].strip(" ,.-#;:")
+        else:
+            break
+
+    val = re.sub(r"[\s,.\-#;:]+$", "", val).strip()
+    return val if val else None
+

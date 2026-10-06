@@ -23,6 +23,7 @@ from address_standardizer._patterns import (
     RE_SEC_UNIT,
     RE_PO_BOX,
     RE_QUEENS_BOROUGH,
+    clean_rooftop_address,
     RE_NUMBER_HYPHEN_NUMBER,
     RE_NUMBERED_STREET,
     RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
@@ -373,6 +374,8 @@ def fast_path_parse(
             is_hub_func(norm_s1, norm_s2, norm_city, state_code, zip5, "USA", raw_street_address) if is_hub_func else False
         )
 
+        rooftop_addr = None if is_priv else clean_rooftop_address(norm_s1)
+
         return StandardizedAddress(
             street1=norm_s1,
             street2=norm_s2,
@@ -388,6 +391,7 @@ def fast_path_parse(
             building_key=b_key,
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
+            rooftop_address=rooftop_addr,
         )
 
     # Path B: Single comma-delimited string passed in street1
@@ -420,6 +424,7 @@ def fast_path_parse(
                     building_key=b_key,
                     phonetic_key=p_key,
                     is_registered_agent_hub=False,
+                    rooftop_address=None,
                 )
         m = RE_CANONICAL_COMMA.match(s1_raw)
         if m:
@@ -476,6 +481,7 @@ def fast_path_parse(
             p_key = generate_phonetic_address_key(norm_s1, zip5, norm_city)
 
             is_hub = is_hub_func(norm_s1, norm_s2, norm_city, state_cand, zip5, "USA", raw_street_address) if is_hub_func else False
+            rooftop_addr = clean_rooftop_address(norm_s1)
 
             return StandardizedAddress(
                 street1=norm_s1,
@@ -492,6 +498,7 @@ def fast_path_parse(
                 building_key=b_key,
                 phonetic_key=p_key,
                 is_registered_agent_hub=is_hub,
+                rooftop_address=rooftop_addr,
             )
 
     return None

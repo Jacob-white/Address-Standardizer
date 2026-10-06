@@ -131,6 +131,12 @@ pub fn generate_phonetic_address_key(
     let loc = if !p_clean.is_empty() {
         if p_clean.len() >= 5 && p_clean[..5].chars().all(|c| c.is_ascii_digit()) {
             &p_clean[..5]
+        } else if p_clean.chars().any(|c| c.is_ascii_alphabetic()) {
+            p_clean
+        } else if p_clean.len() >= 5 {
+            &p_clean[..5]
+        } else if !city.trim().is_empty() {
+            city.trim()
         } else {
             p_clean
         }
@@ -178,6 +184,33 @@ pub fn generate_phonetic_address_key(
         return Ok(Some(res));
     }
 
+    // Urbanization prefix (e.g. URB LAS GLADIOLAS 123 CALLE FLAMBOYAN)
+    if (parts[0] == "URB" || parts[0] == "URBANIZACION") && parts.len() > 2 {
+        let mut h_idx = None;
+        for (idx, p) in parts.iter().enumerate().skip(1) {
+            if p.chars().any(|c| c.is_ascii_digit()) {
+                h_idx = Some(idx);
+                break;
+            }
+        }
+        if let Some(idx) = h_idx {
+            let house_num = parts[idx];
+            let rem_words = &parts[idx + 1..];
+            let street_word = if !rem_words.is_empty() {
+                rem_words[0]
+            } else {
+                parts[1]
+            };
+            let snd = compute_soundex(street_word)?;
+            let res = if loc.is_empty() {
+                format!("{}|{}", house_num, snd)
+            } else {
+                format!("{}|{}|{}", house_num, snd, loc)
+            };
+            return Ok(Some(res));
+        }
+    }
+
     // Extract house number
     let (house_num, words): (String, Vec<&str>) = if parts[0].chars().any(|c| c.is_ascii_digit()) {
         if parts.len() > 1 && (parts[1] == "1/2" || parts[1] == "1/4" || parts[1] == "3/4") {
@@ -191,25 +224,49 @@ pub fn generate_phonetic_address_key(
 
     let mut w_slice = words.as_slice();
 
+    let is_suffix = |w: &str| matches!(
+        w,
+        "ST" | "STREET" | "AVE" | "AVENUE" | "RD" | "ROAD" | "BLVD" | "BOULEVARD"
+        | "DR" | "DRIVE" | "LN" | "LANE" | "WAY" | "CT" | "COURT" | "PL" | "PLACE"
+        | "CIR" | "CIRCLE" | "PKWY" | "PARKWAY"
+    );
+
+    let is_dir = |w: &str| matches!(
+        w,
+        "N" | "S" | "E" | "W" | "NORTH" | "SOUTH" | "EAST" | "WEST" | "NE" | "NW" | "SE" | "SW"
+    );
+
     // Strip pre-directional if multiple words remain
-    if w_slice.len() > 1 && matches!(w_slice[0], "N" | "S" | "E" | "W" | "NORTH" | "SOUTH" | "EAST" | "WEST") {
-        if !(w_slice.len() == 2 && matches!(w_slice[1], "ST" | "STREET" | "AVE" | "AVENUE" | "RD" | "ROAD")) {
+    if w_slice.len() > 1 && is_dir(w_slice[0]) {
+        if w_slice.len() == 2 && is_suffix(w_slice[1]) {
+            // Keep directional as street name: e.g. "SOUTH ST"
+        } else if w_slice.len() == 3
+            && matches!(
+                (w_slice[0], w_slice[1]),
+                ("NORTH", "EAST")
+                    | ("NORTH", "WEST")
+                    | ("SOUTH", "EAST")
+                    | ("SOUTH", "WEST")
+                    | ("N", "E")
+                    | ("N", "W")
+                    | ("S", "E")
+                    | ("S", "W")
+            )
+            && is_suffix(w_slice[2])
+        {
+            // Keep compound directional as street name: e.g. "NORTH EAST ST"
+        } else {
             w_slice = &w_slice[1..];
         }
     }
 
     // Strip post-directional
-    if w_slice.len() > 1 && matches!(w_slice[w_slice.len() - 1], "N" | "S" | "E" | "W" | "NORTH" | "SOUTH" | "EAST" | "WEST") {
+    if w_slice.len() > 1 && is_dir(w_slice[w_slice.len() - 1]) {
         w_slice = &w_slice[..w_slice.len() - 1];
     }
 
     // Strip suffix at end
-    if w_slice.len() > 1 && matches!(
-        w_slice[w_slice.len() - 1],
-        "ST" | "STREET" | "AVE" | "AVENUE" | "RD" | "ROAD" | "BLVD" | "BOULEVARD"
-        | "DR" | "DRIVE" | "LN" | "LANE" | "WAY" | "CT" | "COURT" | "PL" | "PLACE"
-        | "CIR" | "CIRCLE" | "PKWY" | "PARKWAY"
-    ) {
+    if w_slice.len() > 1 && is_suffix(w_slice[w_slice.len() - 1]) {
         w_slice = &w_slice[..w_slice.len() - 1];
     }
 

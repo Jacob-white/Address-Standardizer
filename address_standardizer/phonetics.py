@@ -21,8 +21,8 @@ from address_standardizer._patterns import (
 )
 
 
-def compute_soundex(token: str) -> str:
-    """Computes standard American Soundex code for a word token."""
+def _pure_compute_soundex(token: str) -> str:
+    """Computes standard American Soundex code for a word token in pure Python."""
     clean = RE_CLEAN_ALPHA.sub("", token.upper())
     if not clean:
         return ""
@@ -50,17 +50,19 @@ def compute_soundex(token: str) -> str:
     return (soundex_code + "0000")[:4]
 
 
-def generate_phonetic_address_key(street1: Optional[str], postal_or_zip: str = "", city: str = "") -> Optional[str]:
-    """
-    Generates a fuzzy blocking key for deduplication and typo detection:
-    Format: {STREET_NUM}|{SOUNDEX_OR_NUMBERED_STREET}|{ZIP5_OR_CITY}
-    Examples:
-      '555 MONTGOMERY ST', '94111' -> '555|M532|94111'
-      '100 42ND ST', '10036'       -> '100|#42|10036'
-      '123-45 82ND AVE', '11415'   -> '123-45|#82|11415'
-      'RR 2 BOX 152', '62428'      -> 'RR 2|B200|62428'
-      'PO BOX 1234', '90210'       -> 'POB 1234|90210'
-    """
+def compute_soundex(token: str) -> str:
+    """Computes standard American Soundex code for a word token with native Rust acceleration."""
+    from address_standardizer import _native_dispatch
+    if _native_dispatch.is_using_native() and _native_dispatch._NATIVE_MODULE is not None:
+        try:
+            return _native_dispatch._NATIVE_MODULE.compute_soundex(token)
+        except Exception:
+            pass
+    return _pure_compute_soundex(token)
+
+
+def _pure_generate_phonetic_address_key(street1: Optional[str], postal_or_zip: str = "", city: str = "") -> Optional[str]:
+    """Pure Python implementation of fuzzy blocking key generation."""
     if not street1:
         return None
     st_raw = street1.strip().upper()
@@ -169,3 +171,20 @@ def generate_phonetic_address_key(street1: Optional[str], postal_or_zip: str = "
 
     res = f"{house_num}|{snd}|{loc}".strip("|")
     return res or None
+
+
+def generate_phonetic_address_key(
+    street1: Optional[str],
+    postal_or_zip: str = "",
+    city: str = "",
+) -> Optional[str]:
+    """Generates a fuzzy blocking key with native Rust acceleration."""
+    from address_standardizer import _native_dispatch
+    if _native_dispatch.is_using_native() and _native_dispatch._NATIVE_MODULE is not None:
+        try:
+            return _native_dispatch._NATIVE_MODULE.generate_phonetic_address_key(
+                street1, postal_or_zip=postal_or_zip, city=city
+            )
+        except Exception:
+            pass
+    return _pure_generate_phonetic_address_key(street1, postal_or_zip=postal_or_zip, city=city)

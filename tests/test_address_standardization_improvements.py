@@ -671,3 +671,76 @@ def test_native_rust_core_availability_and_dispatch():
     assert k_py == k_rs
     assert k_disp == k_rs
 
+
+def test_intersection_cross_street_standardization():
+    """Verify intersection addresses are canonicalized with Pub 28 suffixes and route numbers."""
+    res_cherry = standardize_address("Cherry And Fourth Streets", city="Ocilla", state="GA", postal_code="31774")
+    assert res_cherry.address_status == "standardized"
+    assert res_cherry.routing_tier == "AUTO_PASS"
+    assert res_cherry.street1 == "CHERRY ST & 4TH ST"
+    assert res_cherry.normalized_address_key == "CHERRY ST & 4TH ST||OCILLA|GA|31774|USA"
+
+    res_main = standardize_address("Main And Franklin Streets", city="Henderson", state="TN", postal_code="38340")
+    assert res_main.address_status == "standardized"
+    assert res_main.routing_tier == "AUTO_PASS"
+    assert res_main.street1 == "MAIN ST & FRANKLIN ST"
+    assert res_main.normalized_address_key == "MAIN ST & FRANKLIN ST||HENDERSON|TN|38340|USA"
+
+    res_rt = standardize_address("Routes 60 And 155", city="Albany", state="NY", postal_code="12203")
+    assert res_rt.address_status == "standardized"
+    assert res_rt.street1 == "RT 60 & RT 155"
+    assert res_rt.normalized_address_key == "RT 60 & RT 155||ALBANY|NY|12203|USA"
+
+    res_adams = standardize_address("Adams Avenue And Fourth Street", city="Hettinger", state="ND", postal_code="58639")
+    assert res_adams.address_status == "standardized"
+    assert res_adams.street1 == "ADAMS AVE & 4TH ST"
+    assert res_adams.normalized_address_key == "ADAMS AVE & 4TH ST||HETTINGER|ND|58639|USA"
+
+
+def test_multiline_newline_field_bleed_recovery():
+    """Verify embedded newline bleeds between street1, street2, and city are properly disentangled."""
+    res_ny = standardize_address(
+        street1="th Floor\nNew York Office",
+        city="TH FLOOR\nNEW YORK",
+        state="NY",
+        postal_code="10036",
+        allow_locality=True,
+    )
+    assert res_ny.city == "NEW YORK"
+    assert res_ny.state == "NY"
+    assert res_ny.postal_code == "10036"
+    assert res_ny.normalized_address_key == "||NEW YORK|NY|10036|USA"
+    assert res_ny.routing_tier == "FUZZY_REVIEW"
+
+    res_nh = standardize_address(
+        street1="Main St\nNew London Office",
+        city="MAIN ST\nNEW LONDON",
+        state="NH",
+        postal_code="03257",
+        allow_locality=True,
+    )
+    assert res_nh.street1 == "MAIN ST"
+    assert res_nh.city == "NEW LONDON"
+    assert res_nh.state == "NH"
+    assert res_nh.postal_code == "03257"
+    assert res_nh.normalized_address_key == "MAIN ST||NEW LONDON|NH|03257|USA"
+
+
+def test_city_acronym_and_municipal_noise_filtering():
+    """Verify non-numeric city acronyms in street1 are cleared to allow clean locality-only standardization."""
+    res_la = standardize_address(street1="LA", city="LA JOLLA", state="CA", postal_code="92037", allow_locality=True)
+    assert res_la.address_status == "locality_only"
+    assert res_la.normalized_address_key == "||LA JOLLA|CA|92037|USA"
+    assert res_la.routing_tier == "FUZZY_REVIEW"
+
+    res_sb = standardize_address(street1="S BND IN", city="SOUTH BEND", state="IN", postal_code="46601", allow_locality=True)
+    assert res_sb.address_status == "locality_only"
+    assert res_sb.normalized_address_key == "||SOUTH BEND|IN|46601|USA"
+    assert res_sb.routing_tier == "FUZZY_REVIEW"
+
+    res_blvd = standardize_address(street1="BLVD", street2="STE 550", city="SUGAR LAND", state="TX", postal_code="77478", allow_locality=True)
+    assert res_blvd.address_status == "locality_only"
+    assert res_blvd.normalized_address_key == "||SUGAR LAND|TX|77478|USA"
+    assert res_blvd.routing_tier == "FUZZY_REVIEW"
+
+

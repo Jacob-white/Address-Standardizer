@@ -1,0 +1,89 @@
+{
+  "engine_info": {
+    "engine": "Rust_PyO3",
+    "is_native": true,
+    "native_available": true,
+    "force_pure_python": false,
+    "version": "3.3.0",
+    "throughput_sla_target": ">= 50,000 rec/s",
+    "simd_acceleration": true,
+    "zero_copy_slices": true
+  },
+  "firm_branch": {
+    "total_records": 103120,
+    "blank_records": 0,
+    "evaluated_records": 103120,
+    "fully_standardized": 90620,
+    "locality_only": 12500,
+    "parse_failed": 0,
+    "total_resolved": 103120,
+    "resolution_pct": 100.0,
+    "routing_tiers": {
+      "AUTO_PASS": 79137,
+      "FUZZY_REVIEW": 23431,
+      "MANUAL_STEWARDSHIP": 552
+    },
+    "campus_premises_detected": 257,
+    "throughput_rec_sec": 934.3,
+    "elapsed_sec": 110.37,
+    "failure_samples": []
+  },
+  "firm_master": {
+    "total_records": 68831,
+    "blank_records": 20527,
+    "evaluated_records": 48304,
+    "fully_standardized": 36429,
+    "locality_only": 11875,
+    "parse_failed": 0,
+    "total_resolved": 48304,
+    "resolution_pct": 100.0,
+    "routing_tiers": {
+      "AUTO_PASS": 32438,
+      "FUZZY_REVIEW": 15487,
+      "MANUAL_STEWARDSHIP": 20906
+    },
+    "throughput_rec_sec": 2239.5,
+    "elapsed_sec": 30.73,
+    "failure_samples": []
+  },
+  "fdic_bank_branch": {
+    "total_records": 10017,
+    "fully_standardized": 10017,
+    "locality_only": 0,
+    "parse_failed": 0,
+    "total_resolved": 10017,
+    "resolution_pct": 100.0,
+    "cross_border_branches": 306,
+    "sovereign_jurisdictions_count": 42,
+    "routing_tiers": {
+      "AUTO_PASS": 9815,
+      "FUZZY_REVIEW": 183,
+      "MANUAL_STEWARDSHIP": 19
+    },
+    "throughput_rec_sec": 608.0,
+    "elapsed_sec": 16.48
+  },
+  "contact_association": {
+    "total_table_rows": 1238663,
+    "stationed_addresses": {
+      "total_evaluated": 1113261,
+      "fully_standardized": 1092966,
+      "locality_only": 20295,
+      "parse_failed": 0,
+      "total_resolved": 1113261,
+      "resolution_pct": 100.0,
+      "throughput_rec_sec": 13838.8,
+      "elapsed_sec": 80.45
+    },
+    "private_residences": {
+      "total_evaluated": 6999,
+      "privacy_flags_detected": 6999,
+      "detection_pct": 100.0,
+      "sanitized_keys_created": 6999,
+      "sanitized_key_pct": 100.0,
+      "throughput_rec_sec": 8766.6,
+      "elapsed_sec": 0.8
+    }
+  },
+  "total_execution_sec": 247.37
+}

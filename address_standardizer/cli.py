@@ -48,6 +48,7 @@ def _format_text_address(data: Dict[str, Any]) -> str:
         "====================",
         f"Street 1:              {data.get('street1', '')}",
         f"Street 2:              {data.get('street2', '')}",
+        f"Rooftop Address:       {data.get('rooftop_address', '')}",
         f"City:                  {data.get('city', '')}",
         f"State:                 {data.get('state', '')}",
         f"Postal Code:           {data.get('postal_code', '')}",

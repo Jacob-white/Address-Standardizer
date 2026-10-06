@@ -157,6 +157,8 @@ def _process_row_dict(
     res_row["std_state"] = st.state
     res_row["std_postal_code"] = st.postal_code
     res_row["std_country"] = st.country
+    res_row["rooftop_address"] = getattr(st, "rooftop_address", None) or ""
+    res_row["std_rooftop_address"] = getattr(st, "rooftop_address", None) or ""
     res_row["normalized_address_key"] = st.normalized_address_key or ""
     res_row["building_key"] = st.building_key or ""
     res_row["phonetic_key"] = st.phonetic_key or ""
@@ -248,6 +250,8 @@ def _worker_process_chunk(
                         "std_state",
                         "std_postal_code",
                         "std_country",
+                        "rooftop_address",
+                        "std_rooftop_address",
                         "normalized_address_key",
                         "building_key",
                         "phonetic_key",
@@ -294,6 +298,8 @@ def _worker_process_chunk(
                 "std_state": st.state,
                 "std_postal_code": st.postal_code,
                 "std_country": st.country,
+                "rooftop_address": getattr(st, "rooftop_address", None) or "",
+                "std_rooftop_address": getattr(st, "rooftop_address", None) or "",
                 "normalized_address_key": st.normalized_address_key or "",
                 "building_key": st.building_key or "",
                 "phonetic_key": st.phonetic_key or "",
@@ -395,7 +401,7 @@ def stream_standardize_csv(
         reader = csv.DictReader(fin)
         fieldnames = list(reader.fieldnames or []) + [
             "std_street1", "std_street2", "std_city", "std_state", "std_postal_code",
-            "std_country", "normalized_address_key", "building_key", "phonetic_key",
+            "std_country", "rooftop_address", "std_rooftop_address", "normalized_address_key", "building_key", "phonetic_key",
             "is_registered_agent_hub", "is_private_residence", "address_status"
         ]
         if include_confidence:
