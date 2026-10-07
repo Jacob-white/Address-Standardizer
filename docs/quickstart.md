@@ -246,11 +246,44 @@ curl -X POST "http://localhost:8000/standardize" \
 
 ---
 
+## 11. Multi-Platform Client SDKs (TypeScript, .NET, Go)
+
+For applications consuming the microservice daemon across external web, mobile, or backend microservices, use the official client SDKs:
+
+### TypeScript / React
+```typescript
+import { AddressStandardizerClient } from "@address-standardizer/client";
+
+const client = new AddressStandardizerClient({ baseUrl: "http://localhost:8000" });
+const result = await client.standardize({ address: "1600 Pennsylvania Ave NW, Washington, DC" });
+console.log(result.delivery_line_1, result.last_line);
+```
+
+### .NET / C#
+```csharp
+using AddressStandardizer.Client;
+
+using var client = new AddressStandardizerClient("http://localhost:8000");
+var result = await client.StandardizeAsync("1600 Pennsylvania Ave NW, Washington, DC");
+Console.WriteLine(result.DeliveryLine1);
+```
+
+### Go
+```go
+client := standardizer.NewClient("http://localhost:8000")
+result, err := client.Standardize(ctx, standardizer.StandardizeRequest{Address: "1600 Pennsylvania Ave NW"})
+```
+
+See the **[Client SDKs Documentation](../sdks/README.md)** for detailed installation and advanced usage.
+
+---
+
 ## Next Steps
 
 - Consult the **[Complete API Reference](api_reference.md)** for detailed parameters, class definitions, and return types.
 - Review our **[Security Policy & Sandboxing Guide](../SECURITY.md)** for threat modeling and vulnerability disclosure.
 - Explore the **[Enterprise Architectural Blueprints](README.md)** for deep-dive technical roadmaps.
+- Integrate via the **[Multi-Platform Client SDKs](../sdks/README.md)** (TypeScript/React, .NET, Go).
 
 ---
 

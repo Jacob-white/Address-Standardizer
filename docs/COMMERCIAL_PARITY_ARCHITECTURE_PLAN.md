@@ -106,7 +106,7 @@ For over two decades, this ecosystem has been monopolized by a closed cartel of 
 - **Loqate (GBG)**: Premier global addressing and typeahead provider; opaque enterprise pricing (\$30,000–\$100,000+/year) with restrictive per-seat and per-transaction gating.
 - **Google Address Validation API**: Expensive cloud-only API charging **\$17.00 per 1,000 calls (\$0.017/call)**, coupled with restrictive Google Maps Terms of Service that prohibit storing or caching coordinates on non-Google maps or databases.
 
-The **Commercial Parity Charter** establishes `Address-Standardizer` as the definitive, open-source, dual-licensed (Apache 2.0 / Commercial Enterprise) alternative to these proprietary monopolies. Our objective is to deliver:
+The **Commercial Parity Charter** establishes `Address-Standardizer` as the definitive, open-source platform owned and maintained by **HobbyHabbit LLC** under the **MIT License** as an alternative to these proprietary monopolies. Our objective is to deliver:
 1. **Zero-Cost Sovereign Infrastructure**: Complete freedom from per-transaction API billing, allowing enterprises to validate billions of records locally without sending sensitive consumer or corporate identity data across third-party networks.
 2. **True CASS Cycle N Parity via Open Data**: Delivering exact Delivery Point Validation (DPV) diagnostic footnotes, Residential Delivery Indicator (RDI), SuiteLink, LACSLink, and eLOT sorting using public US Census TIGER/Line, OpenAddresses, OpenStreetMap, and county parcel records.
 3. **Sub-Millisecond Offline Spatial Precision**: Rooftop geocoding, parcel snapping, and census block FIPS attribution executing within $< 0.05\text{ ms}$ ($< 50\text{ µs}$) entirely offline, packaged in a memory-mapped spatial format consuming $< 2.5\text{ GB}$ of storage (well within our $< 4\text{ GB}$ budget).
@@ -376,7 +376,7 @@ The following matrix benchmarks `Address-Standardizer` against commercial market
 +=============================================================================================================================================+
 | Dimension / Metric             | Address-Standardizer (Target) | Smarty (SmartyStreets) | Lob                   | Melissa Data          | Loqate (GBG)          | Google Address Valid  |
 +--------------------------------+-------------------------------+------------------------+-----------------------+-----------------------+-----------------------+-----------------------+
-| **Licensing Model**            | Open Source (Apache 2.0 / AGPL)| Proprietary Commercial | Proprietary Commercial| Proprietary Commercial| Proprietary Commercial| Proprietary Commercial|
+| **Licensing Model**            | Open Source (MIT — HobbyHabbit)| Proprietary Commercial | Proprietary Commercial| Proprietary Commercial| Proprietary Commercial| Proprietary Commercial|
 | **Cost per 1,000 Lookups**     | **$0.00 (Free Self-Hosted)**  | $5.00 – $12.00         | $15.00                | Enterprise ($20k+/yr) | Enterprise ($30k+/yr) | **$17.00 ($0.017/call)|
 | **Air-Gapped / Offline Ops**   | **100% Fully Air-Gapped**     | Cloud or $50k+ Applnc  | Cloud SaaS Only       | Local DLLs Available  | Local Server Appliance| Cloud SaaS Only       |
 | **USPS CASS Cycle N Parity**   | **Full Open Data Parity**     | USPS Certified CASS    | USPS Certified CASS   | USPS Certified CASS   | USPS Certified CASS   | USPS Data Integrated  |
@@ -2007,12 +2007,12 @@ The harness continuously validates four statistical parity metrics:
 
 ---
 
-## 7.3 Open-Source Governance, Dual-Licensing & Asset Lifecycle
+## 7.3 Open-Source Governance, MIT Licensing & Asset Lifecycle
 
 To ensure long-term sustainability, community adoption, and commercial viability:
-1. **Dual-Licensing Model:**
-   - **Open Core (Apache 2.0 / AGPL v3):** The core normalization engine, basic CLI, and client SDKs are released under permissive open-source licenses, ensuring broad developer adoption.
-   - **Commercial Enterprise License:** Grants enterprises the right to embed the microservice daemon and compiled MCH3 spatial datasets within proprietary closed-source SaaS products, accompanied by commercial SLAs, indemnification, and priority security patching.
+1. **Open-Source Ownership & MIT Licensing:**
+   - **MIT License (HobbyHabbit LLC):** Address Standardizer, including the core normalization engine, native acceleration dispatch, CLI, microservice daemon, and multi-platform client SDKs, is 100% open-source software owned and maintained by **HobbyHabbit LLC** under the **MIT License**.
+   - **Enterprise Stewardship & Support:** HobbyHabbit LLC provides commercial support, dedicated SLAs, custom spatial data integration pipelines, and managed infrastructure deployments for enterprise partners via `support@hobbyhabbit.com`.
 2. **Reference Data Asset Lifecycle & Versioning:**
    - **Monthly TIGER / OpenAddresses Builds:** Automated GitHub Actions pipelines ingest updated US Census TIGER releases and OpenAddresses national dumps on the 1st of every month.
    - **Content-Addressable Distribution:** Compiled `.mch3` binary bundles are published to a public cloud CDN and BitTorrent tracker, accompanied by cryptographic SHA-256 signatures.

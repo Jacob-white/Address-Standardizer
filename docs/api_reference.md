@@ -16,6 +16,7 @@ Complete, exhaustive reference documentation for the **Address Standardizer** pl
 9. [Volume 9: Real-Time Autocomplete Engine (`address_standardizer.autocomplete`)](#volume-9-real-time-autocomplete-engine)
 10. [Volume 10: Native FFI & Acceleration Dispatch (`address_standardizer._native_dispatch`)](#volume-10-native-ffi--acceleration-dispatch)
 11. [Volume 11: Microservice Server & Command Line Interface (`address_standardizer.server`, `cli`)](#volume-11-microservice-server--command-line-interface)
+12. [Volume 12: Multi-Platform Client SDKs (`TypeScript`, `.NET`, `Go`)](#volume-12-multi-platform-client-sdks)
 
 ---
 
@@ -247,6 +248,43 @@ FastAPI microservice endpoints:
 - `address-standardizer batch -i input.csv -o output.csv --chunk-size 5000`
 - `address-standardizer serve --host 0.0.0.0 --port 8000`
 - `address-standardizer benchmark --records 10000`
+
+---
+
+# Volume 12: Multi-Platform Client SDKs
+
+Address Standardizer provides official client libraries in `sdks/` for communicating with the microservice daemon:
+
+## 1. TypeScript / React SDK (`@address-standardizer/client`)
+- **Package**: `@address-standardizer/client` (located in [`sdks/typescript`](../sdks/typescript/README.md))
+- **`AddressStandardizerClient`**:
+  - `constructor(options?: ClientOptions)`: Initializes client with `baseUrl`, `timeoutMs`, custom `fetch`, and persistent headers.
+  - `standardize(req: StandardizeRequest): Promise<StandardizeResponse>`: Sends single address for normalization and optional spatial geocoding.
+  - `batch(req: BatchStandardizeRequest): Promise<StandardizeResponse[]>`: Processes up to 1,000 addresses in one request.
+  - `streamBatch(records: StandardizeRequest[], onRecord: (res: StandardizeResponse) => void): Promise<void>`: Reads NDJSON stream without unbounded buffering.
+  - `autocomplete(req: AutocompleteRequest): Promise<AutocompleteSuggestion[]>`: Queries prefix trie with latitude/longitude spatial biasing.
+  - `health(): Promise<HealthResponse>`: Diagnostic ping returning version, cache items, and uptime.
+- **React Hook & Headless Controller**:
+  - `useAddressAutocomplete(options)`: React hook returning `{ query, setQuery, suggestions, loading, selectedIndex, selectSuggestion }`.
+  - `AutocompleteController`: Framework-agnostic state machine managing debounce timers, cache LRU, and keyboard selection.
+
+## 2. .NET Client SDK (`AddressStandardizer.Client`)
+- **Package**: `AddressStandardizer.Client` (located in [`sdks/dotnet`](../sdks/dotnet/README.md))
+- **`AddressStandardizerClient`**:
+  - `StandardizeAsync(request, cancellationToken)`: Asynchronous single address standardization.
+  - `StandardizeBatchAsync(request, cancellationToken)`: Batch processing returning `List<StandardizedAddress>`.
+  - `StreamBatchAsync(addresses, cancellationToken)`: IAsyncEnumerable streaming over HTTP chunked responses.
+  - `AutocompleteAsync(request, cancellationToken)`: Interactive prefix search.
+  - `GetHealthAsync(cancellationToken)`: Microservice health check.
+
+## 3. Go Client SDK (`address-standardizer-go`)
+- **Package**: `github.com/jwhite/address-standardizer-go` (located in [`sdks/go`](../sdks/go/README.md))
+- **`Client`**:
+  - `NewClient(baseURL string, opts ...Option) *Client`: Factory initializing client with custom `http.Client` and timeout options.
+  - `Standardize(ctx context.Context, req StandardizeRequest) (*StandardizeResponse, error)`: Standardizes single address.
+  - `Batch(ctx context.Context, req BatchRequest) ([]StandardizeResponse, error)`: Batch standardization.
+  - `Autocomplete(ctx context.Context, req AutocompleteRequest) ([]AutocompleteSuggestion, error)`: Prefix suggestion query.
+  - `Health(ctx context.Context) (*HealthResponse, error)`: Health check.
 
 ---
 

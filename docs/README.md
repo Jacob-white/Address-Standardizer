@@ -7,7 +7,8 @@ Address Standardizer is owned and maintained by **HobbyHabbit LLC** under the **
 ## Developer Guides & Reference
 
 - **[5-Minute Quickstart Guide](quickstart.md)** — Step-by-step onboarding for address parsing, international detection, offline spatial geocoding, streaming batch, and HTTP daemon.
-- **[Complete API Reference](api_reference.md)** — Exhaustive technical reference for all Python models, functions, classes, CLI commands, and microservice endpoints.
+- **[Complete API Reference](api_reference.md)** — Exhaustive technical reference for all Python models, functions, classes, CLI commands, microservice endpoints, and client SDKs.
+- **[Multi-Platform Client SDKs](../sdks/README.md)** — Official client libraries for TypeScript/React, .NET, and Go.
 - **[Security Policy & Sandboxing Guide](../SECURITY.md)** — Threat model, memory safety, air-gapped spatial execution, FinCEN anti-fraud invariants, and vulnerability disclosure procedures.
 
 ---

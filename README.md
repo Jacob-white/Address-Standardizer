@@ -14,7 +14,8 @@ A standalone, ultra-high-throughput multi-national address standardization, offl
 ## 📚 Documentation & Quickstarts
 
 - **[5-Minute Quickstart Guide](docs/quickstart.md)** — Step-by-step onboarding for address parsing, international detection, offline spatial geocoding, streaming batch, and HTTP daemon.
-- **[Complete API Reference](docs/api_reference.md)** — Exhaustive technical reference for all Python models, functions, classes, CLI commands, and microservice endpoints.
+- **[Complete API Reference](docs/api_reference.md)** — Exhaustive technical reference for all Python models, functions, classes, CLI commands, microservice endpoints, and client SDKs.
+- **[Multi-Platform Client SDKs](sdks/README.md)** — Official client libraries for TypeScript/React, .NET, and Go.
 - **[Security Policy & Sandboxing Guide](SECURITY.md)** — Threat model, memory safety, air-gapped spatial execution, FinCEN anti-fraud invariants, and vulnerability disclosure procedures.
 - **[Architectural Specifications Index](docs/README.md)** — Formal engineering roadmaps from Phase 1 through Phase 4 Commercial Parity.
 
