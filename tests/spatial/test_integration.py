@@ -21,7 +21,7 @@ import address_standardizer.spatial as spatial_pkg
 
 class TestSpatialIntegration:
     def test_package_exports_and_version(self):
-        assert __version__ == "3.2.0"
+        assert __version__ == "3.3.0"
         # Top-level exports
         assert StandardizedAddress is not None
         assert SpatialEngine is not None
