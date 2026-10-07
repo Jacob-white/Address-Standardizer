@@ -451,6 +451,13 @@ def main():
     spatial_parser = subparsers.add_parser("spatial", help="Offline SQLite R*Tree spatial engine lookup and diagnostics")
     spatial_sub = spatial_parser.add_subparsers(dest="spatial_action", help="Spatial action")
 
+    # spatial build
+    spatial_build = spatial_sub.add_parser("build", help="Compile parcel points and TIGER edges into offline spatial SQLite database")
+    spatial_build.add_argument("--output", "--output-db", "--db", "--spatial-db", dest="output_db", default="data/spatial_index.db", help="Destination path for SQLite spatial database file (default: data/spatial_index.db)")
+    spatial_build.add_argument("--openaddresses", dest="openaddresses_path", help="Path to OpenAddresses CSV file")
+    spatial_build.add_argument("--tiger", dest="tiger_path", help="Path to TIGER street segments CSV file")
+    spatial_build.add_argument("--osm", dest="osm_path", help="Path to OpenStreetMap GeoJSON building features file")
+
     # spatial lookup
     spatial_lookup = spatial_sub.add_parser("lookup", help="Query spatial database by address, coordinates, or bounding box")
     spatial_lookup.add_argument("address", nargs="*", help="Address string to resolve via spatial cascade")
@@ -830,6 +837,58 @@ def main():
         if not args.spatial_action:
             spatial_parser.print_help()
             sys.exit(1)
+
+        if args.spatial_action == "build":
+            from address_standardizer.spatial.ingestion import (
+                OpenAddressesIngestor,
+                TigerLineIngestor,
+                OsmBuildingIngestor,
+            )
+            oa_path = getattr(args, "openaddresses_path", None)
+            tg_path = getattr(args, "tiger_path", None)
+            osm_path = getattr(args, "osm_path", None)
+
+            if oa_path and not os.path.exists(oa_path):
+                _emit_cli_output(f"Error: OpenAddresses file not found: {oa_path}")
+                sys.exit(1)
+            if tg_path and not os.path.exists(tg_path):
+                _emit_cli_output(f"Error: TIGER file not found: {tg_path}")
+                sys.exit(1)
+            if osm_path and not os.path.exists(osm_path):
+                _emit_cli_output(f"Error: OSM file not found: {osm_path}")
+                sys.exit(1)
+
+            output_path = args.output_db or "data/spatial_index.db"
+            out_dir = os.path.dirname(output_path)
+            if out_dir:
+                os.makedirs(out_dir, exist_ok=True)
+
+            engine = SpatialEngine(db_path=output_path, seed=True)
+            pts_added = 0
+            segs_added = 0
+            osm_added = 0
+
+            if oa_path:
+                oa = OpenAddressesIngestor(engine)
+                pts_added = oa.ingest_csv(oa_path)
+            if tg_path:
+                tg = TigerLineIngestor(engine)
+                segs_added = tg.ingest_csv(tg_path)
+            if osm_path:
+                osm = OsmBuildingIngestor(engine)
+                osm_added = osm.ingest_geojson(osm_path)
+
+            total_points = engine.count()
+            _emit_cli_output(f"Spatial SQLite index built successfully: {output_path}")
+            _emit_cli_output(f"Total spatial points: {total_points}")
+            if pts_added:
+                _emit_cli_output(f"Ingested OpenAddresses points: {pts_added}")
+            if segs_added:
+                _emit_cli_output(f"Ingested TIGER segments: {segs_added}")
+            if osm_added:
+                _emit_cli_output(f"Ingested OSM building features: {osm_added}")
+            engine.close()
+            return
 
         engine = SpatialEngine(db_path=args.spatial_db) if args.spatial_db else get_default_spatial_engine()
         engine_to_close = engine if args.spatial_db else None

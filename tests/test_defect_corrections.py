@@ -190,3 +190,220 @@ class TestDefectCorrections:
         assert "FOSTER PLAZA 6" in r_bldg.street2
         assert r_bldg.building_name == "FOSTER PLAZA 6"
         assert r_bldg.routing_tier == "AUTO_PASS"
+
+    def test_phase4_spanish_thoroughfares_recipient_multiline_pr(self):
+        """Phase 4 Task 1: Spanish thoroughfares tagged as Recipient in multi-line PR addresses."""
+        # Multi-line PR with urbanization in street1 and Spanish thoroughfare in street2
+        r_pr = standardize_address(
+            street1="URB. PASEO DE LA FUENTE",
+            street2="CALLE TIVOLI A6",
+            city="SAN JUAN",
+            state="PR",
+            postal_code="00926",
+        )
+        assert r_pr.address_status == "standardized"
+        assert r_pr.street1 == "URB PASEO DE LA FUENTE CALLE TIVOLI A6"
+        assert r_pr.routing_tier == "AUTO_PASS"
+        assert r_pr.deliverability.value == "DELIVERABLE"
+
+        # Multi-line PR with urbanization and thoroughfare with secondary unit
+        r_pr_apt = standardize_address(
+            street1="URB. PASEO DE LA FUENTE",
+            street2="CALLE TIVOLI A6 APT 2",
+            city="SAN JUAN",
+            state="PR",
+            postal_code="00926",
+        )
+        assert r_pr_apt.address_status == "standardized"
+        assert r_pr_apt.street1 == "URB PASEO DE LA FUENTE CALLE TIVOLI A6"
+        assert r_pr_apt.street2 == "APT 2"
+
+        # Single-line PR with urbanization and thoroughfare
+        r_single = standardize_address("URB. PASEO DE LA FUENTE, CALLE TIVOLI A6, SAN JUAN, PR 00926")
+        assert r_single.address_status == "standardized"
+        assert r_single.street1 == "URB PASEO DE LA FUENTE CALLE TIVOLI A6"
+
+        # Standalone PR street without urbanization must not trigger DPVFootnote.M1
+        r_tivoli = standardize_address("CALLE TIVOLI A6, SAN JUAN, PR 00926")
+        assert r_tivoli.address_status == "standardized"
+        assert r_tivoli.street1 == "CALLE TIVOLI A6"
+        assert r_tivoli.deliverability.value == "DELIVERABLE"
+
+        # PR streets misclassified as USPSBoxType (CALLE FORTALEZA, CALLE DEL CRISTO)
+        r_fort = standardize_address("CALLE FORTALEZA 101, SAN JUAN, PR 00901")
+        assert r_fort.address_status == "standardized"
+        assert r_fort.street1 == "CALLE FORTALEZA 101"
+        assert r_fort.deliverability.value == "DELIVERABLE"
+
+        r_cristo = standardize_address("CALLE DEL CRISTO 252, SAN JUAN, PR 00901")
+        assert r_cristo.address_status == "standardized"
+        assert r_cristo.street1 == "CALLE DEL CRISTO 252"
+        assert r_cristo.deliverability.value == "DELIVERABLE"
+
+        # PR streets misclassified as PlaceName or OccupancyType (CALLE SAN FRANCISCO, PASEO DEL PRADO)
+        r_san_fran = standardize_address("CALLE SAN FRANCISCO 300, SAN JUAN, PR 00901")
+        assert r_san_fran.address_status == "standardized"
+        assert r_san_fran.street1 == "CALLE SAN FRANCISCO 300"
+        assert r_san_fran.deliverability.value == "DELIVERABLE"
+
+        r_prado = standardize_address("PASEO DEL PRADO 5, SAN JUAN, PR 00926")
+        assert r_prado.address_status == "standardized"
+        assert r_prado.street1 == "PASEO DEL PRADO 5"
+        assert r_prado.street2 == ""
+        assert r_prado.deliverability.value == "DELIVERABLE"
+
+        # Avenida Ponce de Leon
+        r_pdl = standardize_address("AVENIDA PONCE DE LEON 100, SAN JUAN, PR 00901")
+        assert r_pdl.address_status == "standardized"
+        assert r_pdl.street1 == "AVENIDA PONCE DE LEON 100"
+        assert r_pdl.deliverability.value == "DELIVERABLE"
+
+    def test_phase4_offshore_grammar_floor_truncation_fix(self):
+        """Phase 4 Task 2: Offshore grammar floor and secondary units preserved when locality is present."""
+        # Multi-line Cayman address with floor in street1 and locality in street2
+        r_off = standardize_address(
+            street1="West Bay Road, FL 2",
+            street2="Seven Mile Beach",
+            city="Grand Cayman",
+            postal_code="KY1-1200",
+            country="CYM",
+        )
+        assert r_off.address_status == "standardized"
+        assert r_off.street1 == "W BAY RD"
+        assert r_off.street2 == "FL 2, SEVEN MILE BEACH"
+
+        # Single-line Cayman address with floor and locality
+        r_single_off = standardize_address(
+            "West Bay Road, FL 2, Seven Mile Beach, Grand Cayman, KY1-1200, Cayman Islands"
+        )
+        assert r_single_off.address_status == "standardized"
+        assert r_single_off.street1 == "W BAY RD"
+        assert r_single_off.street2 == "FL 2"
+        assert r_single_off.city == "SEVEN MILE BEACH"
+
+    def test_phase4_unnumbered_named_street_suffix_rescue(self):
+        """Phase 4 Task 3: Unnumbered named streets rescued from zip_parts classification."""
+        # Structured components with Santa Fe Way (Way previously trapped in zip_parts)
+        r_sf = standardize_address(
+            street1="Santa Fe Way",
+            city="Carmel",
+            state="CA",
+            postal_code="93923",
+        )
+        assert r_sf.street1 == "SANTA FE WAY"
+        assert r_sf.city == "CARMEL"
+        assert r_sf.state == "CA"
+        assert r_sf.postal_code == "93923"
+
+        # Single line unnumbered Santa Fe Way
+        r_single_sf = standardize_address("Santa Fe Way, Carmel, CA 93923")
+        assert r_single_sf.street1 == "SANTA FE WAY"
+        assert r_single_sf.city == "CARMEL"
+        assert r_single_sf.state == "CA"
+
+        # Unnumbered Santa Fe Drive
+        r_drive = standardize_address(
+            street1="Santa Fe Drive",
+            city="Denver",
+            state="CO",
+            postal_code="80204",
+        )
+        assert r_drive.street1 == "SANTA FE DR"
+        assert r_drive.city == "DENVER"
+
+    def test_phase4_care_of_idempotent_loop(self):
+        """Phase 4 Task 4: Parenthesized and duplicate care-of clauses stripped idempotently."""
+        # Parenthesized care-of prefix in street1
+        r_paren_s1 = standardize_address(
+            street1="(C/O AGNITIO)",
+            street2="100 MAIN ST",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+        )
+        assert r_paren_s1.street1 == "100 MAIN ST"
+        assert r_paren_s1.street2 == ""
+
+        # Parenthesized care-of in street2
+        r_paren_s2 = standardize_address(
+            street1="100 MAIN ST",
+            street2="(C/O AGNITIO)",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+        )
+        assert r_paren_s2.street1 == "100 MAIN ST"
+        assert r_paren_s2.street2 == ""
+
+        # Parenthesized care-of in single-line
+        r_paren_single = standardize_address("(C/O AGNITIO) 100 MAIN ST, NEW YORK, NY 10005")
+        assert r_paren_single.street1 == "100 MAIN ST"
+
+        # Space-delimited duplicate care-of clauses
+        r_dup_co = standardize_address(
+            street1="C/O - MJ SUPPORT & CO C/O - MJ SUPPORT & CO",
+            street2="100 MAIN ST",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+        )
+        assert r_dup_co.street1 == "100 MAIN ST"
+        assert r_dup_co.street2 == ""
+
+        # Duplicate care-of in street2
+        r_dup_s2 = standardize_address(
+            street1="100 MAIN ST",
+            street2="C/O - MJ SUPPORT & CO C/O - MJ SUPPORT & CO",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+        )
+        assert r_dup_s2.street1 == "100 MAIN ST"
+        assert r_dup_s2.street2 == ""
+
+        # Care-of alone without any physical street must parse_fail cleanly rather than bleed
+        r_co_only = standardize_address(
+            street1="C/O - MJ SUPPORT & CO C/O - MJ SUPPORT & CO",
+            city="NEW YORK",
+            state="NY",
+            postal_code="10005",
+        )
+        assert r_co_only.address_status == "parse_failed"
+        assert r_co_only.street1 == ""
+
+    def test_phase4_spatial_engine_auto_detect_and_cli_build(self, tmp_path):
+        """Phase 4 Task 5: Auto-detect on-disk spatial index and CLI spatial build subcommand."""
+        import os
+        from unittest.mock import patch
+        from address_standardizer.spatial import engine as spatial_mod
+        from address_standardizer.cli import main as cli_main
+
+        # Test CLI spatial build subcommand
+        test_db = tmp_path / "test_cli_spatial.db"
+        test_args = [
+            "address-standardizer",
+            "spatial",
+            "build",
+            "--output",
+            str(test_db),
+        ]
+        with patch("sys.argv", test_args):
+            cli_main()
+
+        assert os.path.exists(test_db)
+
+        # Test get_default_spatial_engine auto-detection via SPATIAL_DB_PATH
+        spatial_mod._DEFAULT_SPATIAL_ENGINE = None
+        with patch.dict(os.environ, {"SPATIAL_DB_PATH": str(test_db)}):
+            eng = spatial_mod.get_default_spatial_engine()
+            assert eng._db_path == str(test_db)
+            assert eng.count() >= 5
+        spatial_mod._DEFAULT_SPATIAL_ENGINE = None
+
+        # Test CLI build error on nonexistent input file
+        import pytest
+        with patch("sys.argv", ["address-standardizer", "spatial", "build", "--openaddresses", "nonexistent_file.csv"]):
+            with pytest.raises(SystemExit) as exc_info:
+                cli_main()
+            assert exc_info.value.code == 1
+

@@ -126,11 +126,11 @@ RE_PRIVATE_RESIDENCE = re.compile(
 RE_COMMA_DOT = re.compile(r"[,\.]+")
 RE_DIGITS = re.compile(r"\d")
 
-# Care-of / In Care Of / Attention line (e.g. "c/o Ananym Capital Management, LP")
-RE_CARE_OF = re.compile(
-    r"(?:^|[\s,])(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b.*?(?:,\s*(?:LLC|LP|INC|CORP|LTD|CO|P\.?C\.?|PLLC|SA|AG|NV|BV|GMBH|SGIIC|S\.?A\.?|S\.?L\.?))?(?:,\s*|$)",
-    re.IGNORECASE,
+# Spanish Prefix Thoroughfares
+SPANISH_PREFIX_THOROUGHFARES = frozenset(
+    {"CALLE", "AVENIDA", "CARR", "RUTA", "CAMINO", "PASEO", "CALZADA", "CARRETERA"}
 )
+
 
 # Puerto Rico Highway Addresses (e.g. "PR #2 KM 82 HM. 2", "PR-2 KM 82.2", "CARR 167 KM 15")
 RE_PR_HIGHWAY = re.compile(
@@ -232,7 +232,7 @@ MULTI_WORD_CITIES = frozenset({
     "SOUTH BEND", "NORTH VERNON", "PARK CITY", "GROVE CITY", "CEDAR RAPIDS",
     "PALM SPRINGS", "SANTA FE", "SANTA BARBARA", "SAN JOSE", "EL PASO",
     "LAS VEGAS", "CORPUS CHRISTI", "CHULA VISTA", "WINSTON SALEM", "GRAND RAPIDS",
-    "SIOUX FALLS", "FORT WAYNE", "DES MOINES", "LITTLE ROCK"
+    "SIOUX FALLS", "FORT WAYNE", "DES MOINES", "LITTLE ROCK", "SAN JUAN"
 })
 
 # Known Standalone Secondary Units (Pub 28 Section 251)

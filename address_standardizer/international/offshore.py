@@ -231,19 +231,26 @@ class OffshoreGrammar(CountryGrammar):
         if "CHURCH" in street_line.upper():
             st1_base = self._normalize_street_tokens(street_line)
 
-        if st2_base and not unit_number:
-            m_box_s2 = RE_OFFSHORE_PO_BOX.search(st2_base)
-            m_apdo_s2 = RE_APARTADO.search(st2_base)
-            if m_box_s2:
-                unit_type = "PO BOX"
-                unit_number = m_box_s2.group(1).upper()
-            elif m_apdo_s2:
-                unit_type = "APARTADO"
-                unit_number = m_apdo_s2.group(1).upper()
+        if st2_base:
+            if not unit_number:
+                m_box_s2 = RE_OFFSHORE_PO_BOX.search(st2_base)
+                m_apdo_s2 = RE_APARTADO.search(st2_base)
+                if m_box_s2:
+                    unit_type = "PO BOX"
+                    unit_number = m_box_s2.group(1).upper()
+                elif m_apdo_s2:
+                    unit_type = "APARTADO"
+                    unit_number = m_apdo_s2.group(1).upper()
+                else:
+                    s2_p = st2_base.split(maxsplit=1)
+                    unit_type = s2_p[0]
+                    unit_number = s2_p[1] if len(s2_p) > 1 else None
             else:
-                s2_p = st2_base.split(maxsplit=1)
-                unit_type = s2_p[0]
-                unit_number = s2_p[1] if len(s2_p) > 1 else None
+                if unit_type:
+                    unit_number = f"{st2_base}, {unit_type} {unit_number}".strip()
+                    unit_type = None
+                else:
+                    unit_number = f"{st2_base}, {unit_number}".strip()
 
         # Check PO Box in st1_base
         m_box_in = RE_OFFSHORE_PO_BOX.search(st1_base)

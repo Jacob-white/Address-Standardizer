@@ -90,7 +90,7 @@ from address_standardizer._patterns import (
     RE_INTL_SEC_INLINE,
     RE_INTL_SEC_START,
     RE_NUMBER_HYPHEN_NUMBER,
-    RE_CARE_OF,
+    SPANISH_PREFIX_THOROUGHFARES,
     RE_PR_HIGHWAY,
     FROZEN_DIRECTIONAL_VALUES,
     FROZEN_US_STATE_CODES,
@@ -923,7 +923,6 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 else:
                     street_parts.append(clean)
         elif label in ("OccupancyType", "SubaddressType"):
-            SPANISH_PREFIX_THOROUGHFARES = {"CALLE", "AVENIDA", "CARR", "RUTA", "CAMINO", "PASEO", "CALZADA", "CARRETERA"}
             has_existing_suf = any(
                 p in STREET_SUFFIXES or p in STREET_SUFFIXES.values()
                 for p in street_parts[1:]
@@ -933,13 +932,23 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 street_parts.append(clean.upper())
             elif clean.upper() == "SLIP" and not has_existing_suf and street_parts:
                 street_parts.append("SLIP")
+            elif clean.upper() in SECONDARY_UNITS or clean.upper() in SECONDARY_UNITS.values():
+                sec_parts.append(SECONDARY_UNITS.get(clean.upper(), clean.upper()))
+            elif street_parts and any(p.upper() in SPANISH_PREFIX_THOROUGHFARES for p in street_parts):
+                street_parts.append(clean)
             else:
                 sec_parts.append(SECONDARY_UNITS.get(clean, clean))
         elif label in ("OccupancyIdentifier", "SubaddressIdentifier"):
             clean_id = clean.lstrip("#-").strip()
             if clean_id:
-                SPANISH_PREFIX_THOROUGHFARES = {"CALLE", "AVENIDA", "CARR", "RUTA", "CAMINO", "PASEO", "CALZADA", "CARRETERA"}
-                if street_parts and street_parts[-1].upper() in SPANISH_PREFIX_THOROUGHFARES:
+                if street_parts and (
+                    street_parts[-1].upper() in SPANISH_PREFIX_THOROUGHFARES
+                    or (
+                        not sec_parts
+                        and any(p.upper() in SPANISH_PREFIX_THOROUGHFARES for p in street_parts)
+                        and not any(p.isdigit() or re.match(r"^[A-Z]?\d|\d+[A-Z]?$", p) for p in street_parts)
+                    )
+                ):
                     street_parts.append(clean_id)
                 elif clean_id in SECONDARY_UNITS:
                     sec_parts.append(SECONDARY_UNITS[clean_id])
@@ -958,10 +967,21 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
         elif label in ("USPSBoxType", "USPSBoxID"):
             if rr_parts:
                 rr_parts.append(clean)
+            elif (
+                clean.upper() in SPANISH_PREFIX_THOROUGHFARES
+                or (street_parts and any(p.upper() in SPANISH_PREFIX_THOROUGHFARES for p in street_parts))
+            ):
+                street_parts.append(clean)
             else:
                 sec_parts.append(clean)
         elif label == "PlaceName":
-            if re.match(r"^PH-[A-Z0-9]+$", clean):
+            if clean.upper() in SPANISH_PREFIX_THOROUGHFARES or (
+                street_parts
+                and any(p.upper() in SPANISH_PREFIX_THOROUGHFARES for p in street_parts)
+                and not any(p.isdigit() or re.match(r"^[A-Z]?\d|\d+[A-Z]?$", p) for p in street_parts)
+            ):
+                street_parts.append(clean)
+            elif re.match(r"^PH-[A-Z0-9]+$", clean):
                 sec_parts.append(clean)
             elif clean in STANDALONE_SEC_UNITS:
                 sec_type = SECONDARY_UNITS.get(clean, clean)
@@ -993,7 +1013,17 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
             state_parts.append(clean)
         elif label == "ZipCode":
             zip_parts.append(clean)
-        elif label in ("CountryName", "Recipient", "NotAddress"):
+        elif label == "Recipient":
+            if clean.upper() in SPANISH_PREFIX_THOROUGHFARES or (street_parts and street_parts[-1].upper() in SPANISH_PREFIX_THOROUGHFARES):
+                street_parts.append(clean)
+                while i + 1 < len(parsed) and parsed[i + 1][1] == "Recipient":
+                    i += 1
+                    nxt = _clean_token(parsed[i][0]).upper()
+                    if nxt:
+                        street_parts.append(nxt)
+            i += 1
+            continue
+        elif label in ("CountryName", "NotAddress"):
             i += 1
             continue
         elif label == "LandmarkName":
@@ -1036,9 +1066,36 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 "NV", "BV", "GMBH", "SGIIC", "SL", "PLC", "BO", "BARRIO", "SEC", "SECTOR"
             ):
                 state_parts = []
+            elif all(p in STREET_SUFFIXES or p in STREET_SUFFIXES.values() for p in street_parts) and not any(p.isdigit() or re.match(r"^\d+", p) for p in street_parts):
+                street_parts = city_parts + state_parts + street_parts
+                city_parts = []
+                state_parts = []
             else:
                 street_parts.extend(state_parts)
                 state_parts = []
+
+    # Rescue non-numeric street suffixes from zip_parts when no leading house number exists
+    has_leading_house_num = bool(
+        street_parts and (street_parts[0].isdigit() or re.match(r"^\d+", street_parts[0]))
+    )
+    if not has_leading_house_num and zip_parts:
+        rescued_suffixes = [z for z in zip_parts if not z.isdigit() and z.upper() in STREET_SUFFIXES]
+        if rescued_suffixes:
+            for z in rescued_suffixes:
+                zip_parts.remove(z)
+                norm_suf = STREET_SUFFIXES.get(z.upper(), z.upper())
+                if city_parts:
+                    street_parts = city_parts + street_parts + [norm_suf]
+                    city_parts = []
+                else:
+                    street_parts.append(norm_suf)
+        elif any(p.upper() in SPANISH_PREFIX_THOROUGHFARES for p in street_parts):
+            # Rescue numeric or alphanumeric street number mistakenly tagged as ZipCode
+            rescued_nums = [z for z in zip_parts if (len(z) < 5 or not p_zp)]
+            if rescued_nums and not any(p.isdigit() or re.match(r"^[A-Z]?\d|\d+[A-Z]?$", p) for p in street_parts):
+                for z in rescued_nums:
+                    zip_parts.remove(z)
+                    street_parts.append(z)
 
     # If city_raw was explicitly provided, and street_parts has no thoroughfare/street name
     # (e.g. empty or only Roman numerals / bare single identifiers like "LIGHTON PLAZA II" where
@@ -1183,6 +1240,30 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
         s1_clean = clean_redundant_street_tail(s1_clean, city=city_raw)
         if s2_clean:
             s2_clean = clean_redundant_street_tail(s2_clean, city=city_raw)
+
+    # Check if street1 contains purely an urbanization name and street2 contains a physical thoroughfare
+    m_s1_urb = RE_URBANIZATION.search(s1_clean)
+    if m_s1_urb:
+        rem_s1 = s1_clean[:m_s1_urb.start()] + s1_clean[m_s1_urb.end():]
+        if not rem_s1.strip(" ,.-#"):
+            s2_words = {w.upper().strip(" ,.-#") for w in s2_clean.split()}
+            has_thoroughfare = bool(
+                (s2_words & SPANISH_PREFIX_THOROUGHFARES)
+                or (s2_words & set(STREET_SUFFIXES.keys()))
+                or (s2_words & set(STREET_SUFFIXES.values()))
+                or RE_PHYSICAL_STREET_INDICATOR.search(s2_clean)
+                or RE_PR_HIGHWAY.match(s2_clean)
+                or re.match(r"^\d+[A-Z]?\s+[A-Za-z]", s2_clean)
+            )
+            if has_thoroughfare and not RE_PO_BOX.match(s2_clean):
+                urb_prefix = f"URB {m_s1_urb.group(1).strip().upper()}"
+                parse_res = _parse_us_street_tokens(s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+                st1, st2, ok, p_city, p_state, p_zip = parse_res
+                st1 = f"{urb_prefix} {st1}".strip() if st1 else urb_prefix
+                st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
+                st2 = _standardize_secondary_unit(st2)
+                return USStreetParseResult(st1, st2, True, p_city, p_state, p_zip, building_name=getattr(parse_res, "building_name", None))
+
 
     # Check if street1 has physical street and street2 has PO Box (Dual-Address line)
     m_s1_po = RE_PO_BOX.search(s1_clean)
@@ -1547,8 +1628,9 @@ def standardize_address(
 
     # Care-Of / Attention Prefix Cleaner
     # Strips "c/o <Company Name>" segment and legal entity suffixes, preserving physical address parts before or after
-    m_co = re.search(r"(?:^|[\s,])(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[:\s\-]*", s1_in, re.IGNORECASE)
-    if m_co:
+    def _strip_care_of(text: str) -> str:
+        if not text:
+            return ""
         LEGAL_SUFFIXES_CLEAN = {
             "LLC", "LP", "LLP", "LLLPO", "INC", "CORP", "LTD", "CO", "PLLC", "PC",
             "SA", "AG", "NV", "BV", "GMBH", "PLC", "FSB", "ESQ", "CPA", "MD", "PA",
@@ -1558,9 +1640,6 @@ def standardize_address(
             "GROUP", "DEPARTMENT", "DEPT", "DIVISION", "DIV", "OFFICE", "HOLDINGS", "VENTURES", "CAPITAL",
             "MANAGEMENT", "PARTNERS", "FINANCIAL", "SERVICES", "SOLUTIONS", "ESTATES", "PROPERTY", "PROPERTIES"
         }
-        prefix = s1_in[:m_co.start()].strip(" ,.-")
-        after_co = s1_in[m_co.end():].strip()
-
         re_street_boundary = re.compile(
             r"""(?:\b|(?<=[\s,]))(?:
                 # Number followed by street name and thoroughfare suffix
@@ -1577,47 +1656,75 @@ def standardize_address(
             re.IGNORECASE | re.VERBOSE
         )
 
-        extracted_street = ""
-        m_boundary = re_street_boundary.search(after_co)
-        if m_boundary:
-            extracted_street = m_boundary.group(0).strip(" ,.-")
-        else:
-            for suf in LEGAL_SUFFIXES_CLEAN:
-                m_suf = re.search(rf"\b{suf}\b[\s,]+([A-Za-z0-9].*)$", after_co, re.IGNORECASE)
-                if m_suf:
-                    cand_st = m_suf.group(1).strip(" ,.-")
-                    cand_words = [w.upper() for w in re.findall(r"\w+", cand_st)]
-                    if cand_words and all(w in LEGAL_SUFFIXES_CLEAN for w in cand_words):
-                        continue
-                    extracted_street = cand_st
-                    break
+        prev = None
+        curr = text
+        while curr != prev:
+            prev = curr
+            # Strip parenthesized or bracketed care-of / attn clauses: (C/O ...) or [C/O ...]
+            curr = re.sub(
+                r"[\(\[](?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[^)\]]*[\)\]]",
+                " ",
+                curr,
+                flags=re.IGNORECASE,
+            ).strip(" ,.-")
 
-        if not extracted_street:
-            m_fb = re.search(r"\b(\d+\s+[A-Za-z].*)$", after_co)
-            if m_fb:
-                extracted_street = m_fb.group(1).strip(" ,.-")
+            m_co = re.search(r"(?:^|[\s,])(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[:\s\-]*", curr, re.IGNORECASE)
+            if not m_co:
+                break
 
-        if prefix and extracted_street:
-            s1_in = f"{prefix}, {extracted_street}"
-        elif extracted_street:
-            s1_in = extracted_street
-        elif prefix:
-            s1_in = prefix
-        else:
-            co_parts = [p.strip() for p in s1_in.split(",") if p.strip()]
-            rem_co = co_parts[1:]
-            while rem_co and rem_co[0].upper().replace(".", "").replace("&", "").replace(" ", "").strip() in LEGAL_SUFFIXES_CLEAN:
-                rem_co = rem_co[1:]
-            if len(rem_co) == 1 and not re.search(r"\d", rem_co[0]):
-                words = set(re.findall(r"\w+", rem_co[0].upper()))
-                has_street_word = bool(words & {"ST", "STREET", "RD", "ROAD", "AVE", "AVENUE", "BLVD", "BOULEVARD", "DR", "DRIVE", "LN", "LANE", "WAY", "CT", "COURT", "PL", "PLACE", "BOX", "HWY", "HIGHWAY", "PKWY", "PARKWAY", "CIR", "CIRCLE"})
-                if not has_street_word:
-                    rem_co = []
-            s1_in = ", ".join(rem_co)
+            prefix = curr[:m_co.start()].strip(" ,.-")
+            after_co = curr[m_co.end():].strip()
 
-        if not s1_in and s2_in:
-            s1_in = s2_in
-            s2_in = ""
+            extracted_street = ""
+            m_boundary = re_street_boundary.search(after_co)
+            if m_boundary:
+                extracted_street = m_boundary.group(0).strip(" ,.-")
+            else:
+                for suf in LEGAL_SUFFIXES_CLEAN:
+                    m_suf = re.search(rf"\b{suf}\b[\s,]+([A-Za-z0-9].*)$", after_co, re.IGNORECASE)
+                    if m_suf:
+                        cand_st = m_suf.group(1).strip(" ,.-")
+                        cand_words = [w.upper() for w in re.findall(r"\w+", cand_st)]
+                        if cand_words and all(w in LEGAL_SUFFIXES_CLEAN for w in cand_words):
+                            continue
+                        extracted_street = cand_st
+                        break
+
+            if not extracted_street:
+                m_fb = re.search(r"\b(\d+\s+[A-Za-z].*)$", after_co)
+                if m_fb:
+                    extracted_street = m_fb.group(1).strip(" ,.-")
+
+            if prefix and extracted_street:
+                curr = f"{prefix}, {extracted_street}"
+            elif extracted_street:
+                curr = extracted_street
+            elif prefix:
+                curr = prefix
+            else:
+                co_parts = [p.strip() for p in curr.split(",") if p.strip()]
+                rem_co = co_parts[1:]
+                while rem_co and rem_co[0].upper().replace(".", "").replace("&", "").replace(" ", "").strip() in LEGAL_SUFFIXES_CLEAN:
+                    rem_co = rem_co[1:]
+                if len(rem_co) == 1 and not re.search(r"\d", rem_co[0]):
+                    words = set(re.findall(r"\w+", rem_co[0].upper()))
+                    has_street_word = bool(words & {"ST", "STREET", "RD", "ROAD", "AVE", "AVENUE", "BLVD", "BOULEVARD", "DR", "DRIVE", "LN", "LANE", "WAY", "CT", "COURT", "PL", "PLACE", "BOX", "HWY", "HIGHWAY", "PKWY", "PARKWAY", "CIR", "CIRCLE"})
+                    if not has_street_word:
+                        rem_co = []
+                curr = ", ".join(rem_co)
+            curr = curr.strip(" ,.-")
+        return curr
+
+    had_co = bool(
+        re.search(r"[\(\[](?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b", s1_in, re.IGNORECASE)
+        or re.search(r"(?:^|[\s,])(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[:\s\-]*", s1_in, re.IGNORECASE)
+    )
+    s1_in = _strip_care_of(s1_in)
+    if s2_in:
+        s2_in = _strip_care_of(s2_in)
+    if had_co and not s1_in and s2_in:
+        s1_in = s2_in
+        s2_in = ""
 
     s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', s1_in)).strip()
     s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', s2_in)).strip()

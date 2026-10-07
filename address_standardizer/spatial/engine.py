@@ -888,7 +888,24 @@ def get_default_spatial_engine() -> SpatialEngine:
     if _DEFAULT_SPATIAL_ENGINE is None:
         with _SPATIAL_ENGINE_LOCK:
             if _DEFAULT_SPATIAL_ENGINE is None:
-                _DEFAULT_SPATIAL_ENGINE = SpatialEngine(seed=True)
+                env_path = os.environ.get("SPATIAL_DB_PATH")
+                db_path = None
+                if env_path and os.path.isfile(env_path):
+                    db_path = env_path
+                else:
+                    candidates = [
+                        "data/spatial_index.db",
+                        os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "spatial_index.db"),
+                    ]
+                    for cand in candidates:
+                        if os.path.isfile(cand):
+                            db_path = cand
+                            break
+
+                if db_path:
+                    _DEFAULT_SPATIAL_ENGINE = SpatialEngine(db_path=db_path, seed=False)
+                else:
+                    _DEFAULT_SPATIAL_ENGINE = SpatialEngine(seed=True)
     return _DEFAULT_SPATIAL_ENGINE
 
 

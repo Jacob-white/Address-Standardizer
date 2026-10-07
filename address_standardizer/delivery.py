@@ -16,6 +16,7 @@ from address_standardizer.registry import (
     RegistryCategory,
 )
 from address_standardizer.tables import ZIP3_TO_STATE, US_STATES
+from address_standardizer._patterns import SPANISH_PREFIX_THOROUGHFARES
 
 __all__ = [
     "DPVFootnote",
@@ -243,7 +244,10 @@ def evaluate_delivery_intelligence(
     else:
         tokens = st1.split()
         first_tok = tokens[0] if tokens else ""
-        if first_tok in ("URB", "URB.", "URBANIZACION") and len(tokens) > 1:
+        if (
+            first_tok in ("URB", "URB.", "URBANIZACION")
+            or first_tok in SPANISH_PREFIX_THOROUGHFARES
+        ) and len(tokens) > 1:
             for tok in tokens[1:]:
                 tok_clean = re.sub(r"[^\w]", "", tok)
                 if any(ch.isdigit() for ch in tok_clean) or tok_clean in {
