@@ -68,6 +68,16 @@ def get_engine_info() -> Dict[str, Any]:
     }
 
 
+def get_capabilities() -> Dict[str, Any]:
+    """Returns engine capabilities dictionary."""
+    if is_using_native() and hasattr(_NATIVE_MODULE, "get_capabilities"):
+        try:
+            return dict(_NATIVE_MODULE.get_capabilities())
+        except Exception:
+            pass
+    return get_engine_info()
+
+
 def force_pure_python(enabled: bool = True) -> None:
     """Override hook forcing fallback to pure Python engine."""
     global _FORCE_PURE_PYTHON
@@ -167,3 +177,38 @@ def generate_keys_dispatch(
         allow_locality=allow_locality,
         **kwargs,
     )
+
+
+def canonicalize_suffix_dispatch(suffix: str) -> Optional[str]:
+    """Canonicalizes street suffix using Pub 28 standards via native engine or fallback."""
+    if is_using_native() and hasattr(_NATIVE_MODULE, "canonicalize_suffix"):
+        try:
+            return _NATIVE_MODULE.canonicalize_suffix(suffix)
+        except Exception:
+            pass
+    from address_standardizer.tables import STREET_SUFFIXES
+    clean = suffix.strip().upper()
+    return STREET_SUFFIXES.get(clean)
+
+
+def canonicalize_directional_dispatch(dir_token: str) -> Optional[str]:
+    """Canonicalizes directional indicator (e.g. 'NORTH' -> 'N') via native engine or fallback."""
+    if is_using_native() and hasattr(_NATIVE_MODULE, "canonicalize_directional_py"):
+        try:
+            return _NATIVE_MODULE.canonicalize_directional_py(dir_token)
+        except Exception:
+            pass
+    from address_standardizer.tables import DIRECTIONALS
+    clean = dir_token.strip().upper()
+    return DIRECTIONALS.get(clean)
+
+
+def fast_tokenize_dispatch(text: str) -> List[str]:
+    """Performs fast-path tokenization via native engine or fallback."""
+    if is_using_native() and hasattr(_NATIVE_MODULE, "fast_tokenize"):
+        try:
+            return _NATIVE_MODULE.fast_tokenize(text)
+        except Exception:
+            pass
+    import re
+    return re.findall(r"[\w#/-]+", text.upper())

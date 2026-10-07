@@ -8,6 +8,7 @@ thread-safe zero-downtime atomic hot-swapping.
 
 import json
 import os
+import re
 import sqlite3
 import threading
 from dataclasses import dataclass, field
@@ -35,6 +36,8 @@ class RooftopRecord:
     rdi: str = "Unknown"
     is_cmra: bool = False
     is_vacant: bool = False
+    census_tract: Optional[str] = None
+    fips_code: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> Dict[str, Any]:
@@ -57,6 +60,8 @@ class RooftopRecord:
             "rdi": self.rdi,
             "is_cmra": self.is_cmra,
             "is_vacant": self.is_vacant,
+            "census_tract": self.census_tract,
+            "fips_code": self.fips_code,
             "metadata": dict(self.metadata),
         }
 
@@ -104,6 +109,8 @@ SEED_ROOFTOP_RECORDS: List[Dict[str, Any]] = [
         "rdi": "Commercial",
         "is_cmra": False,
         "is_vacant": False,
+        "census_tract": "000900",
+        "fips_code": "36061",
     },
     {
         "address_key": "200 PARK AVE|STE 1200|NEW YORK|NY|10166|USA",
@@ -124,6 +131,8 @@ SEED_ROOFTOP_RECORDS: List[Dict[str, Any]] = [
         "rdi": "Commercial",
         "is_cmra": False,
         "is_vacant": False,
+        "census_tract": "009200",
+        "fips_code": "36061",
     },
     {
         "address_key": "1209 N ORANGE ST|STE 400|WILMINGTON|DE|19801|USA",
@@ -144,6 +153,8 @@ SEED_ROOFTOP_RECORDS: List[Dict[str, Any]] = [
         "rdi": "Commercial",
         "is_cmra": False,
         "is_vacant": False,
+        "census_tract": "002100",
+        "fips_code": "10003",
     },
     {
         "address_key": "30 N GOULD ST|STE R|SHERIDAN|WY|82801|USA",
@@ -164,6 +175,8 @@ SEED_ROOFTOP_RECORDS: List[Dict[str, Any]] = [
         "rdi": "Commercial",
         "is_cmra": True,
         "is_vacant": False,
+        "census_tract": "000100",
+        "fips_code": "56033",
     },
     {
         "address_key": "500 N MICHIGAN AVE|STE 1400|CHICAGO|IL|60611|USA",
@@ -184,6 +197,89 @@ SEED_ROOFTOP_RECORDS: List[Dict[str, Any]] = [
         "rdi": "Commercial",
         "is_cmra": False,
         "is_vacant": False,
+        "census_tract": "081403",
+        "fips_code": "17031",
+    },
+]
+
+SEED_STREET_RANGES: List[Dict[str, Any]] = [
+    {
+        "street_name": "MAIN ST",
+        "postal_code": "10001",
+        "state": "NY",
+        "from_number": 100,
+        "to_number": 200,
+        "start_latitude": 40.7480,
+        "start_longitude": -73.9850,
+        "end_latitude": 40.7500,
+        "end_longitude": -73.9830,
+        "census_tract": "010100",
+        "fips_code": "36061",
+    },
+    {
+        "street_name": "MARKET ST",
+        "postal_code": "94105",
+        "state": "CA",
+        "from_number": 100,
+        "to_number": 500,
+        "start_latitude": 37.7900,
+        "start_longitude": -122.4000,
+        "end_latitude": 37.7950,
+        "end_longitude": -122.3950,
+        "census_tract": "0607501",
+        "fips_code": "06075",
+    },
+    {
+        "street_name": "PENNSYLVANIA AVE",
+        "postal_code": "20500",
+        "state": "DC",
+        "from_number": 1500,
+        "to_number": 1700,
+        "start_latitude": 38.8970,
+        "start_longitude": -77.0370,
+        "end_latitude": 38.8990,
+        "end_longitude": -77.0350,
+        "census_tract": "006202",
+        "fips_code": "11001",
+    },
+    {
+        "street_name": "BROADWAY",
+        "postal_code": "10007",
+        "state": "NY",
+        "from_number": 100,
+        "to_number": 300,
+        "start_latitude": 40.7120,
+        "start_longitude": -74.0070,
+        "end_latitude": 40.7140,
+        "end_longitude": -74.0050,
+        "census_tract": "002900",
+        "fips_code": "36061",
+    },
+    {
+        "street_name": "ELM ST",
+        "postal_code": "75201",
+        "state": "TX",
+        "from_number": 1000,
+        "to_number": 2000,
+        "start_latitude": 32.7800,
+        "start_longitude": -96.8000,
+        "end_latitude": 32.7850,
+        "end_longitude": -96.7900,
+        "census_tract": "001900",
+        "fips_code": "48113",
+    },
+    {
+        "street_name": "PEACHTREE ST",
+        "postal_code": "30303",
+        "state": "GA",
+        "from_number": 100,
+        "to_number": 400,
+        "start_latitude": 33.7550,
+        "start_longitude": -84.3900,
+        "end_latitude": 33.7600,
+        "end_longitude": -84.3870,
+        "census_tract": "002700",
+        "fips_code": "13121",
     },
 ]
 
@@ -191,18 +287,45 @@ SEED_ROOFTOP_RECORDS: List[Dict[str, Any]] = [
 class OfflineReferenceIndex:
     """
     Embedded SQLite reference index supporting rooftop coordinates resolution,
-    parcel validation, and zero-downtime hot-swapping.
+    parcel validation, linear street edge interpolation, and zero-downtime hot-swapping.
     """
 
     def __init__(self, db_path: Optional[str] = None, seed: bool = True):
         self._db_path = db_path or ":memory:"
+        self._seed = seed
+        self._pid = os.getpid()
         self._lock = threading.RLock()
-        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._init_schema(self._conn)
+        self._real_conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        self._real_conn.row_factory = sqlite3.Row
+        self._init_schema(self._real_conn)
 
         if seed and self.count() == 0:
             self.insert_records(SEED_ROOFTOP_RECORDS)
+        if seed and self.count_ranges() == 0:
+            self.insert_street_ranges(SEED_STREET_RANGES)
+
+    @property
+    def _conn(self) -> sqlite3.Connection:
+        current_pid = os.getpid()
+        if current_pid != self._pid:
+            with self._lock:
+                if current_pid != self._pid:
+                    self._pid = current_pid
+                    self._real_conn = sqlite3.connect(self._db_path, check_same_thread=False)
+                    self._real_conn.row_factory = sqlite3.Row
+                    self._init_schema(self._real_conn)
+                    if self._seed and self.count() == 0:
+                        self.insert_records(SEED_ROOFTOP_RECORDS)
+                    if self._seed and self.count_ranges() == 0:
+                        self.insert_street_ranges(SEED_STREET_RANGES)
+        return self._real_conn
+
+    @_conn.setter
+    def _conn(self, val: Optional[sqlite3.Connection]):
+        self._real_conn = val
+
+    def _get_conn(self) -> sqlite3.Connection:
+        return self._conn
 
     def _init_schema(self, conn: sqlite3.Connection):
         with conn:
@@ -226,12 +349,34 @@ class OfflineReferenceIndex:
                     rdi TEXT DEFAULT 'Unknown',
                     is_cmra INTEGER NOT NULL DEFAULT 0,
                     is_vacant INTEGER NOT NULL DEFAULT 0,
+                    census_tract TEXT,
+                    fips_code TEXT,
                     metadata_json TEXT
                 );
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_rooftop_building ON rooftop_reference(building_key);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_rooftop_zip_st ON rooftop_reference(postal_code, street1);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_rooftop_parcel ON rooftop_reference(parcel_id);")
+
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS street_ranges (
+                    range_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    street_name TEXT NOT NULL,
+                    postal_code TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    from_number INTEGER NOT NULL,
+                    to_number INTEGER NOT NULL,
+                    start_latitude REAL NOT NULL,
+                    start_longitude REAL NOT NULL,
+                    end_latitude REAL NOT NULL,
+                    end_longitude REAL NOT NULL,
+                    census_tract TEXT,
+                    fips_code TEXT
+                );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ranges_zip_st ON street_ranges(postal_code, street_name);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_ranges_state_st ON street_ranges(state, street_name);")
+
             if self._db_path != ":memory:":
                 conn.execute("PRAGMA journal_mode=WAL;")
                 conn.execute("PRAGMA synchronous=NORMAL;")
@@ -256,18 +401,22 @@ class OfflineReferenceIndex:
         rdi: str = "Unknown",
         is_cmra: bool = False,
         is_vacant: bool = False,
+        census_tract: Optional[str] = None,
+        fips_code: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ):
         """Inserts or replaces a rooftop reference record."""
         with self._lock:
-            with self._conn:
-                self._conn.execute(
+            conn = self._get_conn()
+            with conn:
+                conn.execute(
                     """
                     INSERT OR REPLACE INTO rooftop_reference (
                         address_key, building_key, street1, street2, city, state, postal_code,
                         country, latitude, longitude, precision, accuracy_radius_meters,
-                        parcel_id, is_multi_unit, known_units, rdi, is_cmra, is_vacant, metadata_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        parcel_id, is_multi_unit, known_units, rdi, is_cmra, is_vacant,
+                        census_tract, fips_code, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         address_key.strip().upper(),
@@ -288,6 +437,8 @@ class OfflineReferenceIndex:
                         rdi,
                         1 if is_cmra else 0,
                         1 if is_vacant else 0,
+                        census_tract,
+                        fips_code,
                         json.dumps(metadata or {}),
                     ),
                 )
@@ -296,6 +447,132 @@ class OfflineReferenceIndex:
         """Batch insert rooftop reference records."""
         for rec in records:
             self.insert_record(**rec)
+
+    def insert_street_range(
+        self,
+        street_name: str,
+        postal_code: str,
+        state: str,
+        from_number: int,
+        to_number: int,
+        start_latitude: float,
+        start_longitude: float,
+        end_latitude: float,
+        end_longitude: float,
+        census_tract: Optional[str] = None,
+        fips_code: Optional[str] = None,
+    ):
+        """Inserts a street edge range for linear interpolation (Census TIGER style)."""
+        with self._lock:
+            conn = self._get_conn()
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO street_ranges (
+                        street_name, postal_code, state, from_number, to_number,
+                        start_latitude, start_longitude, end_latitude, end_longitude,
+                        census_tract, fips_code
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        street_name.strip().upper(),
+                        postal_code.strip(),
+                        state.strip().upper(),
+                        int(from_number),
+                        int(to_number),
+                        float(start_latitude),
+                        float(start_longitude),
+                        float(end_latitude),
+                        float(end_longitude),
+                        census_tract,
+                        fips_code,
+                    ),
+                )
+
+    def insert_street_ranges(self, ranges: List[Dict[str, Any]]):
+        """Batch insert street edge ranges."""
+        for r in ranges:
+            self.insert_street_range(**r)
+
+    def count_ranges(self) -> int:
+        """Returns total records in the street_ranges table."""
+        with self._lock:
+            cur = self._get_conn().execute("SELECT count(*) FROM street_ranges")
+            row = cur.fetchone()
+            return row[0] if row else 0
+
+    def interpolate_street_range(
+        self,
+        street_number: int,
+        street_name: str,
+        postal_code: str = "",
+        state: str = "",
+    ) -> Optional[RooftopRecord]:
+        """
+        Linearly interpolates coordinates along street edge segments (US Census TIGER style).
+        Zero external API calls.
+        """
+        clean_st = street_name.strip().upper()
+        zip5 = postal_code[:5] if postal_code else ""
+        norm_st = state.strip().upper()
+
+        with self._lock:
+            query = """
+                SELECT * FROM street_ranges
+                WHERE (street_name = ? OR street_name LIKE ? OR ? LIKE street_name || '%')
+            """
+            params: List[Any] = [clean_st, f"{clean_st}%", clean_st]
+            if zip5:
+                query += " AND postal_code LIKE ?"
+                params.append(f"{zip5}%")
+            elif norm_st:
+                query += " AND state = ?"
+                params.append(norm_st)
+
+            cur = self._get_conn().execute(query, tuple(params))
+            rows = cur.fetchall()
+            for row in rows:
+                from_num = int(row["from_number"])
+                to_num = int(row["to_number"])
+                min_n = min(from_num, to_num)
+                max_n = max(from_num, to_num)
+                if min_n <= street_number <= max_n:
+                    if max_n == min_n:
+                        t = 0.5
+                    else:
+                        t = (street_number - from_num) / (to_num - from_num)
+                        t = max(0.0, min(1.0, t))
+
+                    start_lat = float(row["start_latitude"])
+                    end_lat = float(row["end_latitude"])
+                    start_lon = float(row["start_longitude"])
+                    end_lon = float(row["end_longitude"])
+
+                    lat = start_lat + t * (end_lat - start_lat)
+                    lon = start_lon + t * (end_lon - start_lon)
+
+                    c_tract = row["census_tract"]
+                    f_code = row["fips_code"]
+                    r_post = row["postal_code"]
+                    r_st = row["state"]
+
+                    return RooftopRecord(
+                        address_key=f"{street_number} {clean_st}||{r_st}|{r_post}|USA",
+                        building_key=f"{street_number} {clean_st}||{r_st}|{r_post}|USA",
+                        street1=f"{street_number} {clean_st}",
+                        street2="",
+                        city="",
+                        state=r_st,
+                        postal_code=r_post,
+                        country="USA",
+                        latitude=round(lat, 6),
+                        longitude=round(lon, 6),
+                        precision="RANGE_INTERPOLATED",
+                        accuracy_radius_meters=15.0,
+                        census_tract=c_tract,
+                        fips_code=f_code,
+                    )
+        return None
 
     def _row_to_record(self, row: sqlite3.Row) -> RooftopRecord:
         known_u = []
@@ -311,6 +588,13 @@ class OfflineReferenceIndex:
                 meta = json.loads(row["metadata_json"])
             except Exception:
                 meta = {}
+
+        c_tract = row["census_tract"] if "census_tract" in row.keys() else None
+        f_code = row["fips_code"] if "fips_code" in row.keys() else None
+        if not c_tract and meta.get("census_tract"):
+            c_tract = str(meta["census_tract"])
+        if not f_code and meta.get("fips_code"):
+            f_code = str(meta["fips_code"])
 
         return RooftopRecord(
             address_key=row["address_key"],
@@ -331,6 +615,8 @@ class OfflineReferenceIndex:
             rdi=row["rdi"] or "Unknown",
             is_cmra=bool(row["is_cmra"]),
             is_vacant=bool(row["is_vacant"]),
+            census_tract=c_tract,
+            fips_code=f_code,
             metadata=meta,
         )
 
@@ -341,13 +627,14 @@ class OfflineReferenceIndex:
         street number transposition healing, and parcel_id.
         """
         with self._lock:
+            conn = self._get_conn()
             # 1. Try normalized_address_key
             norm_key = getattr(address, "normalized_address_key", None)
             if isinstance(address, str):
                 norm_key = address
 
             if norm_key:
-                cur = self._conn.execute(
+                cur = conn.execute(
                     "SELECT * FROM rooftop_reference WHERE address_key = ?",
                     (norm_key.strip().upper(),),
                 )
@@ -358,7 +645,7 @@ class OfflineReferenceIndex:
             # 2. Try building_key
             b_key = getattr(address, "building_key", None)
             if b_key:
-                cur = self._conn.execute(
+                cur = conn.execute(
                     "SELECT * FROM rooftop_reference WHERE building_key = ? LIMIT 1",
                     (b_key.strip().upper(),),
                 )
@@ -371,7 +658,7 @@ class OfflineReferenceIndex:
             post = getattr(address, "postal_code", None)
             if st1 and post:
                 zip5 = post[:5]
-                cur = self._conn.execute(
+                cur = conn.execute(
                     "SELECT * FROM rooftop_reference WHERE postal_code LIKE ? AND street1 = ? LIMIT 1",
                     (f"{zip5}%", st1.strip().upper()),
                 )
@@ -384,7 +671,7 @@ class OfflineReferenceIndex:
                 if st_tokens and any(c.isdigit() for c in st_tokens[0]):
                     num_part = st_tokens[0]
                     rest_part = " ".join(st_tokens[1:])
-                    cur = self._conn.execute(
+                    cur = conn.execute(
                         "SELECT street1 FROM rooftop_reference WHERE postal_code LIKE ? AND street1 LIKE ?",
                         (f"{zip5}%", f"%{rest_part}"),
                     )
@@ -400,7 +687,7 @@ class OfflineReferenceIndex:
                         healed_num = heal_street_number_transposition(num_part, valid_ranges=ranges)
                         if healed_num and healed_num != num_part:
                             healed_st1 = f"{healed_num} {rest_part}".strip().upper()
-                            cur = self._conn.execute(
+                            cur = conn.execute(
                                 "SELECT * FROM rooftop_reference WHERE postal_code LIKE ? AND street1 = ? LIMIT 1",
                                 (f"{zip5}%", healed_st1),
                             )
@@ -410,7 +697,7 @@ class OfflineReferenceIndex:
 
             # 5. Try parcel_id or plain string address parsing
             if isinstance(address, str) and norm_key:
-                cur = self._conn.execute(
+                cur = conn.execute(
                     "SELECT * FROM rooftop_reference WHERE parcel_id = ? LIMIT 1",
                     (norm_key.strip().upper(),),
                 )
@@ -421,10 +708,85 @@ class OfflineReferenceIndex:
                 if "|" not in address:
                     from address_standardizer.standardizer import standardize_address
                     std = standardize_address(address)
-                    if std.address_status != "parse_failed":
-                        return self.resolve_coordinates(std)
+                    rec = self.resolve_coordinates(std)
+                    if rec:
+                        return rec
+            # 6. Try street edge range interpolation (US Census TIGER style)
+            st1_val = getattr(address, "street1", None)
+            post_val = getattr(address, "postal_code", None)
+            state_val = getattr(address, "state", None)
+            if isinstance(address, str) and not st1_val:
+                parts = [p.strip() for p in address.split(",") if p.strip()]
+                if parts:
+                    st1_val = parts[0]
+            if st1_val:
+                m_num = re.match(r"^(\d+)\s+(.+)$", str(st1_val).strip().upper())
+                if m_num:
+                    st_num = int(m_num.group(1))
+                    st_name = m_num.group(2).strip()
+                    interp_rec = self.interpolate_street_range(
+                        street_number=st_num,
+                        street_name=st_name,
+                        postal_code=str(post_val) if post_val else "",
+                        state=str(state_val) if state_val else "",
+                    )
+                    if interp_rec:
+                        return interp_rec
 
             return None
+
+    def geocode(self, address: Any, fallback_to_centroids: bool = True) -> Dict[str, Any]:
+        """
+        Pure offline rooftop geocoding (zero external network calls):
+        1. Exact point rooftop match (OpenAddresses / Reference)
+        2. TIGER street edge range linear interpolation
+        3. Regional ZIP / state centroid fallback
+        """
+        if isinstance(address, str) and "|" not in address:
+            from address_standardizer.standardizer import standardize_address
+            address = standardize_address(address)
+
+        rec = self.resolve_coordinates(address)
+        if rec is not None:
+            return {
+                "latitude": rec.latitude,
+                "longitude": rec.longitude,
+                "precision": rec.precision,
+                "accuracy_radius_meters": rec.accuracy_radius_meters,
+                "census_tract": rec.census_tract,
+                "fips_code": rec.fips_code,
+            }
+        if fallback_to_centroids:
+            from address_standardizer.geocoder import get_fallback_centroid
+            from address_standardizer.tables import STATE_TO_FIPS, US_STATES, ZIP3_TO_STATE
+            post = getattr(address, "postal_code", None)
+            st = getattr(address, "state", None)
+            if isinstance(address, str):
+                m_zip = re.search(r"\b(\d{5})\b", address)
+                if m_zip:
+                    post = m_zip.group(1)
+            if not st and post and len(post) >= 3:
+                st = ZIP3_TO_STATE.get(post[:3])
+            coords = get_fallback_centroid(zip5=post, state=st)
+            if coords:
+                norm_st = US_STATES.get(str(st).upper(), str(st).upper()) if st else None
+                fips = STATE_TO_FIPS.get(norm_st) if norm_st else None
+                return {
+                    "latitude": coords[0],
+                    "longitude": coords[1],
+                    "precision": "POSTAL_CENTROID" if post else "LOCALITY",
+                    "accuracy_radius_meters": 5000.0,
+                    "census_tract": None,
+                    "fips_code": fips,
+                }
+        return {
+            "latitude": None,
+            "longitude": None,
+            "precision": "UNRESOLVED",
+            "accuracy_radius_meters": None,
+            "census_tract": None,
+            "fips_code": None,
+        }
 
     def validate_parcel(self, address: Any) -> ParcelValidationResult:
         """
@@ -433,7 +795,7 @@ class OfflineReferenceIndex:
         """
         if isinstance(address, str) and "|" not in address:
             with self._lock:
-                cur = self._conn.execute(
+                cur = self._get_conn().execute(
                     "SELECT * FROM rooftop_reference WHERE parcel_id = ? LIMIT 1",
                     (address.strip().upper(),),
                 )
@@ -502,7 +864,7 @@ class OfflineReferenceIndex:
     def count(self) -> int:
         """Returns total records in the reference table."""
         with self._lock:
-            cur = self._conn.execute("SELECT count(*) FROM rooftop_reference")
+            cur = self._get_conn().execute("SELECT count(*) FROM rooftop_reference")
             row = cur.fetchone()
             return row[0] if row else 0
 
@@ -535,3 +897,8 @@ def resolve_offline_coordinates(address: Any) -> Optional[RooftopRecord]:
 def validate_parcel_offline(address: Any) -> ParcelValidationResult:
     """Public helper to validate parcel status via the default offline index."""
     return get_default_offline_index().validate_parcel(address)
+
+
+def geocode_offline(address: Any, fallback_to_centroids: bool = True) -> Dict[str, Any]:
+    """Public helper to perform pure offline geocoding via the default offline index."""
+    return get_default_offline_index().geocode(address, fallback_to_centroids=fallback_to_centroids)

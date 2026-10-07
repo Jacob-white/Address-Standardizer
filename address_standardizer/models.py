@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
+import re
 
 
 @dataclass(slots=True)
@@ -82,12 +83,16 @@ class StandardizedAddress:
     rooftop_address: Optional[str] = None
 
     def __post_init__(self):
-        if getattr(self, "rooftop_address", None) is None:
-            if self.is_private_residence or self.address_status in ("locality_only", "city_level", "parse_failed"):
-                self.rooftop_address = None
-            else:
-                from address_standardizer._patterns import clean_rooftop_address
-                self.rooftop_address = clean_rooftop_address(self.street1)
+        has_po = bool(re.search(
+            r"\b(?:P\.?\s*O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX|APO|FPO|DPO)\b",
+            f"{self.street1} {self.street2} {self.raw_street_address}".upper()
+        ))
+        is_dual_physical = has_po and bool(self.street1 and re.match(r"^(?:\d+|PR-|CARR-|KM\b)", self.street1))
+        if self.is_private_residence or (has_po and not is_dual_physical) or self.address_status in ("locality_only", "city_level", "parse_failed"):
+            self.rooftop_address = None
+        elif getattr(self, "rooftop_address", None) is None:
+            from address_standardizer._patterns import clean_rooftop_address
+            self.rooftop_address = clean_rooftop_address(self.street1)
         if not hasattr(self, "_confidence_score"):
             self._confidence_score: Optional[float] = None
         if not hasattr(self, "_routing_tier"):
@@ -112,6 +117,20 @@ class StandardizedAddress:
             self._corporate_risk_flags: Optional[List[str]] = None
         if not hasattr(self, "_spatial_result"):
             self._spatial_result: Optional[SpatialResolutionResult] = None
+        if not hasattr(self, "_deliverability"):
+            self._deliverability: Optional[str] = None
+        if not hasattr(self, "_latitude"):
+            self._latitude: Optional[float] = None
+        if not hasattr(self, "_longitude"):
+            self._longitude: Optional[float] = None
+        if not hasattr(self, "_precision"):
+            self._precision: Optional[str] = None
+        if not hasattr(self, "_accuracy_radius_meters"):
+            self._accuracy_radius_meters: Optional[float] = None
+        if not hasattr(self, "_census_tract"):
+            self._census_tract: Optional[str] = None
+        if not hasattr(self, "_fips_code"):
+            self._fips_code: Optional[str] = None
         if not hasattr(self, "_country_iso3"):
             self._country_iso3: str = getattr(self, "country", "USA") or "USA"
         if not hasattr(self, "_is_locality_only"):
@@ -233,6 +252,102 @@ class StandardizedAddress:
         self._spatial_result = value
 
     @property
+    def deliverability(self) -> str:
+        val = getattr(self, "_deliverability", None)
+        if val is not None:
+            return val
+        footnotes = set(self.dpv_footnotes)
+        if "N1" in footnotes:
+            return "REQUIRES_SECONDARY"
+        if "BB" in footnotes:
+            return "DELIVERABLE"
+        if self.address_status == "parse_failed" or "M1" in footnotes or "M3" in footnotes:
+            return "UNDELIVERABLE"
+        return "DELIVERABLE" if self.address_status == "standardized" else "UNDELIVERABLE"
+
+    @deliverability.setter
+    def deliverability(self, value: str):
+        self._deliverability = value
+
+    @property
+    def latitude(self) -> Optional[float]:
+        val = getattr(self, "_latitude", None)
+        if val is not None:
+            return val
+        if self.spatial_result is not None:
+            return self.spatial_result.latitude
+        return None
+
+    @latitude.setter
+    def latitude(self, value: Optional[float]):
+        self._latitude = value
+
+    @property
+    def longitude(self) -> Optional[float]:
+        val = getattr(self, "_longitude", None)
+        if val is not None:
+            return val
+        if self.spatial_result is not None:
+            return self.spatial_result.longitude
+        return None
+
+    @longitude.setter
+    def longitude(self, value: Optional[float]):
+        self._longitude = value
+
+    @property
+    def precision(self) -> Optional[str]:
+        val = getattr(self, "_precision", None)
+        if val is not None:
+            return val
+        if self.spatial_result is not None:
+            return self.spatial_result.precision
+        return None
+
+    @precision.setter
+    def precision(self, value: Optional[str]):
+        self._precision = value
+
+    @property
+    def accuracy_radius_meters(self) -> Optional[float]:
+        val = getattr(self, "_accuracy_radius_meters", None)
+        if val is not None:
+            return val
+        if self.spatial_result is not None:
+            return self.spatial_result.accuracy_radius_meters
+        return None
+
+    @accuracy_radius_meters.setter
+    def accuracy_radius_meters(self, value: Optional[float]):
+        self._accuracy_radius_meters = value
+
+    @property
+    def census_tract(self) -> Optional[str]:
+        val = getattr(self, "_census_tract", None)
+        if val is not None:
+            return val
+        if self.spatial_result is not None and hasattr(self.spatial_result, "metadata") and isinstance(self.spatial_result.metadata, dict):
+            return self.spatial_result.metadata.get("census_tract")
+        return None
+
+    @census_tract.setter
+    def census_tract(self, value: Optional[str]):
+        self._census_tract = value
+
+    @property
+    def fips_code(self) -> Optional[str]:
+        val = getattr(self, "_fips_code", None)
+        if val is not None:
+            return val
+        if self.spatial_result is not None and hasattr(self.spatial_result, "metadata") and isinstance(self.spatial_result.metadata, dict):
+            return self.spatial_result.metadata.get("fips_code")
+        return None
+
+    @fips_code.setter
+    def fips_code(self, value: Optional[str]):
+        self._fips_code = value
+
+    @property
     def country_iso3(self) -> str:
         return getattr(self, "_country_iso3", getattr(self, "country", "USA") or "USA")
 
@@ -320,6 +435,13 @@ class StandardizedAddress:
                     if hasattr(self.cascade_result, "as_dict")
                     else self.cascade_result
                 )
+            d["deliverability"] = self.deliverability
+            d["latitude"] = self.latitude
+            d["longitude"] = self.longitude
+            d["precision"] = self.precision
+            d["accuracy_radius_meters"] = self.accuracy_radius_meters
+            d["census_tract"] = self.census_tract
+            d["fips_code"] = self.fips_code
             if self.spatial_result is not None:
                 d["spatial_result"] = (
                     self.spatial_result.as_dict()

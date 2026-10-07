@@ -30,7 +30,7 @@ from address_standardizer.tables import COUNTRY_MAP, GLOBAL_METRO_TO_COUNTRY
 
 # Secondary unit indicators (Polish, Czech, Romanian, Greek, Cyrillic, Latin)
 RE_EE_SECONDARY = re.compile(
-    r"\b(?:m\.|lok\.|mieszkanie|lokal|ap\.|apt|ap|apartament|byt|bl\.|bloc|sc\.|scara|et\.|etaj|кв\.|кв|квартира|ап\.|ап|оф\.|офис|офіс|вх\.|вход|ет\.|етаж|διαμ\.|diam\.|orofos)\s*([A-Za-z0-9\-]+)?",
+    r"\b(?:(?:m\.|m)\s*(?=\d)|lok\.|mieszkanie|lokal|ap\.|apt|apartament|byt|bl\.|bloc|sc\.|scara|et\.|etaj|кв\.|кв|квартира|ап\.|оф\.|офис|офіс|вх\.|вход|ет\.|етаж|διαμ\.|diam\.|orofos)\s*#?\s*([A-Za-z0-9\-]+)",
     re.IGNORECASE,
 )
 
@@ -103,6 +103,16 @@ class EasternEuropeGrammar(CountryGrammar):
         if m:
             st_num = m.group(2).strip()
             return None, st_num, line
+
+        # Check leading house number: e.g. "91, M. Alexandrou Str." or "91 M. Alexandrou"
+        m_lead = re.match(r"^(\d+[A-Za-z0-9\-\/]*)[,\s]+([A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF].*)$", line)
+        if m_lead:
+            st_num = m_lead.group(1).strip()
+            thoroughfare = m_lead.group(2).strip()
+            return None, st_num, thoroughfare
+
+        if re.match(r"^\d+[A-Za-z]?$", line):
+            return None, None, None
 
         return None, None, line
 

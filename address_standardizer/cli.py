@@ -518,6 +518,16 @@ def main():
         help="Output format: json, text, table (default: json)",
     )
 
+    # Command: serve microservice daemon
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="Start standalone FastAPI microservice daemon with OpenAPI documentation",
+    )
+    serve_parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+    serve_parser.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    serve_parser.add_argument("--workers", type=int, default=1, help="Number of worker processes (default: 1)")
+    serve_parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+
     raw_args = sys.argv[1:]
     normalized_args = []
     i = 0
@@ -989,6 +999,22 @@ def main():
                 lines.append(f"{i}. {s.text}{sec_notice}")
             if lines:
                 _emit_cli_output("\n".join(lines))
+
+    elif args.command == "serve":
+        try:
+            import uvicorn
+        except ImportError:
+            sys.stderr.write(
+                "Error: uvicorn is required to run the server daemon. Install with `pip install uvicorn`.\n"
+            )
+            sys.exit(1)
+        uvicorn.run(
+            "address_standardizer.server:app",
+            host=args.host,
+            port=args.port,
+            workers=args.workers,
+            reload=args.reload,
+        )
 
 
 if __name__ == "__main__":

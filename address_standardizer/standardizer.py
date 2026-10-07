@@ -72,6 +72,7 @@ from address_standardizer._patterns import (
     parse_intersection_address,
     is_city_noise_in_street1,
     clean_rooftop_address,
+    is_invalid_thoroughfare,
     RE_HIGHWAY_CONTRACT,
     RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
     RE_ATTACHED_SUFFIX_BARE_UNIT,
@@ -87,6 +88,8 @@ from address_standardizer._patterns import (
     RE_INTL_SEC_INLINE,
     RE_INTL_SEC_START,
     RE_NUMBER_HYPHEN_NUMBER,
+    RE_CARE_OF,
+    RE_PR_HIGHWAY,
     FROZEN_DIRECTIONAL_VALUES,
     FROZEN_US_STATE_CODES,
     ROUTE_PREFIXES,
@@ -455,17 +458,21 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
     # Check for Rural Route / Highway Contract
     m_rr = RE_RURAL_ROUTE.search(clean_addr)
     if m_rr:
-        rr_num = m_rr.group(2)
-        box_id = m_rr.group(3)
-        st1_rr = f"RR {rr_num} BOX {box_id}".strip() if box_id else f"RR {rr_num}"
-        return st1_rr, "", True
+        prefix_before = clean_addr[:m_rr.start()].strip()
+        if not any(c.isdigit() for c in prefix_before):
+            rr_num = m_rr.group(2)
+            box_id = m_rr.group(3)
+            st1_rr = f"RR {rr_num} BOX {box_id}".strip() if box_id else f"RR {rr_num}"
+            return st1_rr, "", True
 
     m_hc = RE_HIGHWAY_CONTRACT.search(clean_addr)
     if m_hc:
-        hc_num = m_hc.group(2)
-        box_id = m_hc.group(3)
-        st1_hc = f"HC {hc_num} BOX {box_id}".strip() if box_id else f"HC {hc_num}"
-        return st1_hc, "", True
+        prefix_before = clean_addr[:m_hc.start()].strip()
+        if not any(c.isdigit() for c in prefix_before):
+            hc_num = m_hc.group(2)
+            box_id = m_hc.group(3)
+            st1_hc = f"HC {hc_num} BOX {box_id}".strip() if box_id else f"HC {hc_num}"
+            return st1_hc, "", True
 
     # Check for Military Unit Box
     m_mil = RE_MILITARY_UNIT_BOX.search(clean_addr)
@@ -644,34 +651,38 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
     # Check for Rural Route in single string before usaddress
     m_rr = RE_RURAL_ROUTE.search(clean_input)
     if m_rr and not RE_PHYSICAL_STREET_INDICATOR.search(clean_input):
-        rr_num = m_rr.group(2)
-        box_id = m_rr.group(3)
-        st1_rr = f"RR {rr_num} BOX {box_id}".strip() if box_id else f"RR {rr_num}"
-        # Extract city state zip
-        m_sz = RE_STATE_ZIP.search(clean_input.upper())
-        p_st = m_sz.group(1) if m_sz else ""
-        p_zp = m_sz.group(2) if m_sz else ""
-        p_city = ""
-        if m_sz:
-            before_sz = clean_input[:m_sz.start()].rstrip(" ,")
-            after_rr = before_sz[m_rr.end():].strip(" ,")
-            p_city = after_rr
-        return st1_rr, "", True, p_city, p_st, p_zp
+        prefix_before = clean_input[:m_rr.start()].strip()
+        if not any(c.isdigit() for c in prefix_before):
+            rr_num = m_rr.group(2)
+            box_id = m_rr.group(3)
+            st1_rr = f"RR {rr_num} BOX {box_id}".strip() if box_id else f"RR {rr_num}"
+            # Extract city state zip
+            m_sz = RE_STATE_ZIP.search(clean_input.upper())
+            p_st = m_sz.group(1) if m_sz else ""
+            p_zp = m_sz.group(2) if m_sz else ""
+            p_city = ""
+            if m_sz:
+                before_sz = clean_input[:m_sz.start()].rstrip(" ,")
+                after_rr = before_sz[m_rr.end():].strip(" ,")
+                p_city = after_rr
+            return st1_rr, "", True, p_city, p_st, p_zp
 
     m_hc = RE_HIGHWAY_CONTRACT.search(clean_input)
     if m_hc and not RE_PHYSICAL_STREET_INDICATOR.search(clean_input):
-        hc_num = m_hc.group(2)
-        box_id = m_hc.group(3)
-        st1_hc = f"HC {hc_num} BOX {box_id}".strip() if box_id else f"HC {hc_num}"
-        m_sz = RE_STATE_ZIP.search(clean_input.upper())
-        p_st = m_sz.group(1) if m_sz else ""
-        p_zp = m_sz.group(2) if m_sz else ""
-        p_city = ""
-        if m_sz:
-            before_sz = clean_input[:m_sz.start()].rstrip(" ,")
-            after_hc = before_sz[m_hc.end():].strip(" ,")
-            p_city = after_hc
-        return st1_hc, "", True, p_city, p_st, p_zp
+        prefix_before = clean_input[:m_hc.start()].strip()
+        if not any(c.isdigit() for c in prefix_before):
+            hc_num = m_hc.group(2)
+            box_id = m_hc.group(3)
+            st1_hc = f"HC {hc_num} BOX {box_id}".strip() if box_id else f"HC {hc_num}"
+            m_sz = RE_STATE_ZIP.search(clean_input.upper())
+            p_st = m_sz.group(1) if m_sz else ""
+            p_zp = m_sz.group(2) if m_sz else ""
+            p_city = ""
+            if m_sz:
+                before_sz = clean_input[:m_sz.start()].rstrip(" ,")
+                after_hc = before_sz[m_hc.end():].strip(" ,")
+                p_city = after_hc
+            return st1_hc, "", True, p_city, p_st, p_zp
 
     # Check for Military Unit Box
     m_mil = RE_MILITARY_UNIT_BOX.search(clean_input)
@@ -954,12 +965,47 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
             elif len(state_parts) > 1 and state_parts[-1] in FROZEN_US_STATE_CODES:
                 city_parts = state_parts[:-1] + city_parts
                 state_parts = [state_parts[-1]]
+            elif clean_st.upper().replace(".", "") in (
+                "LP", "LLC", "INC", "CORP", "LTD", "CO", "PLLC", "PC", "SA", "AG",
+                "NV", "BV", "GMBH", "SGIIC", "SL", "PLC", "BO", "BARRIO", "SEC", "SECTOR"
+            ):
+                state_parts = []
             else:
                 street_parts.extend(state_parts)
                 state_parts = []
 
+    # If city_raw was explicitly provided, and street_parts has no thoroughfare/street name
+    # (e.g. empty or only Roman numerals / bare single identifiers like "LIGHTON PLAZA II" where
+    # "LIGHTON PLAZA" was tagged as PlaceName and "II" as street/state), reassociate city_parts
+    if city_raw and city_parts:
+        city_raw_clean = re.sub(r"[^\w]", "", city_raw.upper())
+        cand_city = re.sub(r"[^\w]", "", " ".join(city_parts).upper())
+        if city_raw_clean and cand_city and cand_city != city_raw_clean:
+            is_continuation_only = (not street_parts) or all(
+                p in ("I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X")
+                or p in STREET_SUFFIXES
+                or p in STREET_SUFFIXES.values()
+                or p.isdigit()
+                or len(p) == 1
+                for p in street_parts
+            )
+            has_premise_indicator = any(
+                p.upper() in LANDMARK_CAMPUS_KEYWORDS
+                or p.upper() in STREET_SUFFIXES
+                or p.upper() in ("CITY", "PARK", "PLACE", "TERRACE", "ROW", "MEWS", "SQUARE",
+                                 "CALLE", "AVENIDA", "AVE", "CAMINO", "PASEO", "CARRETERA", "CARR", "RUTA")
+                for p in city_parts
+            )
+            if is_continuation_only and has_premise_indicator:
+                street_parts = city_parts + street_parts
+                city_parts = []
+
     st1 = " ".join(street_parts).strip()
     st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
+    if is_invalid_thoroughfare(st1):
+        if st1:
+            sec_parts.append(st1)
+            st1 = ""
     st2 = _standardize_secondary_unit(" ".join(sec_parts).strip())
     if not p_city or not p_city.strip():
         p_city = " ".join(city_parts).strip()
@@ -1059,6 +1105,19 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
         combined_st2 = _standardize_secondary_unit(combined_st2)
         st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
         return st1, combined_st2, True, p_city, p_state, p_zip
+
+    # Puerto Rico Highway Mile/Kilometer Markers (e.g. "PR #2 KM 82 HM. 2", "PR-2 KM 82.2", "CARR 167 KM 15")
+    m_pr_hwy = RE_PR_HIGHWAY.match(s1_clean)
+    if m_pr_hwy:
+        hwy = m_pr_hwy.group(1).upper()
+        km = m_pr_hwy.group(2).upper()
+        hm = m_pr_hwy.group(3) or ""
+        rest = (m_pr_hwy.group(4) or "").strip()
+        km_str = f"{km}.{hm}" if (hm and "." not in km) else km
+        hwy_prefix = "PR" if s1_clean.upper().startswith("PR") else "CARR"
+        st1_res = f"{hwy_prefix}-{hwy} KM {km_str}"
+        st2_res = _standardize_secondary_unit(rest) if rest else ""
+        return st1_res, st2_res, True, "", "", ""
 
     combined = " ".join(filter(None, [s1_clean, s2_clean]))
     if not combined:
@@ -1211,6 +1270,7 @@ def _finalize_standardized_address(
     std.vacant = deliv.vacant
     std.is_vacant = deliv.is_vacant
     std.dpv_footnotes = deliv.dpv_footnotes
+    std.deliverability = deliv.deliverability
 
     # 2. Corporate Risk & BOI Transparency Flags
     corp_score, corp_flags = evaluate_corporate_risk(std, raw_input=raw_input)
@@ -1232,10 +1292,37 @@ def _finalize_standardized_address(
         )
         std.audit_record = audit_rec
 
-    # 4. Offline Spatial Coordinate Resolution
+    # 4. Pure Offline Spatial & Rooftop Coordinate Resolution (Zero External APIs)
     if enable_geocoding:
         from address_standardizer.spatial import resolve_spatial_coordinates
-        std.spatial_result = resolve_spatial_coordinates(std)
+        sp = resolve_spatial_coordinates(std)
+        std.spatial_result = sp
+        if sp is not None:
+            std.latitude = sp.latitude
+            std.longitude = sp.longitude
+            std.precision = sp.precision
+            std.accuracy_radius_meters = sp.accuracy_radius_meters
+            if hasattr(sp, "metadata") and isinstance(sp.metadata, dict):
+                std.census_tract = sp.metadata.get("census_tract")
+                std.fips_code = sp.metadata.get("fips_code")
+
+        # Enrich with census tract / FIPS metadata and handle fallback from offline reference index
+        from address_standardizer.geocoder import geocode_offline
+        geo_dict = geocode_offline(std, fallback_to_centroids=True)
+        if geo_dict:
+            if not std.census_tract and geo_dict.get("census_tract"):
+                std.census_tract = geo_dict["census_tract"]
+                if sp is not None and hasattr(sp, "metadata") and isinstance(sp.metadata, dict):
+                    sp.metadata["census_tract"] = geo_dict["census_tract"]
+            if not std.fips_code and geo_dict.get("fips_code"):
+                std.fips_code = geo_dict["fips_code"]
+                if sp is not None and hasattr(sp, "metadata") and isinstance(sp.metadata, dict):
+                    sp.metadata["fips_code"] = geo_dict["fips_code"]
+            if (std.latitude is None or (sp and sp.precision == "UNRESOLVED")) and geo_dict.get("latitude") is not None:
+                std.latitude = geo_dict["latitude"]
+                std.longitude = geo_dict["longitude"]
+                std.precision = geo_dict["precision"]
+                std.accuracy_radius_meters = geo_dict["accuracy_radius_meters"]
 
     if cache_key is not None:
         cache = get_default_cache()
@@ -1302,7 +1389,8 @@ def standardize_address(
             return copy.copy(cached)
 
     # Tier 0: Pre-Flight Sanity, Multiline Bleed Recovery, & Unicode NFKC Normalization
-    s1_in = str(street1).strip() if street1 is not None else ""
+    s1_cand = street1 if street1 is not None else kwargs.get("street")
+    s1_in = str(s1_cand).strip() if s1_cand is not None else ""
     s2_in = str(street2).strip() if street2 is not None else ""
     city_in = str(city).strip() if city is not None else ""
     state_in = str(state).strip() if state is not None else ""
@@ -1359,6 +1447,30 @@ def standardize_address(
     # Municipal Prefix / City Acronym Noise Filter in street1
     if is_city_noise_in_street1(s1_in, city_in, state_in):
         s1_in = ""
+
+    # Care-Of / Attention Prefix Cleaner
+    # Strips the leading "c/o <Company Name>" segment and any legal entity suffix, preserving all subsequent address parts
+    if re.match(r"^(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b", s1_in, re.IGNORECASE):
+        co_parts = [p.strip() for p in s1_in.split(",") if p.strip()]
+        rem_co = co_parts[1:]
+        LEGAL_SUFFIXES_CLEAN = {
+            "LLC", "LP", "LLP", "LLLPO", "INC", "CORP", "LTD", "CO", "PLLC", "PC",
+            "SA", "AG", "NV", "BV", "GMBH", "PLC", "FSB", "ESQ", "CPA", "MD", "PA",
+            "NA", "NTSA", "TRUST", "COMPANY", "LIMITED", "INCORPORATED", "CORPORATION",
+            "PARTNERSHIP", "SGIIC", "SL", "SRL", "SARL", "SAS", "SP", "SPA", "PTY",
+            "BHD", "SDN", "KGAA", "SE", "QC", "SC", "EIRL", "SCOP", "JR", "SR", "II", "III", "IV", "LPA", "APC"
+        }
+        while rem_co and rem_co[0].upper().replace(".", "").replace("&", "").replace(" ", "").strip() in LEGAL_SUFFIXES_CLEAN:
+            rem_co = rem_co[1:]
+        if len(rem_co) == 1 and not re.search(r"\d", rem_co[0]):
+            words = set(re.findall(r"\w+", rem_co[0].upper()))
+            has_street_word = bool(words & {"ST", "STREET", "RD", "ROAD", "AVE", "AVENUE", "BLVD", "BOULEVARD", "DR", "DRIVE", "LN", "LANE", "WAY", "CT", "COURT", "PL", "PLACE", "BOX", "HWY", "HIGHWAY", "PKWY", "PARKWAY", "CIR", "CIRCLE"})
+            if not has_street_word:
+                rem_co = []
+        s1_in = ", ".join(rem_co)
+        if not s1_in and s2_in:
+            s1_in = s2_in
+            s2_in = ""
 
     s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', s1_in)).strip()
     s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', s2_in)).strip()
@@ -1472,6 +1584,10 @@ def standardize_address(
                 norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
                     s1_clean, s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw
                 )
+        if is_invalid_thoroughfare(norm_s1):
+            if norm_s1:
+                norm_s2 = f"{norm_s1} {norm_s2}".strip() if norm_s2 else norm_s1
+                norm_s1 = ""
         if not city_raw and p_city:
             city_raw = p_city
         if not state_raw and p_state:
@@ -1555,7 +1671,9 @@ def standardize_address(
                 raw_street=raw_street_address,
             )
 
-        rooftop_addr = None if (is_priv or not norm_s1 or status != "standardized") else clean_rooftop_address(norm_s1)
+        has_po = bool(re.search(r"\b(?:P\.?\s*O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX|APO|FPO|DPO)\b", f"{norm_s1} {norm_s2} {raw_street_address}".upper()))
+        is_dual_physical = has_po and bool(norm_s1 and re.match(r"^(?:\d+|PR-|CARR-|KM\b)", norm_s1))
+        rooftop_addr = None if (is_priv or (has_po and not is_dual_physical) or not norm_s1 or status != "standardized") else clean_rooftop_address(norm_s1)
 
         std_us = StandardizedAddress(
             street1=norm_s1,
@@ -1618,10 +1736,16 @@ def standardize_address(
         if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
             norm_s1 = ""
 
+        if is_invalid_thoroughfare(norm_s1):
+            if norm_s1:
+                norm_s2 = f"{norm_s1} {norm_s2}".strip() if norm_s2 else norm_s1
+                norm_s1 = ""
+
         # If thoroughfare (street1) is empty but secondary delivery line / PO Box exists, promote it
         if not norm_s1 and norm_s2:
-            norm_s1 = norm_s2
-            norm_s2 = ""
+            if norm_s2.startswith("PO BOX ") or (RE_PHYSICAL_STREET_INDICATOR.search(norm_s2) and not is_invalid_thoroughfare(norm_s2)):
+                norm_s1 = norm_s2
+                norm_s2 = ""
 
         # Minimum viable check: requires valid non-empty street line or locality-only record
         has_locality = bool(norm_city or norm_state or norm_postal)
@@ -1665,7 +1789,9 @@ def standardize_address(
                 raw_street=raw_street_address,
             )
 
-        rooftop_addr = None if (is_priv or not norm_s1 or status != "standardized") else clean_rooftop_address(norm_s1)
+        has_po = bool(re.search(r"\b(?:P\.?\s*O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX|APO|FPO|DPO)\b", f"{norm_s1} {norm_s2} {raw_street_address}".upper()))
+        is_dual_physical = has_po and bool(norm_s1 and re.match(r"^(?:\d+|PR-|CARR-|KM\b)", norm_s1))
+        rooftop_addr = None if (is_priv or (has_po and not is_dual_physical) or not norm_s1 or status != "standardized") else clean_rooftop_address(norm_s1)
 
         std_intl = StandardizedAddress(
             street1=norm_s1,

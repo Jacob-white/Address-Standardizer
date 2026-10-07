@@ -42,9 +42,31 @@ def split_intl_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
     # Pre-split Flat / Apt at start: "Flat 4 150 High Street" -> st1="150 High Street", st2="APT 4"
     m_flat = RE_INTL_FLAT.match(st1)
     if m_flat:
-        st2_cand = f"APT {m_flat.group(1).upper()}"
+        cand_id = m_flat.group(1).upper()
+        rem_cand = m_flat.group(2).strip()
+        if len(rem_cand) == 1 and rem_cand.isalpha():
+            st2_cand = f"APT {cand_id}{rem_cand.upper()}"
+            st1 = ""
+        else:
+            st2_cand = f"APT {cand_id}"
+            st1 = rem_cand
         st2 = f"{st2_cand} {st2}".strip() if st2 else st2_cand
-        st1 = m_flat.group(2).strip()
+
+    # Pre-split leading Asian/International floor numbers: "8F SHIN-OTEMACHI BLDG" -> st1="SHIN-OTEMACHI BLDG", st2="FL 8"
+    m_floor = re.match(r"^([B]?\d+)F\b\s+(.*)$", st1, re.IGNORECASE)
+    if m_floor:
+        st2_cand = f"FL {m_floor.group(1).upper()}"
+        st2 = f"{st2_cand} {st2}".strip() if st2 else st2_cand
+        st1 = m_floor.group(2).strip()
+
+    # Pre-split leading ordinal floor numbers: "9TH FLOOR WEST" -> st1="", st2="FL 9TH WEST"
+    m_ord_floor = re.match(r"^(\d+(?:ST|ND|RD|TH)|\d+)\s+(?:FLOOR|FL|FLR)\b(?:\s+(WEST|EAST|NORTH|SOUTH))?(?:[,\s]+(.*))?$", st1, re.IGNORECASE)
+    if m_ord_floor:
+        fl_num = m_ord_floor.group(1).upper()
+        wing = f" {m_ord_floor.group(2).upper()}" if m_ord_floor.group(2) else ""
+        st2_cand = f"FL {fl_num}{wing}"
+        st2 = f"{st2_cand} {st2}".strip() if st2 else st2_cand
+        st1 = (m_ord_floor.group(3) or "").strip(" ,.-")
 
     if not st2:
         m = RE_INTL_SEC_INLINE.search(st1)
@@ -55,6 +77,9 @@ def split_intl_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
             st2 = f"{sec_type_norm} {sec_id}"
             st1 = st1[:m.start()] + st1[m.end():]
             st1 = RE_WHITESPACE.sub(" ", st1.strip(" ,.-"))
+            if len(st1) == 1 and st1.isalpha():
+                st2 = f"{st2}{st1}"
+                st1 = ""
     elif st2:
         m2 = RE_INTL_SEC_START.match(st2)
         if m2:

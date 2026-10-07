@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  address-standardizer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: address-standardizer:latest
+    container_name: address-standardizer-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ADDRESS_STANDARDIZER_CACHE_MAX_SIZE=100000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G

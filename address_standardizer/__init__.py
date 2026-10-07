@@ -6,6 +6,8 @@ and cross-border corporate entity resolution platform.
 Adheres to USPS Publication 28, Universal Postal Union (UPU) S42, and ISO 19160-4 standards.
 """
 
+__version__ = "3.2.0"
+
 from address_standardizer.models import StandardizedAddress
 from address_standardizer.standardizer import (
     standardize_address,
@@ -125,6 +127,14 @@ from address_standardizer._native_dispatch import (
     standardize_record_dispatch,
     standardize_batch_dispatch,
 )
+from address_standardizer.arrow import (
+    standardize_arrow,
+    standardize_polars,
+    register_duckdb_udfs,
+)
+from address_standardizer.server import (
+    create_app,
+)
 
 __version__ = "3.2.0"
 
@@ -229,6 +239,10 @@ __all__ = [
     "PostalValidationResult",
     "validate_postal_code",
     "extract_postal_code",
+    "standardize_arrow",
+    "standardize_polars",
+    "register_duckdb_udfs",
+    "create_app",
     "__version__",
 ]
 

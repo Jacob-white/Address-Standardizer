@@ -6,6 +6,7 @@ Residential Delivery Indicator (RDI), Commercial Mail Receiving Agency (CMRA)
 identification, and vacancy detection.
 """
 
+from enum import Enum
 import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any
@@ -15,6 +16,14 @@ from address_standardizer.registry import (
     RegistryCategory,
 )
 from address_standardizer.tables import ZIP3_TO_STATE, US_STATES
+
+__all__ = [
+    "DPVFootnote",
+    "RDI",
+    "Deliverability",
+    "DeliveryIntelligenceResult",
+    "evaluate_delivery_intelligence",
+]
 
 
 class DPVFootnote:
@@ -34,7 +43,7 @@ class DPVFootnote:
     U1 = "U1"  # Unique ZIP code
 
 
-class RDI:
+class RDI(str, Enum):
     """Residential Delivery Indicator values."""
     RESIDENTIAL = "Residential"
     COMMERCIAL = "Commercial"
@@ -56,6 +65,13 @@ RESIDENTIAL_SEC_UNITS = frozenset({
 })
 
 
+class Deliverability(str, Enum):
+    """Consolidated USPS deliverability classifications."""
+    DELIVERABLE = "DELIVERABLE"
+    REQUIRES_SECONDARY = "REQUIRES_SECONDARY"
+    UNDELIVERABLE = "UNDELIVERABLE"
+
+
 @dataclass
 class DeliveryIntelligenceResult:
     """Structured delivery intelligence metadata."""
@@ -63,6 +79,7 @@ class DeliveryIntelligenceResult:
     cmra: bool
     vacant: bool
     dpv_footnotes: List[str] = field(default_factory=list)
+    deliverability: str = Deliverability.DELIVERABLE
 
     @property
     def is_cmra(self) -> bool:
@@ -80,25 +97,58 @@ class DeliveryIntelligenceResult:
             "vacant": self.vacant,
             "is_vacant": self.vacant,
             "dpv_footnotes": list(self.dpv_footnotes),
+            "deliverability": self.deliverability,
         }
 
 
 def evaluate_delivery_intelligence(
-    std_address: Any,
+    std_address: Any = None,
     raw_input: Optional[Dict[str, Any]] = None,
     is_vacant_override: Optional[bool] = None,
+    *,
+    street1: Optional[str] = None,
+    street2: Optional[str] = None,
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    postal_code: Optional[str] = None,
+    country: Optional[str] = None,
+    address_status: Optional[str] = None,
+    **kwargs: Any,
 ) -> DeliveryIntelligenceResult:
     """
     Evaluates delivery intelligence for a standardized address, computing
-    RDI, CMRA status, vacancy flag, and USPS DPV diagnostic footnote codes.
+    RDI, CMRA status, vacancy flag, USPS DPV diagnostic footnote codes,
+    and consolidated deliverability classification.
     """
+    if std_address is None or street1 is not None or kwargs:
+        from address_standardizer.standardizer import standardize_address
+        s1_val = (street1 or getattr(std_address, "street1", "") or kwargs.get("street1", "") or "").strip()
+        s2_val = (street2 or getattr(std_address, "street2", "") or kwargs.get("street2", "") or "").strip()
+        c_val = (city or getattr(std_address, "city", "") or kwargs.get("city", "") or "").strip()
+        st_val = (state or getattr(std_address, "state", "") or kwargs.get("state", "") or "").strip()
+        post_val = (postal_code or getattr(std_address, "postal_code", "") or kwargs.get("postal_code", "") or "").strip()
+        cntry_val = (country or getattr(std_address, "country", "USA") or kwargs.get("country", "USA"))
+
+        std_address = standardize_address(
+            street1=s1_val,
+            street2=s2_val,
+            city=c_val,
+            state=st_val,
+            postal_code=post_val,
+            country=cntry_val,
+            allow_locality=True,
+        )
+
     # 1. International short-circuit
     if not getattr(std_address, "is_us", True):
+        status = getattr(std_address, "address_status", "standardized")
+        is_deliv = (status == "standardized")
         return DeliveryIntelligenceResult(
             rdi=RDI.UNKNOWN,
             cmra=False,
             vacant=False,
             dpv_footnotes=[],
+            deliverability=Deliverability.DELIVERABLE if is_deliv else Deliverability.UNDELIVERABLE,
         )
 
     raw = raw_input or {}
@@ -207,7 +257,9 @@ def evaluate_delivery_intelligence(
                 country="USA",
                 raw_street=raw_combined,
             )
-            is_multi_unit_hub = is_hub or (reg_entry is not None)
+            from address_standardizer.offline_index import get_default_offline_index
+            offline_rec = get_default_offline_index().resolve_coordinates(std_address)
+            is_multi_unit_hub = is_hub or (reg_entry is not None) or (offline_rec is not None and getattr(offline_rec, "is_multi_unit", False))
 
             if st2:
                 footnotes.append(DPVFootnote.CC)
@@ -216,9 +268,22 @@ def evaluate_delivery_intelligence(
         else:
             footnotes.append(DPVFootnote.M1)
 
+    # Consolidated deliverability classification
+    if status == "parse_failed" or DPVFootnote.M1 in footnotes or DPVFootnote.M3 in footnotes:
+        deliverability = Deliverability.UNDELIVERABLE
+    elif DPVFootnote.N1 in footnotes:
+        deliverability = Deliverability.REQUIRES_SECONDARY
+    elif DPVFootnote.BB in footnotes:
+        deliverability = Deliverability.DELIVERABLE
+    elif DPVFootnote.A1 in footnotes:
+        deliverability = Deliverability.UNDELIVERABLE
+    else:
+        deliverability = Deliverability.DELIVERABLE if status == "standardized" else Deliverability.UNDELIVERABLE
+
     return DeliveryIntelligenceResult(
         rdi=rdi,
         cmra=is_cmra,
         vacant=is_vacant,
         dpv_footnotes=footnotes,
+        deliverability=deliverability,
     )

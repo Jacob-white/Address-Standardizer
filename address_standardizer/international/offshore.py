@@ -93,8 +93,15 @@ class OffshoreGrammar(CountryGrammar):
         if "," in line:
             parts = [p.strip() for p in line.split(",") if p.strip()]
             if len(parts) >= 2:
-                premise = parts[0].upper()
-                thoroughfare_part = parts[1]
+                if parts[1].upper().replace(".", "") in ("LP", "LLC", "INC", "CORP", "LTD", "CO", "PLLC", "PC", "SA", "AG", "NV", "BV", "GMBH", "PLC"):
+                    if len(parts) >= 3:
+                        premise = f"{parts[0]}, {parts[1]}".upper()
+                        thoroughfare_part = parts[2]
+                    else:
+                        return None, None, None
+                else:
+                    premise = parts[0].upper()
+                    thoroughfare_part = parts[1]
                 m_num = re.match(r"^(\d+[A-Za-z0-9\-\/]*)\s+(.*)$", thoroughfare_part)
                 if m_num:
                     st_num = m_num.group(1).upper()

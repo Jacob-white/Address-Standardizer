@@ -29,6 +29,9 @@ from address_standardizer.cascade import (
 
 __all__ = [
     "CensusGeocoder",
+    "OfflineGeocoder",
+    "get_default_offline_geocoder",
+    "geocode_offline",
     "get_fallback_centroid",
     "parse_census_geocoder_response",
     "VerificationCascade",
@@ -176,3 +179,72 @@ class CensusGeocoder:
             fallback_to_centroids=fallback_to_centroids,
         )
         return res.get("1")
+
+
+class OfflineGeocoder:
+    """
+    Pure Offline Rooftop Geocoding & Interpolation Engine (Zero External APIs).
+    Supports:
+    1. Exact Rooftop matches (OpenAddresses / OfflineReferenceIndex)
+    2. Linear interpolation along street edges (US Census TIGER)
+    3. Locality / Postal centroid fallback
+    Populates: latitude, longitude, precision (ROOFTOP, RANGE_INTERPOLATED, LOCALITY),
+               accuracy_radius_meters, census_tract, and fips_code.
+    """
+
+    def __init__(self, index: Optional[Any] = None):
+        if index is not None:
+            self._index = index
+        else:
+            from address_standardizer.offline_index import get_default_offline_index
+            self._index = get_default_offline_index()
+
+    def geocode(self, address: Any, fallback_to_centroids: bool = True) -> Dict[str, Any]:
+        """Geocodes a StandardizedAddress or address string completely offline."""
+        return self._index.geocode(address, fallback_to_centroids=fallback_to_centroids)
+
+    def geocode_address(
+        self,
+        street: str,
+        city: str = "",
+        state: str = "",
+        zip_code: str = "",
+        fallback_to_centroids: bool = True,
+    ) -> Dict[str, Any]:
+        """Geocodes address fields completely offline."""
+        from address_standardizer.standardizer import standardize_address
+        std = standardize_address(street1=street, city=city, state=state, postal_code=zip_code, enable_geocoding=False)
+        return self.geocode(std, fallback_to_centroids=fallback_to_centroids)
+
+    def geocode_batch(
+        self,
+        records: List[Tuple[str, str, str, str, str]],
+        fallback_to_centroids: bool = True,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        Geocodes a batch of records completely offline:
+        [(id_str, street, city, state, zip_code), ...]
+        Returns dict: { id_str: {'latitude': float, 'longitude': float, 'precision': str, 'accuracy_radius_meters': float, 'census_tract': Optional[str], 'fips_code': Optional[str]} }
+        """
+        output: Dict[str, Dict[str, Any]] = {}
+        for rec in records:
+            rec_id, st1, city, state, zip_c = rec
+            output[str(rec_id)] = self.geocode_address(
+                st1, city=city, state=state, zip_code=zip_c, fallback_to_centroids=fallback_to_centroids
+            )
+        return output
+
+
+_DEFAULT_OFFLINE_GEOCODER: Optional[OfflineGeocoder] = None
+
+
+def get_default_offline_geocoder() -> OfflineGeocoder:
+    global _DEFAULT_OFFLINE_GEOCODER
+    if _DEFAULT_OFFLINE_GEOCODER is None:
+        _DEFAULT_OFFLINE_GEOCODER = OfflineGeocoder()
+    return _DEFAULT_OFFLINE_GEOCODER
+
+
+def geocode_offline(address: Any, fallback_to_centroids: bool = True) -> Dict[str, Any]:
+    """Convenience functional interface for pure offline geocoding."""
+    return get_default_offline_geocoder().geocode(address, fallback_to_centroids=fallback_to_centroids)

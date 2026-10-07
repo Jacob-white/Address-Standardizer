@@ -118,6 +118,18 @@ RE_PRIVATE_MAILBOX = re.compile(r"\bPRIVATE\s+MAILBOX\b", re.IGNORECASE)
 RE_HYPHENATED_UNIT = re.compile(r"\b(STE|SUITE|APT|UNIT|FL)-(\d+)", re.IGNORECASE)
 RE_COMMA_DOT = re.compile(r"[,\.]+")
 RE_DIGITS = re.compile(r"\d")
+
+# Care-of / In Care Of / Attention line (e.g. "c/o Ananym Capital Management, LP")
+RE_CARE_OF = re.compile(
+    r"^(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b.*?(?:,\s*(?:LLC|LP|INC|CORP|LTD|CO|P\.?C\.?|PLLC|SA|AG|NV|BV|GMBH|SGIIC|S\.?A\.?|S\.?L\.?))?(?:,\s*|$)",
+    re.IGNORECASE,
+)
+
+# Puerto Rico Highway Addresses (e.g. "PR #2 KM 82 HM. 2", "PR-2 KM 82.2", "CARR 167 KM 15")
+RE_PR_HIGHWAY = re.compile(
+    r"^(?:PR|CARR|CARRETERA)\s*(?:#|NO\.?|-)?\s*(\d+[A-Z]?)\s+(?:KM|KILOMETRO)\.?\s*(\d+(?:\.\d+)?)(?:\s+(?:HM|HECTOMETRO)\.?\s*(\d+))?(.*)$",
+    re.IGNORECASE,
+)
 RE_PHYSICAL_STREET_INDICATOR = re.compile(r"\b\d+\s+[A-Za-z]+\s+(ST|AVE|RD|BLVD|DR|LN|WAY)\b", re.IGNORECASE)
 RE_OCCUPANCY_VAL_CLEAN = re.compile(r"[^\w\-]")
 RE_IDENTIFIER_TOKEN = re.compile(r"^(\d+[A-Z0-9\-]*|[A-Z]\d+|[A-Z])$")
@@ -147,9 +159,62 @@ FROZEN_SECONDARY_UNITS = frozenset(SECONDARY_UNITS.keys())
 FROZEN_SECONDARY_UNIT_VALUES = frozenset(SECONDARY_UNITS.values())
 
 ROUTE_PREFIXES = frozenset({
-    "RTE", "ROUTE", "HWY", "HIGHWAY", "CR", "SR",
-    "COUNTY RD", "COUNTY ROAD", "STATE ROUTE", "ROAD", "RD", "CO RD"
+    "RTE", "ROUTE", "HWY", "HIGHWAY", "CR", "SR", "RR", "FM", "RM",
+    "COUNTY RD", "COUNTY ROAD", "STATE ROUTE", "ROAD", "RD", "CO RD",
+    "RANCH ROAD", "FARM ROAD"
 })
+
+KNOWN_VALID_SINGLE_WORD_STREETS = frozenset({
+    "BROADWAY", "BOWERY", "THE EMBARCADERO", "THE MALL", "WALL", "MALL"
+})
+
+
+RE_BARE_UNIT_PHRASE = re.compile(
+    r"^(?:FL|FLOOR|APT|APARTMENT|STE|SUITE|UNIT|RM|ROOM|BLDG|BUILDING|LEVEL|LVL)\s*#?\s*[A-Z0-9\-]+$",
+    re.IGNORECASE
+)
+RE_LONE_NUMBER = re.compile(r"^\d+[A-Z0-9\-\/]*$")
+RE_LONE_ALPHANUM = re.compile(r"^[A-Z]\d+$|^\d+[A-Z]$")
+INVALID_ORPHAN_TOKENS = frozenset({
+    "UP", "BO", "GDN", "LB", "DUO", "FSB", "ESQ", "CPA", "MD", "PA", "NA", "NTSA",
+    "JR", "SR", "II", "III", "IV", "LPA", "FLT", "LHS", "RHS", "TOR",
+    "LLC", "LP", "LLP", "INC", "CORP", "LTD", "PLC", "SA", "AG", "GMBH", "BV", "NV",
+    "IST", "IIND", "IIIRD", "IVTH"
+})
+
+
+def is_invalid_thoroughfare(st1: Optional[str]) -> bool:
+    """
+    Returns True if st1 is NOT a legitimate thoroughfare line.
+    Detects bare house/unit numbers, orphan unit designators, and stray legal suffixes.
+    """
+    if not st1:
+        return True
+    clean = str(st1).strip().upper()
+    if not clean:
+        return True
+    clean_alnum = re.sub(r"[^\w]", "", clean)
+    if len(clean_alnum) <= 1:
+        return True
+    if clean.startswith("(") and clean.endswith(")"):
+        return True
+    if " " not in clean and "&" in clean:
+        return True
+    if " " in clean:
+        return bool(RE_BARE_UNIT_PHRASE.match(clean))
+    if clean in KNOWN_VALID_SINGLE_WORD_STREETS:
+        return False
+    if clean in INVALID_ORPHAN_TOKENS or clean_alnum in INVALID_ORPHAN_TOKENS:
+        return True
+    if clean in ("ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN"):
+        return True
+    if clean in STREET_SUFFIXES or clean in STREET_SUFFIXES.values():
+        return True
+    if RE_LONE_NUMBER.match(clean):
+        return True
+    if RE_LONE_ALPHANUM.match(clean):
+        return True
+    return False
 
 MULTI_WORD_CITIES = frozenset({
     "NEW YORK", "SAN FRANCISCO", "LOS ANGELES", "SALT LAKE CITY", "KANSAS CITY",
@@ -294,7 +359,11 @@ def clean_redundant_street_tail(
                 st_pat = "|".join(set(st_variants))
                 m_st = re.search(r"(?:,\s*|\s+)(?:" + st_pat + r")$", curr, re.IGNORECASE)
                 if m_st:
-                    curr = curr[:m_st.start()].rstrip(" ,.-")
+                    cand = curr[:m_st.start()].rstrip(" ,.-")
+                    tokens_cand = cand.split()
+                    has_street_words = any(t.isalpha() and t.upper() not in ("ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN") for t in tokens_cand)
+                    if has_street_words or not tokens_cand:
+                        curr = cand
 
         # 4. Strip matching city if at end or exact match
         if city:
@@ -302,7 +371,11 @@ def clean_redundant_street_tail(
             if city_clean:
                 m_city = re.search(r"(?:,\s*|\s+)" + re.escape(city_clean) + r"$", curr, re.IGNORECASE)
                 if m_city:
-                    curr = curr[:m_city.start()].rstrip(" ,.-")
+                    cand = curr[:m_city.start()].rstrip(" ,.-")
+                    tokens_cand = cand.split()
+                    has_street_words = any(t.isalpha() and t.upper() not in ("ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN") for t in tokens_cand)
+                    if has_street_words or not tokens_cand:
+                        curr = cand
                 if curr.upper() == city_clean:
                     curr = ""
 
@@ -656,7 +729,10 @@ RE_ROOFTOP_SEC = re.compile(
     r"(?:,?\s+(?:#\s*([A-Z0-9\-]+)|(APT|APARTMENT|STE|SUITE|FL|FLOOR|FLR|UNIT|RM|ROOM|DEPT|DEPARTMENT|BLDG|BUILDING|PH|PENTHOUSE|BSMT|BASEMENT|MEZZ|MEZZANINE|OFC|OFFICE|SPC|SPACE|TRLR|TRAILER|LOT|LEVEL|LVL|LBBY|LOBBY|LOWR|LOWER|UPPR|UPPER|FRNT|FRONT|REAR|SIDE|SLIP|STP|STOP|HNGR|HANGAR|KEY|PIER|FLAT)\b(?:\s*([A-Z0-9\-#]+))?|(\d+(?:ST|ND|RD|TH))\s+(FL|FLOOR|FLR)\b.*))$",
     re.IGNORECASE,
 )
-RE_PO_BOX_PREFIX = re.compile(r"^(?:P\.?\s*O\.?\s*BOX|POB|BOX|RR|HC)\b", re.IGNORECASE)
+RE_PO_BOX_ANYWHERE = re.compile(
+    r"\b(?:P\.?\s*O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX|APO|FPO|DPO)\b|^(?:BOX|RR|HC)\b",
+    re.IGNORECASE,
+)
 
 
 def clean_rooftop_address(street_line: Optional[str]) -> Optional[str]:
@@ -671,7 +747,9 @@ def clean_rooftop_address(street_line: Optional[str]) -> Optional[str]:
     val_upper = val.upper()
     if val_upper in ("PRIVATE RESIDENCE", "CONFIDENTIAL", "RESIDENTIAL", "PERSONAL RESIDENCE"):
         return None
-    if RE_PO_BOX_PREFIX.search(val_upper):
+    if RE_PO_BOX_ANYWHERE.search(val_upper):
+        return None
+    if " " not in val_upper and is_invalid_thoroughfare(val):
         return None
 
     # Fast-path check: if none of the secondary indicator substrings are present, return immediately
@@ -683,7 +761,9 @@ def clean_rooftop_address(street_line: Optional[str]) -> Optional[str]:
             "LEVEL", "FLAT", "FRNT", "REAR", "SIDE", "SLIP", "HNGR", "PIER"
         )
     ):
-        return val
+        if " " in val_upper:
+            return val
+        return None if is_invalid_thoroughfare(val) else val
 
     # Iteratively strip trailing secondary units (e.g., 'BLDG 4 STE 200')
     for _ in range(3):
@@ -706,5 +786,7 @@ def clean_rooftop_address(street_line: Optional[str]) -> Optional[str]:
             break
 
     val = re.sub(r"[\s,.\-#;:]+$", "", val).strip()
-    return val if val else None
+    if not val or is_invalid_thoroughfare(val):
+        return None
+    return val
 

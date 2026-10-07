@@ -146,29 +146,50 @@ class SpatialEngine:
 
     def __init__(self, db_path: Optional[str] = None, seed: bool = True):
         self._db_path = db_path or ":memory:"
+        self._seed = seed
+        self._pid = os.getpid()
         self._lock = threading.RLock()
-        self._conn = sqlite3.connect(self._db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._init_schema()
+        self._real_conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        self._real_conn.row_factory = sqlite3.Row
+        self._init_schema(self._real_conn)
 
         if seed and self.count() == 0:
             self._seed_defaults()
 
-    def _init_schema(self):
-        with self._lock, self._conn:
+    @property
+    def _conn(self) -> sqlite3.Connection:
+        current_pid = os.getpid()
+        if current_pid != self._pid:
+            with self._lock:
+                if current_pid != self._pid:
+                    self._pid = current_pid
+                    self._real_conn = sqlite3.connect(self._db_path, check_same_thread=False)
+                    self._real_conn.row_factory = sqlite3.Row
+                    self._init_schema(self._real_conn)
+                    if self._seed and self.count() == 0:
+                        self._seed_defaults()
+        return self._real_conn
+
+    @_conn.setter
+    def _conn(self, val: Optional[sqlite3.Connection]):
+        self._real_conn = val
+
+    def _init_schema(self, conn: Optional[sqlite3.Connection] = None):
+        target_conn = conn or self._real_conn
+        with self._lock, target_conn:
             # Memory and WAL pragmas
             if self._db_path != ":memory:":
                 try:
-                    self._conn.execute("PRAGMA journal_mode = WAL;")
-                    self._conn.execute("PRAGMA synchronous = NORMAL;")
-                    self._conn.execute("PRAGMA mmap_size = 268435456;")
+                    target_conn.execute("PRAGMA journal_mode = WAL;")
+                    target_conn.execute("PRAGMA synchronous = NORMAL;")
+                    target_conn.execute("PRAGMA mmap_size = 268435456;")
                 except sqlite3.Error:
                     pass
-            self._conn.execute("PRAGMA cache_size = -64000;")
-            self._conn.execute("PRAGMA temp_store = MEMORY;")
+            target_conn.execute("PRAGMA cache_size = -64000;")
+            target_conn.execute("PRAGMA temp_store = MEMORY;")
 
             # 1. R*Tree Virtual Table for Spatial Points
-            self._conn.execute("""
+            target_conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS spatial_rtree USING rtree(
                     id INTEGER PRIMARY KEY,
                     minX REAL, maxX REAL,
@@ -177,7 +198,7 @@ class SpatialEngine:
             """)
 
             # 2. Master Spatial Points Table
-            self._conn.execute("""
+            target_conn.execute("""
                 CREATE TABLE IF NOT EXISTS spatial_points (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     address_key TEXT NOT NULL,
@@ -198,14 +219,14 @@ class SpatialEngine:
                     metadata_json TEXT
                 );
             """)
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_addr ON spatial_points(address_key);")
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_bld ON spatial_points(building_key);")
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_h3 ON spatial_points(h3_res10);")
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_parcel ON spatial_points(parcel_id);")
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_post_st ON spatial_points(postal_code, street_name);")
+            target_conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_addr ON spatial_points(address_key);")
+            target_conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_bld ON spatial_points(building_key);")
+            target_conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_h3 ON spatial_points(h3_res10);")
+            target_conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_parcel ON spatial_points(parcel_id);")
+            target_conn.execute("CREATE INDEX IF NOT EXISTS idx_spatial_post_st ON spatial_points(postal_code, street_name);")
 
             # 3. R*Tree Virtual Table for Street Segments
-            self._conn.execute("""
+            target_conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS street_segments_rtree USING rtree(
                     id INTEGER PRIMARY KEY,
                     minX REAL, maxX REAL,
@@ -214,7 +235,7 @@ class SpatialEngine:
             """)
 
             # 4. Master Street Segments Table
-            self._conn.execute("""
+            target_conn.execute("""
                 CREATE TABLE IF NOT EXISTS street_segments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     street_name TEXT NOT NULL,
@@ -232,11 +253,11 @@ class SpatialEngine:
                     source TEXT DEFAULT 'TIGER'
                 );
             """)
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_street_seg_name ON street_segments(street_name);")
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_street_seg_post ON street_segments(postal_code, street_name);")
+            target_conn.execute("CREATE INDEX IF NOT EXISTS idx_street_seg_name ON street_segments(street_name);")
+            target_conn.execute("CREATE INDEX IF NOT EXISTS idx_street_seg_post ON street_segments(postal_code, street_name);")
 
             # 5. Postal Centroids Table
-            self._conn.execute("""
+            target_conn.execute("""
                 CREATE TABLE IF NOT EXISTS postal_centroids (
                     postal_code TEXT PRIMARY KEY,
                     latitude REAL NOT NULL,
@@ -250,7 +271,7 @@ class SpatialEngine:
             """)
 
             # 6. Municipal Centroids Table
-            self._conn.execute("""
+            target_conn.execute("""
                 CREATE TABLE IF NOT EXISTS municipal_centroids (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
@@ -262,7 +283,7 @@ class SpatialEngine:
                     accuracy_radius_m REAL NOT NULL
                 );
             """)
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_muni_lookup ON municipal_centroids(country_iso3, state, name);")
+            target_conn.execute("CREATE INDEX IF NOT EXISTS idx_muni_lookup ON municipal_centroids(country_iso3, state, name);")
 
     def _seed_defaults(self):
         for pt in SEED_SPATIAL_POINTS:
