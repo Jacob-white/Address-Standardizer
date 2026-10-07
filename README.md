@@ -1,18 +1,28 @@
 # Address Standardizer
 
-[![Version](https://img.shields.io/badge/version-3.2.0-blue.svg)](https://github.com/Jacob-white/Address-Standardizer)
+[![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)](https://github.com/Jacob-white/Address-Standardizer)
 [![CI Tests](https://img.shields.io/badge/tests-950%2B%20passed-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
 [![Coverage](https://img.shields.io/badge/coverage-100%25%20(37%20modules)-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Standards](https://img.shields.io/badge/Standards-USPS%20Pub%2028%20%7C%20UPU%20S42%20%7C%20ISO%2019160--4-orange.svg)](https://pe.usps.com/text/pub28/welcome.htm)
 
-A standalone, ultra-high-throughput multi-national address standardization, offline spatial rooftop geocoding, and cross-border corporate entity resolution platform. Built to parse, normalize, validate, deduplicate, and geocode physical addresses across all 249 ISO-3166-1 countries and territories without third-party vendor lock-in or recurring cloud API fees.
+A standalone, ultra-high-throughput multi-national address standardization, offline spatial rooftop geocoding, and cross-border corporate entity resolution platform. Built to parse, normalize, validate, deduplicate, and geocode physical addresses across all 249 ISO-3166-1 countries and territories without third-party vendor lock-in or recurring cloud API fees. Owned and maintained by **HobbyHabbit LLC** under the **MIT License**.
+
+---
+
+## 📚 Documentation & Quickstarts
+
+- **[5-Minute Quickstart Guide](docs/quickstart.md)** — Step-by-step onboarding for address parsing, international detection, offline spatial geocoding, streaming batch, and HTTP daemon.
+- **[Complete API Reference](docs/api_reference.md)** — Exhaustive technical reference for all Python models, functions, classes, CLI commands, and microservice endpoints.
+- **[Security Policy & Sandboxing Guide](SECURITY.md)** — Threat model, memory safety, air-gapped spatial execution, FinCEN anti-fraud invariants, and vulnerability disclosure procedures.
+- **[Architectural Specifications Index](docs/README.md)** — Formal engineering roadmaps from Phase 1 through Phase 4 Commercial Parity.
 
 ---
 
 ## Table of Contents
 
+- [Documentation & Quickstarts](#-documentation--quickstarts)
 - [Highlights & Enterprise Capabilities](#highlights--enterprise-capabilities)
 - [Architecture & Standards](#architecture--standards)
 - [Installation](#installation)
@@ -31,6 +41,7 @@ A standalone, ultra-high-throughput multi-national address standardization, offl
 - [Command Line Interface (CLI)](#command-line-interface-cli)
 - [Data Model (`StandardizedAddress`)](#data-model-standardizedaddress)
 - [Enterprise Verification & Benchmarks](#enterprise-verification--benchmarks)
+- [Security Policy](#security-policy)
 - [License](#license)
 
 ---
@@ -631,6 +642,15 @@ pytest tests/ --cov=address_standardizer --cov-report=term-missing
 
 ---
 
+## Security Policy
+
+Security is a foundational pillar of Address Standardizer. For details on our threat model, defensive architecture, air-gapped spatial execution, and Coordinated Vulnerability Disclosure (CVD) policy, please review our **[SECURITY.md](SECURITY.md)**.
+
+To report security vulnerabilities, email `security@hobbyhabbit.com`, `support@hobbyhabbit.com`, and `jake@hobbyhabbit.com`.
+
+---
+
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+Copyright © 2026 HobbyHabbit LLC.

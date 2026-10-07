@@ -2,6 +2,8 @@
 name = "_address_standardizer_rs"
 version = "3.3.0"
 edition = "2021"
+authors = ["HobbyHabbit LLC <support@hobbyhabbit.com>"]
+license = "MIT"
 
 [lib]
 name = "_address_standardizer_rs"
