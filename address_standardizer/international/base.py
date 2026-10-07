@@ -93,6 +93,8 @@ def split_intl_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
         w_clean = RE_NON_ALPHANUMERIC.sub("", w).upper()
         if w_clean == "FORT":
             norm_words.append("FORT")
+        elif w_clean == "AL" and (w.endswith(".") or w.lower() == "al."):
+            norm_words.append("AL.")
         elif w_clean == "SOUTH" and "CHURCH" in st1.upper():
             norm_words.append("SOUTH")
         elif w_clean in STREET_SUFFIXES:

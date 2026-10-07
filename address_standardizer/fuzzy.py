@@ -230,6 +230,8 @@ def heal_street_name(name_raw: str, max_distance: int = 1) -> Optional[str]:
     Guarded against corrupting valid English proper names, Spanish street indicators,
     and dictionary words.
     """
+    if any(c.isdigit() for c in name_raw):
+        return None
     name_unaccented = unicodedata.normalize("NFKD", name_raw).encode("ASCII", "ignore").decode("utf-8")
     clean_name = re.sub(r"[^A-Z]", "", name_unaccented.upper())
     if not clean_name or len(clean_name) < 3:

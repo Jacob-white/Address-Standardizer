@@ -29,6 +29,7 @@ from address_standardizer._patterns import (
     RE_ATTACHED_SUFFIX_EXPLICIT_UNIT,
     RE_ATTACHED_SUFFIX_BARE_UNIT,
     RE_SAINT_HYPHEN,
+    RE_GLUED_HOUSE_NUM,
     FROZEN_US_STATE_CODES,
     FROZEN_DIRECTIONAL_VALUES,
     ROUTE_PREFIXES,
@@ -107,6 +108,8 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
     if not phrase_upper:
         return None
 
+    # Split glued house numbers: '3340PEACHTREE ROAD' -> '3340 PEACHTREE ROAD'
+    phrase_upper = RE_GLUED_HOUSE_NUM.sub(r"\1 \2", phrase_upper)
     # Normalize Saint hyphenation e.g. 'St-Charles' -> 'St Charles'
     phrase_upper = RE_SAINT_HYPHEN.sub(r"\1 \2", phrase_upper)
     # Suffix-attached unit: 'Main St-Ste 200' -> 'Main St STE 200', 'Main St-4B' -> 'Main St APT 4B'

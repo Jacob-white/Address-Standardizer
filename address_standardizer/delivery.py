@@ -80,6 +80,9 @@ class DeliveryIntelligenceResult:
     vacant: bool
     dpv_footnotes: List[str] = field(default_factory=list)
     deliverability: str = Deliverability.DELIVERABLE
+    secondary_prompt_required: bool = False
+    prompt_message: Optional[str] = None
+    suggested_secondary_units: List[str] = field(default_factory=list)
 
     @property
     def is_cmra(self) -> bool:
@@ -98,6 +101,9 @@ class DeliveryIntelligenceResult:
             "is_vacant": self.vacant,
             "dpv_footnotes": list(self.dpv_footnotes),
             "deliverability": self.deliverability,
+            "secondary_prompt_required": self.secondary_prompt_required,
+            "prompt_message": self.prompt_message,
+            "suggested_secondary_units": list(self.suggested_secondary_units),
         }
 
 
@@ -237,6 +243,15 @@ def evaluate_delivery_intelligence(
     else:
         tokens = st1.split()
         first_tok = tokens[0] if tokens else ""
+        if first_tok in ("URB", "URB.", "URBANIZACION") and len(tokens) > 1:
+            for tok in tokens[1:]:
+                tok_clean = re.sub(r"[^\w]", "", tok)
+                if any(ch.isdigit() for ch in tok_clean) or tok_clean in {
+                    "ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN"
+                }:
+                    first_tok = tok_clean
+                    break
+
         first_digits = re.sub(r"[^\d]", "", first_tok)
         is_all_zero = bool(first_digits and all(c == "0" for c in first_digits))
         has_num = not is_all_zero and (any(ch.isdigit() for ch in first_tok) or first_tok in {
@@ -280,10 +295,25 @@ def evaluate_delivery_intelligence(
     else:
         deliverability = Deliverability.DELIVERABLE if status == "standardized" else Deliverability.UNDELIVERABLE
 
+    sec_prompt_required = False
+    prompt_msg = None
+    suggested_sec_units: List[str] = []
+
+    if DPVFootnote.N1 in footnotes:
+        sec_prompt_required = True
+        prompt_msg = "Requires Suite / Apartment Number"
+        if offline_rec and getattr(offline_rec, "known_units", None):
+            suggested_sec_units = list(offline_rec.known_units)
+        else:
+            suggested_sec_units = ["STE", "FL", "UNIT", "APT"]
+
     return DeliveryIntelligenceResult(
         rdi=rdi,
         cmra=is_cmra,
         vacant=is_vacant,
         dpv_footnotes=footnotes,
         deliverability=deliverability,
+        secondary_prompt_required=sec_prompt_required,
+        prompt_message=prompt_msg,
+        suggested_secondary_units=suggested_sec_units,
     )

@@ -89,12 +89,13 @@ RE_NUMBERED_STREET = re.compile(r"^(\d+)(?:ST|ND|RD|TH)?$", re.IGNORECASE)
 # Glued punctuation normalization
 RE_GLUED_HASH = re.compile(r"(?<=[A-Za-z0-9])#(?=[A-Za-z0-9])")
 RE_GLUED_UNIT = re.compile(r"\b(APT|STE|UNIT|FL)\.?(?=\d)", re.IGNORECASE)
+RE_GLUED_HOUSE_NUM = re.compile(r"^(\d+)([A-Za-z]{3,})\b")
 
 # Military Mail (APO, FPO, DPO)
 RE_MILITARY_CITY = re.compile(r"\b(APO|FPO|DPO)\b", re.IGNORECASE)
 RE_MILITARY_STATE = re.compile(r"\b(AE|AP|AA)\b", re.IGNORECASE)
 RE_MILITARY_UNIT_BOX = re.compile(
-    r"\b((?:UNIT|PSC|CMR)\s+\d+)\s*(?:,)?\s*(BOX\s+\d+)\b",
+    r"^\s*((?:UNIT|PSC|CMR)\s+\d+)\s*(?:,)?\s*(BOX\s+\d+)\b",
     re.IGNORECASE,
 )
 

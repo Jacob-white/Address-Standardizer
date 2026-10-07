@@ -22,7 +22,7 @@ DIRECTIONALS: Dict[str, str] = {
 
 # Street Suffixes (USPS Pub 28 Appendix C1)
 STREET_SUFFIXES: Dict[str, str] = {
-    "ALLEY": "ALY", "ALY": "ALY",
+    "ALLEY": "ALY", "ALY": "ALY", "AL": "ALY",
     "ANNEX": "ANX", "ANX": "ANX", "ANNX": "ANX",
     "ARCADE": "ARC", "ARC": "ARC",
     "AVENUE": "AVE", "AVE": "AVE", "AVEN": "AVE", "AVENU": "AVE", "AVN": "AVE", "AVNUE": "AVE", "AV": "AVE",
@@ -32,7 +32,7 @@ STREET_SUFFIXES: Dict[str, str] = {
     "BLUFF": "BLF", "BLF": "BLF", "BLUF": "BLF",
     "BLUFFS": "BLFS", "BLFS": "BLFS",
     "BOTTOM": "BTM", "BTM": "BTM", "BOT": "BTM", "BOTTM": "BTM",
-    "BOULEVARD": "BLVD", "BLVD": "BLVD", "BOUL": "BLVD", "BOULV": "BLVD",
+    "BOULEVARD": "BLVD", "BLVD": "BLVD", "BOUL": "BLVD", "BOULV": "BLVD", "BL": "BLVD", "BLV": "BLVD",
     "BRANCH": "BR", "BR": "BR", "BRNCH": "BR",
     "BRIDGE": "BRG", "BRG": "BRG", "BRDGE": "BRG",
     "BROOK": "BRK", "BRK": "BRK",
@@ -96,6 +96,7 @@ STREET_SUFFIXES: Dict[str, str] = {
     "GARDEN": "GDN", "GDN": "GDN", "GARDN": "GDN", "GRDEN": "GDN", "GRDN": "GDN",
     "GARDENS": "GDNS", "GDNS": "GDNS", "GRDNS": "GDNS",
     "GATEWAY": "GTWY", "GTWY": "GTWY", "GATEWY": "GTWY", "GATWAY": "GTWY",
+    "GADE": "ST",
     "GLEN": "GLN", "GLN": "GLN",
     "GLENS": "GLNS", "GLNS": "GLNS",
     "GREEN": "GRN", "GRN": "GRN",
@@ -106,7 +107,7 @@ STREET_SUFFIXES: Dict[str, str] = {
     "HARBORS": "HBRS", "HBRS": "HBRS",
     "HAVEN": "HVN", "HVN": "HVN",
     "HEIGHTS": "HTS", "HTS": "HTS", "HT": "HTS",
-    "HIGHWAY": "HWY", "HWY": "HWY", "HIGHWY": "HWY", "HIWAY": "HWY", "HIWY": "HWY", "HWAY": "HWY",
+    "HIGHWAY": "HWY", "HWY": "HWY", "HIGHWY": "HWY", "HIWAY": "HWY", "HIWY": "HWY", "HWAY": "HWY", "HY": "HWY", "HW": "HWY",
     "HILL": "HL", "HL": "HL",
     "HILLS": "HLS", "HLS": "HLS",
     "HOLLOW": "HOLW", "HOLW": "HOLW", "HOLLOWS": "HOLW", "HOLWS": "HOLW",
@@ -149,8 +150,8 @@ STREET_SUFFIXES: Dict[str, str] = {
     "ORCHARD": "ORCH", "ORCH": "ORCH", "ORCHRD": "ORCH",
     "OVAL": "OVAL", "OVL": "OVAL",
     "OVERPASS": "OPAS", "OPAS": "OPAS",
-    "PARK": "PARK", "PRK": "PARK", "PARKS": "PARK",
-    "PARKWAY": "PKWY", "PKWY": "PKWY", "PARKWY": "PKWY", "PKWAY": "PKWY", "PKY": "PKWY",
+    "PARK": "PARK", "PRK": "PARK", "PARKS": "PARK", "PK": "PARK",
+    "PARKWAY": "PKWY", "PKWY": "PKWY", "PARKWY": "PKWY", "PKWAY": "PKWY", "PKY": "PKWY", "PW": "PKWY",
     "PARKWAYS": "PKWY", "PKWYS": "PKWY",
     "PASS": "PASS",
     "PASSAGE": "PSGE", "PSGE": "PSGE",
@@ -203,7 +204,7 @@ STREET_SUFFIXES: Dict[str, str] = {
     "TRACE": "TRCE", "TRCE": "TRCE", "TRACES": "TRCE",
     "TRACK": "TRAK", "TRAK": "TRAK", "TRACKS": "TRAK", "TRK": "TRAK", "TRKS": "TRAK",
     "TRAFFICWAY": "TRFY", "TRFY": "TRFY",
-    "TRAIL": "TRL", "TRL": "TRL", "TRAILS": "TRL", "TRLS": "TRL",
+    "TRAIL": "TRL", "TRL": "TRL", "TRAILS": "TRL", "TRLS": "TRL", "TR": "TRL",
     "TRAILER": "TRLR", "TRLR": "TRLR",
     "TUNNEL": "TUNL", "TUNL": "TUNL", "TUNEL": "TUNL", "TUNLS": "TUNL",
     "TURNPIKE": "TPKE", "TPKE": "TPKE", "TRNPK": "TPKE", "TURNPK": "TPKE",
@@ -220,7 +221,7 @@ STREET_SUFFIXES: Dict[str, str] = {
     "VILLE": "VL", "VL": "VL",
     "VISTA": "VIS", "VIS": "VIS", "VIST": "VIS", "VST": "VIS", "VSTA": "VIS",
     "WALK": "WALK", "WALKS": "WALK",
-    "WAY": "WAY", "WAYS": "WAYS",
+    "WAY": "WAY", "WAYS": "WAYS", "WY": "WAY",
     "WELL": "WL", "WL": "WL",
     "WELLS": "WLS", "WLS": "WLS",
 }
@@ -938,7 +939,7 @@ COMPOUND_ORDINALS: Dict[str, str] = {
 
 # 3-Digit ZIP Code Prefix Ranges (USPS Sectional Centers -> State)
 ZIP3_STATE_RANGES: List[Tuple[int, int, str]] = [
-    (5, 5, "NY"), (6, 9, "PR"), (10, 27, "MA"), (28, 29, "RI"), (30, 38, "NH"),
+    (5, 5, "NY"), (6, 7, "PR"), (8, 8, "VI"), (9, 9, "PR"), (10, 27, "MA"), (28, 29, "RI"), (30, 38, "NH"),
     (39, 49, "ME"), (50, 59, "VT"), (60, 69, "CT"), (70, 89, "NJ"), (90, 99, "AE"),
     (100, 149, "NY"), (150, 196, "PA"), (197, 199, "DE"), (200, 205, "DC"), (206, 219, "MD"),
     (220, 246, "VA"), (247, 268, "WV"), (270, 289, "NC"), (290, 299, "SC"), (300, 319, "GA"),

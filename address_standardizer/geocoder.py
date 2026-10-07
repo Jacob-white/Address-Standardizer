@@ -201,6 +201,8 @@ class OfflineGeocoder:
 
     def geocode(self, address: Any, fallback_to_centroids: bool = True) -> Dict[str, Any]:
         """Geocodes a StandardizedAddress or address string completely offline."""
+        if fallback_to_centroids and not getattr(address, "is_us", True):
+            fallback_to_centroids = False
         return self._index.geocode(address, fallback_to_centroids=fallback_to_centroids)
 
     def geocode_address(

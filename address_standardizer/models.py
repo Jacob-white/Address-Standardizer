@@ -270,6 +270,40 @@ class StandardizedAddress:
         self._deliverability = value
 
     @property
+    def secondary_prompt_required(self) -> bool:
+        return "N1" in self.dpv_footnotes or getattr(self, "_secondary_prompt_required", False)
+
+    @secondary_prompt_required.setter
+    def secondary_prompt_required(self, value: bool):
+        self._secondary_prompt_required = bool(value)
+
+    @property
+    def prompt_message(self) -> Optional[str]:
+        val = getattr(self, "_prompt_message", None)
+        if val is not None:
+            return val
+        if self.secondary_prompt_required:
+            return "Requires Suite / Apartment Number"
+        return None
+
+    @prompt_message.setter
+    def prompt_message(self, value: Optional[str]):
+        self._prompt_message = value
+
+    @property
+    def suggested_secondary_units(self) -> List[str]:
+        val = getattr(self, "_suggested_secondary_units", None)
+        if val is not None:
+            return list(val)
+        if self.secondary_prompt_required:
+            return ["STE", "FL", "UNIT", "APT"]
+        return []
+
+    @suggested_secondary_units.setter
+    def suggested_secondary_units(self, value: List[str]):
+        self._suggested_secondary_units = list(value)
+
+    @property
     def latitude(self) -> Optional[float]:
         val = getattr(self, "_latitude", None)
         if val is not None:
@@ -436,6 +470,9 @@ class StandardizedAddress:
                     else self.cascade_result
                 )
             d["deliverability"] = self.deliverability
+            d["secondary_prompt_required"] = self.secondary_prompt_required
+            d["prompt_message"] = self.prompt_message
+            d["suggested_secondary_units"] = list(self.suggested_secondary_units)
             d["latitude"] = self.latitude
             d["longitude"] = self.longitude
             d["precision"] = self.precision

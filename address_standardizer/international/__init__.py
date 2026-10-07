@@ -35,6 +35,15 @@ from address_standardizer.international.uk import (
     UKGrammar,
     is_valid_uk_postcode,
 )
+from address_standardizer.international.hong_kong import HongKongGrammar
+from address_standardizer.international.singapore import SingaporeGrammar
+from address_standardizer.international.australia import AustraliaGrammar
+from address_standardizer.international.india import IndiaGrammar
+from address_standardizer.international.ireland import (
+    IrelandGrammar,
+    is_valid_eircode,
+    format_eircode,
+)
 from address_standardizer.international.postal import (
     PostalRule,
     PostalValidationResult,
@@ -57,6 +66,11 @@ def register_default_grammars() -> None:
     CountryGrammarRegistry.register(LatinAmericaGrammar())
     CountryGrammarRegistry.register(EasternEuropeGrammar())
     CountryGrammarRegistry.register(MenaAfricaGrammar())
+    CountryGrammarRegistry.register(HongKongGrammar())
+    CountryGrammarRegistry.register(SingaporeGrammar())
+    CountryGrammarRegistry.register(AustraliaGrammar())
+    CountryGrammarRegistry.register(IndiaGrammar())
+    CountryGrammarRegistry.register(IrelandGrammar())
 
 
 # Initialize default registry upon module import
@@ -80,6 +94,13 @@ __all__ = [
     "LatinAmericaGrammar",
     "EasternEuropeGrammar",
     "MenaAfricaGrammar",
+    "HongKongGrammar",
+    "SingaporeGrammar",
+    "AustraliaGrammar",
+    "IndiaGrammar",
+    "IrelandGrammar",
+    "is_valid_eircode",
+    "format_eircode",
     "LIGATURE_MAP",
     "CYRILLIC_GREEK_MAP",
     "fold_to_ascii_key",
@@ -93,3 +114,4 @@ __all__ = [
     "format_upu_address",
     "register_default_grammars",
 ]
+

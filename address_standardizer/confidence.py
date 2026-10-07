@@ -205,6 +205,12 @@ class ConfidenceScorer:
             if st1 and not (is_po_box or is_rural or is_priv or is_intersection):
                 tokens = st1.split()
                 first_tok = tokens[0] if tokens else ""
+                if first_tok in ("URB", "URB.", "URBANIZACION") and len(tokens) > 1:
+                    for tok in tokens[1:]:
+                        tok_clean = re.sub(r"[^\w]", "", tok)
+                        if any(ch.isdigit() for ch in tok_clean) or tok_clean in WORD_NUMBERS:
+                            first_tok = tok_clean
+                            break
                 has_num = any(ch.isdigit() for ch in first_tok) or first_tok.upper() in WORD_NUMBERS
                 if not has_num:
                     st1_tokens = set(re.findall(r"\b[A-Z0-9]+\b", st1.upper()))
@@ -279,6 +285,7 @@ class ConfidenceScorer:
                     or any(t in STREET_SUFFIXES.values() or t in STREET_SUFFIXES for t in st1_tokens[1:])
                     or any(t in ["WAY", "WALK", "MALL", "LOOP", "PASS", "ROW", "RUN"] for t in st1_tokens)
                     or any(t in LANDMARK_CAMPUS_KEYWORDS for t in st1_tokens)
+                    or any(t in {"CALLE", "AVENIDA", "CARR", "PASEO", "CAMINO", "CALZADA", "CARRETERA", "RUTA"} for t in st1_tokens)
                 )
                 if not has_valid_suf:
                     s_ref -= 0.20
@@ -333,7 +340,16 @@ class ConfidenceScorer:
             if z3 and z3 in ZIP3_TO_STATE:
                 expected_st = ZIP3_TO_STATE[z3]
                 raw_st = (raw.get("state") or "").strip().upper()
+                if raw_st.startswith("USA-"):
+                    raw_st = raw_st[4:].strip()
+                elif raw_st.startswith("US-"):
+                    raw_st = raw_st[3:].strip()
+
                 std_st = (std_address.state or "").strip().upper()
+                if std_st.startswith("USA-"):
+                    std_st = std_st[4:].strip()
+                elif std_st.startswith("US-"):
+                    std_st = std_st[3:].strip()
 
                 is_raw_mismatch = bool(raw_st and raw_st != expected_st and US_STATES.get(raw_st, raw_st) != expected_st)
                 is_std_mismatch = bool(std_st and std_st != expected_st and US_STATES.get(std_st, std_st) != expected_st)
