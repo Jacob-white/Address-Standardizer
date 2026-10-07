@@ -277,8 +277,13 @@ class ConfidenceScorer:
                 # 1. Last token or second to last token (before directional) is standard suffix
                 # 2. Well-known thoroughfares without suffixes (Broadway, Bowery, Embarcadero)
                 # 3. Thoroughfare type appears as prefix or intermediate token (Highway 101, Route 66, Avenue of the Americas)
+                is_ordinal_thoroughfare = bool(
+                    re.match(r"^\d+(?:ST|ND|RD|TH)$", last_tok)
+                    or (last_tok in DIRECTIONALS.values() and re.match(r"^\d+(?:ST|ND|RD|TH)$", prev_tok))
+                )
                 has_valid_suf = (
-                    last_tok in STREET_SUFFIXES.values()
+                    is_ordinal_thoroughfare
+                    or last_tok in STREET_SUFFIXES.values()
                     or last_tok in STREET_SUFFIXES
                     or (last_tok in DIRECTIONALS.values() and (prev_tok in STREET_SUFFIXES.values() or prev_tok in STREET_SUFFIXES))
                     or any(name in st1 for name in PROPER_THOROUGHFARES_NO_SUFFIX)

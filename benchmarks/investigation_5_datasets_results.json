@@ -1,65 +1,68 @@
 {
   "timestamp": "2026-10-07T12:54:49Z",
-  "total_records_evaluated": 314129,
-  "overall_duration_seconds": 342.17,
-  "overall_throughput_rec_sec": 918.0,
+  "total_records_evaluated": 3486820,
+  "overall_duration_seconds": 2610.18,
+  "overall_throughput_rec_sec": 1335.9,
   "datasets": {
     "OpenAddresses Global": {
-      "total_records": 25000,
-      "duration_seconds": 15.51,
-      "throughput_rec_sec": 1611.5,
+      "total_records": 541258,
+      "duration_seconds": 381.98,
+      "throughput_rec_sec": 1417.0,
       "status": {
-        "standardized": 25000,
+        "standardized": 541258,
         "locality_only": 0,
         "parse_failed": 0,
         "usable_yield_percent": 100.0
       },
       "routing_tiers": {
-        "auto_pass": 24988,
-        "fuzzy_review": 12,
+        "auto_pass": 540892,
+        "fuzzy_review": 366,
         "manual_stewardship": 0,
-        "auto_pass_pct": 99.95,
-        "fuzzy_review_pct": 0.05,
+        "auto_pass_pct": 99.93,
+        "fuzzy_review_pct": 0.07,
         "manual_stewardship_pct": 0.0
       },
       "deliverability": {
-        "deliverable": 25000,
-        "requires_secondary": 0,
-        "undeliverable": 0,
-        "deliverable_pct": 100.0,
+        "deliverable": 541226,
+        "requires_secondary": 7,
+        "undeliverable": 25,
+        "deliverable_pct": 99.99,
         "requires_secondary_pct": 0.0,
         "undeliverable_pct": 0.0
       },
       "spatial_precision": {
         "confirmed_rooftop": 0,
-        "range_interpolated": 3,
-        "postal_centroid": 24997,
+        "range_interpolated": 185,
+        "postal_centroid": 388445,
         "municipal_centroid": 0,
-        "unresolved": 0,
+        "unresolved": 152628,
         "confirmed_rooftop_pct": 0.0,
-        "range_interpolated_pct": 0.01,
-        "postal_centroid_pct": 99.99,
-        "unresolved_pct": 0.0
+        "range_interpolated_pct": 0.03,
+        "postal_centroid_pct": 71.77,
+        "municipal_centroid_pct": 0.0,
+        "unresolved_pct": 28.2
       },
-      "rooftop_address_extracted_count": 25000,
+      "rooftop_address_extracted_count": 541258,
       "entity_features": {
         "private_residences": 0,
         "registered_agent_hubs": 0,
-        "cmra": 0,
+        "cmra": 34,
         "vacant": 0
       },
       "geography": {
-        "us_count": 12500,
-        "intl_count": 12500,
+        "us_count": 388630,
+        "intl_count": 152628,
         "jurisdictions_count": 2,
         "top_jurisdictions": {
-          "USA": 12500,
-          "FRA": 12500
+          "USA": 388630,
+          "FRA": 152628
         }
       },
       "failure_reason_codes": {
-        "WARN_TYPO_HEALED": 434,
-        "ERR_UNRESOLVED_SUFFIX": 12
+        "WARN_TYPO_HEALED": 13928,
+        "ERR_UNRESOLVED_SUFFIX": 366,
+        "WARN_CMRA_DETECTED": 34,
+        "WARN_MISSING_SECONDARY_UNIT": 7
       },
       "false_positives": {
         "total_count": 0,
@@ -74,129 +77,741 @@
       "edge_cases": []
     },
     "Overture Maps Global / Worldwide Entities": {
-      "total_records": 25000,
-      "duration_seconds": 12.06,
-      "throughput_rec_sec": 2072.8,
+      "total_records": 78814,
+      "duration_seconds": 46.41,
+      "throughput_rec_sec": 1698.2,
       "status": {
-        "standardized": 20829,
-        "locality_only": 4171,
+        "standardized": 73160,
+        "locality_only": 5654,
         "parse_failed": 0,
         "usable_yield_percent": 100.0
       },
       "routing_tiers": {
-        "auto_pass": 20245,
-        "fuzzy_review": 4732,
-        "manual_stewardship": 23,
-        "auto_pass_pct": 80.98,
-        "fuzzy_review_pct": 18.93,
-        "manual_stewardship_pct": 0.09
+        "auto_pass": 73113,
+        "fuzzy_review": 5685,
+        "manual_stewardship": 16,
+        "auto_pass_pct": 92.77,
+        "fuzzy_review_pct": 7.21,
+        "manual_stewardship_pct": 0.02
       },
       "deliverability": {
-        "deliverable": 20746,
-        "requires_secondary": 57,
-        "undeliverable": 4197,
-        "deliverable_pct": 82.98,
-        "requires_secondary_pct": 0.23,
-        "undeliverable_pct": 16.79
+        "deliverable": 72970,
+        "requires_secondary": 153,
+        "undeliverable": 5691,
+        "deliverable_pct": 92.59,
+        "requires_secondary_pct": 0.19,
+        "undeliverable_pct": 7.22
       },
       "spatial_precision": {
-        "confirmed_rooftop": 2,
+        "confirmed_rooftop": 6,
         "range_interpolated": 0,
-        "postal_centroid": 19829,
-        "municipal_centroid": 2325,
-        "unresolved": 2844,
+        "postal_centroid": 4224,
+        "municipal_centroid": 3397,
+        "unresolved": 71187,
         "confirmed_rooftop_pct": 0.01,
         "range_interpolated_pct": 0.0,
-        "postal_centroid_pct": 79.32,
-        "unresolved_pct": 11.38
+        "postal_centroid_pct": 5.36,
+        "municipal_centroid_pct": 4.31,
+        "unresolved_pct": 90.32
       },
-      "rooftop_address_extracted_count": 20521,
+      "rooftop_address_extracted_count": 72382,
       "entity_features": {
-        "private_residences": 0,
-        "registered_agent_hubs": 157,
-        "cmra": 0,
+        "private_residences": 3,
+        "registered_agent_hubs": 367,
+        "cmra": 1,
         "vacant": 0
       },
       "geography": {
-        "us_count": 2695,
-        "intl_count": 22305,
-        "jurisdictions_count": 143,
+        "us_count": 3968,
+        "intl_count": 74846,
+        "jurisdictions_count": 158,
         "top_jurisdictions": {
-          "DEU": 4304,
-          "IND": 3672,
-          "USA": 2691,
-          "GBR": 1928,
-          "LUX": 947,
-          "AUT": 778,
-          "POL": 652,
-          "AUS": 621,
-          "NLD": 583,
-          "DNK": 540
+          "ESP": 18165,
+          "IND": 8513,
+          "FRA": 5705,
+          "DEU": 5441,
+          "ITA": 5368,
+          "NLD": 4380,
+          "USA": 3963,
+          "GBR": 3077,
+          "DNK": 2116,
+          "SWE": 1976
         }
       },
       "failure_reason_codes": {
-        "NO_STREET_NUMBER": 4171,
-        "WARN_LOCALITY_ONLY": 4171,
-        "ERR_ZIP_STATE_MISMATCH": 584,
-        "WARN_CRA_HUB_DETECTED": 157,
-        "WARN_MISSING_SECONDARY_UNIT": 57,
-        "ERR_UNRESOLVED_SUFFIX": 19,
-        "ERR_MISSING_HOUSE_NUM": 11,
-        "WARN_TYPO_HEALED": 4,
-        "WARN_LANDMARK_CAMPUS_PREMISE": 2
+        "NO_STREET_NUMBER": 5654,
+        "WARN_LOCALITY_ONLY": 5654,
+        "WARN_CRA_HUB_DETECTED": 367,
+        "WARN_MISSING_SECONDARY_UNIT": 153,
+        "ERR_UNRESOLVED_SUFFIX": 31,
+        "ERR_MISSING_HOUSE_NUM": 16,
+        "WARN_LANDMARK_CAMPUS_PREMISE": 9,
+        "WARN_TYPO_HEALED": 8,
+        "WARN_RESIDENTIAL_COMM": 3,
+        "ERR_ZIP_STATE_MISMATCH": 2,
+        "WARN_CMRA_DETECTED": 1
       },
       "false_positives": {
-        "total_count": 1,
+        "total_count": 3741,
         "breakdown": {
-          "SEVERE_STREET_TRUNCATION": 1
+          "CROSS_BORDER_CENTROID_MISMATCH": 3660,
+          "SEVERE_STREET_TRUNCATION": 7,
+          "FP_PLAZA_STRIPPING": 6,
+          "CARE_OF_RETAINED_IN_STREET1": 58,
+          "STREET_NUMBER_DROPPED": 10
         },
         "samples": [
           {
-            "type": "SEVERE_STREET_TRUNCATION",
-            "raw_street": "Unit 5 RG",
-            "street1": "RG",
-            "reason": "Suspiciously short street1 (RG) from raw (Unit 5 RG)"
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+            "lat": 40.7549,
+            "lon": -73.984
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+            "lat": 40.7549,
+            "lon": -73.984
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+            "lat": 40.7128,
+            "lon": -74.006
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+            "lat": 40.7549,
+            "lon": -73.984
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+            "lat": 40.7549,
+            "lon": -73.984
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.8448, lon=-73.8648",
+            "lat": 40.8448,
+            "lon": -73.8648
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+            "lat": 40.7549,
+            "lon": -73.984
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+            "lat": 40.7128,
+            "lon": -74.006
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (NG) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+            "lat": 40.7128,
+            "lon": -74.006
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (HU) record assigned US spatial coordinates: lat=38.9072, lon=-77.0369",
+            "lat": 38.9072,
+            "lon": -77.0369
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (SK) record assigned US spatial coordinates: lat=34.0522, lon=-118.2437",
+            "lat": 34.0522,
+            "lon": -118.2437
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (SK) record assigned US spatial coordinates: lat=34.0736, lon=-118.4004",
+            "lat": 34.0736,
+            "lon": -118.4004
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (DK) record assigned US spatial coordinates: lat=34.0522, lon=-118.2437",
+            "lat": 34.0522,
+            "lon": -118.2437
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (DK) record assigned US spatial coordinates: lat=34.0522, lon=-118.2437",
+            "lat": 34.0522,
+            "lon": -118.2437
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (DK) record assigned US spatial coordinates: lat=29.7604, lon=-95.3698",
+            "lat": 29.7604,
+            "lon": -95.3698
           }
         ]
       },
       "false_negatives": {
-        "total_count": 1,
-        "breakdown": {
-          "FN_MANUAL_STEWARDSHIP_VALID_INPUT": 1
-        },
-        "samples": [
-          {
-            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-            "raw_input": "1761 OLD YORK, ABINGTON, US-PA 19001 US",
-            "reasons": [
-              "ERR_UNRESOLVED_SUFFIX",
-              "ERR_ZIP_STATE_MISMATCH"
-            ],
-            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX', 'ERR_ZIP_STATE_MISMATCH']"
-          }
-        ]
+        "total_count": 0,
+        "breakdown": {},
+        "samples": []
       },
       "edge_cases": [
         {
-          "input": "Unit 5 RG , Charlestown, KN-N KN0802 KN",
-          "output": "RG | APT 5 | CHARLESTOWN | KN-N KN0802 | KNA",
+          "input": "27 GERRARD ROAD , LAGOS, NG-LA 101233 NG",
+          "output": "27 GERRARD RD |  | LAGOS | NG-LA 101233 | NGA",
           "status": "standardized",
           "tier": "AUTO_PASS",
           "deliv": "DELIVERABLE",
           "prec": "POSTAL_CENTROID",
           "fps": [
             {
-              "type": "SEVERE_STREET_TRUNCATION",
-              "raw_street": "Unit 5 RG",
-              "street1": "RG",
-              "reason": "Suspiciously short street1 (RG) from raw (Unit 5 RG)"
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+              "lat": 40.7549,
+              "lon": -73.984
             }
           ],
           "fns": []
         },
         {
-          "input": "1761 OLD YORK , ABINGTON, US-PA 19001 US",
-          "output": "1761 OLD YORK |  | ABINGTON | PA 19001 | USA",
+          "input": "THE WINGS OFFICE COMPLEX 6TH FLOOR EAST TOWER , VICTORIA ISLAND, NG-LA 101241 NG",
+          "output": "THE WINGS OFFICE COMPLEX 6TH TOWER | FL EAST | VICTORIA ISLAND | NG-LA 101241 | NGA",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+              "lat": 40.7549,
+              "lon": -73.984
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "2ND FLOOR KINGSWAY BUILDING , LAGOS, NG-LA 100221 NG",
+          "output": "KINGSWAY BUILDING | FL 2ND | LAGOS | NG-LA 100221 | NGA",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+              "lat": 40.7128,
+              "lon": -74.006
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "20 LAYI YUSUF CRESCENT , LEKKI, NG-LA 101241 NG",
+          "output": "20 LAYI YUSUF CRES |  | LEKKI | NG-LA 101241 | NGA",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+              "lat": 40.7549,
+              "lon": -73.984
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "954A, IDEJO STREET, OFF ADEOLA ODEKU, VICTORIA ISLAND, LAGOS. , LAGOS, NG-LA 101241 NG",
+          "output": "954A, IDEJO ST OFF ADEOLA ODEKU, VICTORIA IS LAGOS |  | LAGOS | NG-LA 101241 | NGA",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+              "lat": 40.7549,
+              "lon": -73.984
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "13 WALTER CARRINGTON CRESCENT , LAGOS, NG-LA 104211 NG",
+          "output": "13 WALTER CARRINGTON CRES |  | LAGOS | NG-LA 104211 | NGA",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.8448, lon=-73.8648",
+              "lat": 40.8448,
+              "lon": -73.8648
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "BUA TOWERS 32 CHURCHGATE STREET , LAGOS, NG-LA 101245 NG",
+          "output": "BUA TOWERS 32 CHURCHGATE ST |  | LAGOS | NG-LA 101245 | NGA",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+              "lat": 40.7549,
+              "lon": -73.984
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "23A, ODIYAN STREET , LAGOS, NG-LA 100001 NG",
+          "output": "23A, ODIYAN ST |  | LAGOS | NG-LA 100001 | NGA",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+              "lat": 40.7128,
+              "lon": -74.006
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "84 OPEBI ROAD , LAGOS, NG-LA 100271 NG",
+          "output": "84 OPEBI RD |  | LAGOS | NG-LA 100271 | NGA",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (NG) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+              "lat": 40.7128,
+              "lon": -74.006
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "Bagoly utca 23. , Szentendre, HU-BU 2000 HU",
+          "output": "BAGOLY UTCA 23 |  | SZENTENDRE | HU-BU 2000 | HUN",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (HU) record assigned US spatial coordinates: lat=38.9072, lon=-77.0369",
+              "lat": 38.9072,
+              "lon": -77.0369
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "Doln\u00e1 2099 , Modra, SK-BL 900 01 SK",
+          "output": "DOLN\u00c1 2099 |  | MODRA | SK-BL 900 01 | SVK",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (SK) record assigned US spatial coordinates: lat=34.0522, lon=-118.2437",
+              "lat": 34.0522,
+              "lon": -118.2437
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "Katar\u00edny Franklovej 5791/10 , Pezinok, SK-BL 902 01 SK",
+          "output": "KATAR\u00cdNY FRANKLOVEJ 5791/10 |  | PEZINOK | SK-BL 902 01 | SVK",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (SK) record assigned US spatial coordinates: lat=34.0736, lon=-118.4004",
+              "lat": 34.0736,
+              "lon": -118.4004
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "Fuglev\u00e6nget 10 , Aalborg, DK-81 9000 DK",
+          "output": "FUGLEV\u00c6NGET 10 |  | AALBORG | DK-81 9000 | DNK",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (DK) record assigned US spatial coordinates: lat=34.0522, lon=-118.2437",
+              "lat": 34.0522,
+              "lon": -118.2437
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "Ferskenvej 77 , Aalborg, DK-81 9000 DK",
+          "output": "FERSKENVEJ 77 |  | AALBORG | DK-81 9000 | DNK",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (DK) record assigned US spatial coordinates: lat=34.0522, lon=-118.2437",
+              "lat": 34.0522,
+              "lon": -118.2437
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "Hundborgvej 29A , Thisted, DK-82 7700 DK",
+          "output": "HUNDBORGVEJ 29A |  | THISTED | DK-82 7700 | DNK",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (DK) record assigned US spatial coordinates: lat=29.7604, lon=-95.3698",
+              "lat": 29.7604,
+              "lon": -95.3698
+            }
+          ],
+          "fns": []
+        }
+      ]
+    },
+    "US Census TIGER/Line Addresses": {
+      "total_records": 590026,
+      "duration_seconds": 481.2,
+      "throughput_rec_sec": 1226.2,
+      "status": {
+        "standardized": 431435,
+        "locality_only": 158591,
+        "parse_failed": 0,
+        "usable_yield_percent": 100.0
+      },
+      "routing_tiers": {
+        "auto_pass": 310923,
+        "fuzzy_review": 168471,
+        "manual_stewardship": 110632,
+        "auto_pass_pct": 52.7,
+        "fuzzy_review_pct": 28.55,
+        "manual_stewardship_pct": 18.75
+      },
+      "deliverability": {
+        "deliverable": 320683,
+        "requires_secondary": 11,
+        "undeliverable": 269332,
+        "deliverable_pct": 54.35,
+        "requires_secondary_pct": 0.0,
+        "undeliverable_pct": 45.65
+      },
+      "spatial_precision": {
+        "confirmed_rooftop": 0,
+        "range_interpolated": 1,
+        "postal_centroid": 88510,
+        "municipal_centroid": 501515,
+        "unresolved": 0,
+        "confirmed_rooftop_pct": 0.0,
+        "range_interpolated_pct": 0.0,
+        "postal_centroid_pct": 15.0,
+        "municipal_centroid_pct": 85.0,
+        "unresolved_pct": 0.0
+      },
+      "rooftop_address_extracted_count": 431428,
+      "entity_features": {
+        "private_residences": 0,
+        "registered_agent_hubs": 3,
+        "cmra": 8,
+        "vacant": 0
+      },
+      "geography": {
+        "us_count": 590026,
+        "intl_count": 0,
+        "jurisdictions_count": 1,
+        "top_jurisdictions": {
+          "USA": 590026
+        }
+      },
+      "failure_reason_codes": {
+        "NO_STREET_NUMBER": 158591,
+        "WARN_LOCALITY_ONLY": 158591,
+        "ERR_MISSING_HOUSE_NUM": 108065,
+        "ERR_UNRESOLVED_SUFFIX": 20237,
+        "WARN_TYPO_HEALED": 2568,
+        "WARN_LANDMARK_CAMPUS_PREMISE": 2476,
+        "WARN_MISSING_SECONDARY_UNIT": 11,
+        "WARN_CMRA_DETECTED": 8,
+        "WARN_CRA_HUB_DETECTED": 3,
+        "ERR_ZIP_STATE_MISMATCH": 2
+      },
+      "false_positives": {
+        "total_count": 20,
+        "breakdown": {
+          "SEVERE_STREET_TRUNCATION": 15,
+          "FP_PLAZA_STRIPPING": 5
+        },
+        "samples": [
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Way",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Way)"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "FP_PLAZA_STRIPPING",
+            "raw_street": "Plaza",
+            "street1": "",
+            "reason": "Plaza descriptor disappeared from primary street without being recognized as building_name"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "FP_PLAZA_STRIPPING",
+            "raw_street": "Plaza",
+            "street1": "",
+            "reason": "Plaza descriptor disappeared from primary street without being recognized as building_name"
+          },
+          {
+            "type": "FP_PLAZA_STRIPPING",
+            "raw_street": "1701 Mariachi Plaza de Los Angeles",
+            "street1": "1701 MARIACHI",
+            "reason": "Plaza descriptor disappeared from primary street without being recognized as building_name"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "SEVERE_STREET_TRUNCATION",
+            "raw_street": "Santa Fe Dam",
+            "street1": "FE",
+            "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Dam)"
+          },
+          {
+            "type": "FP_PLAZA_STRIPPING",
+            "raw_street": "Plaza",
+            "street1": "",
+            "reason": "Plaza descriptor disappeared from primary street without being recognized as building_name"
+          }
+        ]
+      },
+      "false_negatives": {
+        "total_count": 50,
+        "breakdown": {
+          "FN_MANUAL_STEWARDSHIP_VALID_INPUT": 50
+        },
+        "samples": [
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "120 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "120 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "70 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "155 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "155 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "70 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "155 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "120 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "70 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "120 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "70 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "4001 Chicago, Oakland, CA 94501 USA",
+            "reasons": [
+              "ERR_MISSING_HOUSE_NUM"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_MISSING_HOUSE_NUM']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "155 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "70 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "155 Cnl, Oakland, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          }
+        ]
+      },
+      "edge_cases": [
+        {
+          "input": "120 Cnl , Oakland, CA  USA",
+          "output": "120 CNL |  | OAKLAND | CA  | USA",
           "status": "standardized",
           "tier": "MANUAL_STEWARDSHIP",
           "deliv": "DELIVERABLE",
@@ -205,137 +820,331 @@
           "fns": [
             {
               "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "1761 OLD YORK, ABINGTON, US-PA 19001 US",
+              "raw_input": "120 Cnl, Oakland, CA  USA",
               "reasons": [
-                "ERR_UNRESOLVED_SUFFIX",
-                "ERR_ZIP_STATE_MISMATCH"
+                "ERR_UNRESOLVED_SUFFIX"
               ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX', 'ERR_ZIP_STATE_MISMATCH']"
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "120 Cnl , Oakland, CA  USA",
+          "output": "120 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "120 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "70 Cnl , Oakland, CA  USA",
+          "output": "70 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "70 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "155 Cnl , Oakland, CA  USA",
+          "output": "155 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "155 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "155 Cnl , Oakland, CA  USA",
+          "output": "155 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "155 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "Santa Fe Way , Oakland, CA  USA",
+          "output": "FE |  | OAKLAND | CA WAY | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "UNDELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "SEVERE_STREET_TRUNCATION",
+              "raw_street": "Santa Fe Way",
+              "street1": "FE",
+              "reason": "Suspiciously short street1 (FE) from raw (Santa Fe Way)"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "70 Cnl , Oakland, CA  USA",
+          "output": "70 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "70 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "155 Cnl , Oakland, CA  USA",
+          "output": "155 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "155 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "120 Cnl , Oakland, CA  USA",
+          "output": "120 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "120 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "70 Cnl , Oakland, CA  USA",
+          "output": "70 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "70 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "120 Cnl , Oakland, CA  USA",
+          "output": "120 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "120 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "70 Cnl , Oakland, CA  USA",
+          "output": "70 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "70 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "4001 Chicago , Oakland, CA 94501 USA",
+          "output": "CHICAGO | STE 4001 | OAKLAND | CA 94501 | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "UNDELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "4001 Chicago, Oakland, CA 94501 USA",
+              "reasons": [
+                "ERR_MISSING_HOUSE_NUM"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_MISSING_HOUSE_NUM']"
+            }
+          ]
+        },
+        {
+          "input": "155 Cnl , Oakland, CA  USA",
+          "output": "155 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "155 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            }
+          ]
+        },
+        {
+          "input": "70 Cnl , Oakland, CA  USA",
+          "output": "70 CNL |  | OAKLAND | CA  | USA",
+          "status": "standardized",
+          "tier": "MANUAL_STEWARDSHIP",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [],
+          "fns": [
+            {
+              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+              "raw_input": "70 Cnl, Oakland, CA  USA",
+              "reasons": [
+                "ERR_UNRESOLVED_SUFFIX"
+              ],
+              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
             }
           ]
         }
       ]
     },
-    "US Census TIGER/Line Addresses": {
-      "total_records": 25000,
-      "duration_seconds": 20.51,
-      "throughput_rec_sec": 1218.9,
-      "status": {
-        "standardized": 25000,
-        "locality_only": 0,
-        "parse_failed": 0,
-        "usable_yield_percent": 100.0
-      },
-      "routing_tiers": {
-        "auto_pass": 24717,
-        "fuzzy_review": 283,
-        "manual_stewardship": 0,
-        "auto_pass_pct": 98.87,
-        "fuzzy_review_pct": 1.13,
-        "manual_stewardship_pct": 0.0
-      },
-      "deliverability": {
-        "deliverable": 24999,
-        "requires_secondary": 1,
-        "undeliverable": 0,
-        "deliverable_pct": 100.0,
-        "requires_secondary_pct": 0.0,
-        "undeliverable_pct": 0.0
-      },
-      "spatial_precision": {
-        "confirmed_rooftop": 0,
-        "range_interpolated": 1,
-        "postal_centroid": 9795,
-        "municipal_centroid": 15204,
-        "unresolved": 0,
-        "confirmed_rooftop_pct": 0.0,
-        "range_interpolated_pct": 0.0,
-        "postal_centroid_pct": 39.18,
-        "unresolved_pct": 0.0
-      },
-      "rooftop_address_extracted_count": 25000,
-      "entity_features": {
-        "private_residences": 0,
-        "registered_agent_hubs": 0,
-        "cmra": 1,
-        "vacant": 0
-      },
-      "geography": {
-        "us_count": 25000,
-        "intl_count": 0,
-        "jurisdictions_count": 1,
-        "top_jurisdictions": {
-          "USA": 25000
-        }
-      },
-      "failure_reason_codes": {
-        "ERR_UNRESOLVED_SUFFIX": 283,
-        "WARN_TYPO_HEALED": 114,
-        "WARN_CMRA_DETECTED": 1,
-        "WARN_MISSING_SECONDARY_UNIT": 1
-      },
-      "false_positives": {
-        "total_count": 0,
-        "breakdown": {},
-        "samples": []
-      },
-      "false_negatives": {
-        "total_count": 0,
-        "breakdown": {},
-        "samples": []
-      },
-      "edge_cases": []
-    },
     "UK PAF & UPU Global Standards": {
-      "total_records": 25000,
-      "duration_seconds": 12.47,
-      "throughput_rec_sec": 2005.0,
+      "total_records": 850799,
+      "duration_seconds": 459.67,
+      "throughput_rec_sec": 1850.9,
       "status": {
-        "standardized": 22397,
-        "locality_only": 2505,
-        "parse_failed": 98,
-        "usable_yield_percent": 99.61
+        "standardized": 793608,
+        "locality_only": 49675,
+        "parse_failed": 7516,
+        "usable_yield_percent": 99.12
       },
       "routing_tiers": {
-        "auto_pass": 21581,
-        "fuzzy_review": 3309,
-        "manual_stewardship": 110,
-        "auto_pass_pct": 86.32,
-        "fuzzy_review_pct": 13.24,
-        "manual_stewardship_pct": 0.44
+        "auto_pass": 787422,
+        "fuzzy_review": 55861,
+        "manual_stewardship": 7516,
+        "auto_pass_pct": 92.55,
+        "fuzzy_review_pct": 6.57,
+        "manual_stewardship_pct": 0.88
       },
       "deliverability": {
-        "deliverable": 22372,
+        "deliverable": 793595,
         "requires_secondary": 13,
-        "undeliverable": 2615,
-        "deliverable_pct": 89.49,
-        "requires_secondary_pct": 0.05,
-        "undeliverable_pct": 10.46
+        "undeliverable": 57191,
+        "deliverable_pct": 93.28,
+        "requires_secondary_pct": 0.0,
+        "undeliverable_pct": 6.72
       },
       "spatial_precision": {
         "confirmed_rooftop": 14,
         "range_interpolated": 0,
-        "postal_centroid": 10141,
-        "municipal_centroid": 41,
-        "unresolved": 14804,
-        "confirmed_rooftop_pct": 0.06,
+        "postal_centroid": 111,
+        "municipal_centroid": 109,
+        "unresolved": 850565,
+        "confirmed_rooftop_pct": 0.0,
         "range_interpolated_pct": 0.0,
-        "postal_centroid_pct": 40.56,
-        "unresolved_pct": 59.22
+        "postal_centroid_pct": 0.01,
+        "municipal_centroid_pct": 0.01,
+        "unresolved_pct": 99.97
       },
-      "rooftop_address_extracted_count": 22276,
+      "rooftop_address_extracted_count": 791240,
       "entity_features": {
-        "private_residences": 8,
-        "registered_agent_hubs": 367,
+        "private_residences": 64,
+        "registered_agent_hubs": 15811,
         "cmra": 0,
         "vacant": 0
       },
       "geography": {
         "us_count": 53,
-        "intl_count": 24947,
+        "intl_count": 850746,
         "jurisdictions_count": 24,
         "top_jurisdictions": {
-          "GBR": 24236,
+          "GBR": 850035,
           "CAN": 168,
           "DEU": 101,
           "FRA": 49,
@@ -348,186 +1157,569 @@
         }
       },
       "failure_reason_codes": {
-        "NO_STREET_NUMBER": 2505,
-        "WARN_LOCALITY_ONLY": 2505,
-        "WARN_CRA_HUB_DETECTED": 367,
-        "ERR_EMPTY_STREET": 98,
-        "ERR_EMPTY_ADDRESS": 98,
+        "NO_STREET_NUMBER": 49675,
+        "WARN_LOCALITY_ONLY": 49675,
+        "WARN_CRA_HUB_DETECTED": 15811,
+        "ERR_EMPTY_STREET": 7516,
+        "ERR_EMPTY_ADDRESS": 7514,
+        "WARN_RESIDENTIAL_COMM": 64,
         "WARN_MISSING_SECONDARY_UNIT": 13,
-        "ERR_MISSING_HOUSE_NUM": 12,
-        "ERR_UNRESOLVED_SUFFIX": 12,
-        "WARN_RESIDENTIAL_COMM": 8
+        "ERR_PARSE_FAILED": 2,
+        "WARN_PMB_DISGUISED": 2
       },
       "false_positives": {
-        "total_count": 0,
-        "breakdown": {},
-        "samples": []
-      },
-      "false_negatives": {
-        "total_count": 0,
-        "breakdown": {},
-        "samples": []
-      },
-      "edge_cases": []
-    },
-    "Firm Network Production Database": {
-      "total_records": 214129,
-      "duration_seconds": 281.62,
-      "throughput_rec_sec": 760.4,
-      "status": {
-        "standardized": 168540,
-        "locality_only": 24976,
-        "parse_failed": 20613,
-        "usable_yield_percent": 90.37
-      },
-      "routing_tiers": {
-        "auto_pass": 139469,
-        "fuzzy_review": 53209,
-        "manual_stewardship": 21451,
-        "auto_pass_pct": 65.13,
-        "fuzzy_review_pct": 24.85,
-        "manual_stewardship_pct": 10.02
-      },
-      "deliverability": {
-        "deliverable": 153374,
-        "requires_secondary": 46,
-        "undeliverable": 60709,
-        "deliverable_pct": 71.63,
-        "requires_secondary_pct": 0.02,
-        "undeliverable_pct": 28.35
-      },
-      "spatial_precision": {
-        "confirmed_rooftop": 100,
-        "range_interpolated": 10,
-        "postal_centroid": 40505,
-        "municipal_centroid": 148661,
-        "unresolved": 24853,
-        "confirmed_rooftop_pct": 0.05,
-        "range_interpolated_pct": 0.0,
-        "postal_centroid_pct": 18.92,
-        "unresolved_pct": 11.61
-      },
-      "rooftop_address_extracted_count": 152090,
-      "entity_features": {
-        "private_residences": 14465,
-        "registered_agent_hubs": 352,
-        "cmra": 533,
-        "vacant": 0
-      },
-      "geography": {
-        "us_count": 205212,
-        "intl_count": 8917,
-        "jurisdictions_count": 100,
-        "top_jurisdictions": {
-          "USA": 205206,
-          "GBR": 1958,
-          "CAN": 946,
-          "HKG": 703,
-          "SGP": 527,
-          "CYM": 465,
-          "CHE": 291,
-          "ISR": 289,
-          "CHN": 274,
-          "IND": 256
-        }
-      },
-      "failure_reason_codes": {
-        "NO_STREET_NUMBER": 24976,
-        "WARN_LOCALITY_ONLY": 24976,
-        "ERR_EMPTY_STREET": 20614,
-        "ERR_EMPTY_ADDRESS": 20613,
-        "WARN_RESIDENTIAL_COMM": 14465,
-        "ERR_UNRESOLVED_SUFFIX": 4146,
-        "WARN_TYPO_HEALED": 1819,
-        "WARN_CMRA_DETECTED": 533,
-        "ERR_MISSING_HOUSE_NUM": 519,
-        "ERR_ZIP_STATE_MISMATCH": 488,
-        "WARN_CRA_HUB_DETECTED": 352,
-        "WARN_PMB_DISGUISED": 243
-      },
-      "false_positives": {
-        "total_count": 19,
+        "total_count": 1619,
         "breakdown": {
-          "STREET_NUMBER_DROPPED": 10,
-          "SEVERE_STREET_TRUNCATION": 9
+          "CROSS_BORDER_CENTROID_MISMATCH": 181,
+          "CARE_OF_RETAINED_IN_STREET1": 1356,
+          "FP_PLAZA_STRIPPING": 35,
+          "STREET_NUMBER_DROPPED": 2,
+          "SEVERE_STREET_TRUNCATION": 45
         },
         "samples": [
           {
-            "type": "STREET_NUMBER_DROPPED",
-            "raw_street": "360 NORTH CRESCENT DRIVE",
-            "street1": "BUILDING 360 N CRESCENT DR S",
-            "reason": "Raw street had leading house number but standardized street1 has none"
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (GBR) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+            "lat": 40.7549,
+            "lon": -73.984
           },
           {
-            "type": "SEVERE_STREET_TRUNCATION",
-            "raw_street": "ND OFFICE",
-            "street1": "ND",
-            "reason": "Suspiciously short street1 (ND) from raw (ND OFFICE)"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "23 C/O SEVERIN FINANCE",
+            "street1": "23 C/O SEVERIN FINANCE",
+            "reason": "Care-of prefix was not wiped from street1"
           },
           {
-            "type": "SEVERE_STREET_TRUNCATION",
-            "raw_street": "NE LA VIS",
-            "street1": "NE",
-            "reason": "Suspiciously short street1 (NE) from raw (NE LA VIS)"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT",
+            "street1": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT",
+            "reason": "Care-of prefix was not wiped from street1"
           },
           {
-            "type": "STREET_NUMBER_DROPPED",
-            "raw_street": "121 DE DIEGO AVENUE",
-            "street1": "URB SAN FRANCISCO 121 DE DIEGO AVE",
-            "reason": "Raw street had leading house number but standardized street1 has none"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT",
+            "street1": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT",
+            "reason": "Care-of prefix was not wiped from street1"
           },
           {
-            "type": "STREET_NUMBER_DROPPED",
-            "raw_street": "2F LANDMARK SQ 64 EARTH CLOSE SEVEN MILE BCH SEVEN MILE BCH SEVEN MILE BCH GRAND CAYMAN KY1-1201 CYM SEVEN MILE BEACH",
-            "street1": "LANDMARK SQ 64 EARTH CLOSE SEVEN MILE BCH GRAND CAYMAN KY1-1201 CYM SEVEN MILE BCH",
-            "reason": "Raw street had leading house number but standardized street1 has none"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "107 IMAGE COURT C/O JPC FINANCIAL LTD",
+            "street1": "107 IMAGE CT C/O JPC FINANCIAL LTD",
+            "reason": "Care-of prefix was not wiped from street1"
           },
           {
-            "type": "SEVERE_STREET_TRUNCATION",
-            "raw_street": "ND OFFICE",
-            "street1": "ND",
-            "reason": "Suspiciously short street1 (ND) from raw (ND OFFICE)"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "TRUST HOUSE C/O ISAACS",
+            "street1": "TRUST HOUSE C/O ISAACS",
+            "reason": "Care-of prefix was not wiped from street1"
           },
           {
-            "type": "STREET_NUMBER_DROPPED",
-            "raw_street": "247 EDWARDS PLAZA UNIT 17",
-            "street1": "UNIT 17 BOX 13",
-            "reason": "Raw street had leading house number but standardized street1 has none"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "9B CHURCHILL BUILDING C/O HOMEWISE ESTATES QUEEN STREET",
+            "street1": "9B CHURCHILL BUILDING C/O HOMEWISE ESTS QUEEN ST",
+            "reason": "Care-of prefix was not wiped from street1"
           },
           {
-            "type": "SEVERE_STREET_TRUNCATION",
-            "raw_street": "RYE NH UNITED ESTS",
-            "street1": "RYE",
-            "reason": "Suspiciously short street1 (RYE) from raw (RYE NH UNITED ESTS)"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "1 BAKERS ROW RESIDENTS LTD C/O ERA PROPERTY SERVICES LTD",
+            "street1": "1 BAKERS ROW RESIDENTS LTD C/O ERA PROPERTY SERVICES LTD",
+            "reason": "Care-of prefix was not wiped from street1"
           },
           {
-            "type": "SEVERE_STREET_TRUNCATION",
-            "raw_street": "C/O CIRCLE INTERNET GROUP ONE WORLD TRADE CENTER",
-            "street1": "FL",
-            "reason": "Suspiciously short street1 (FL) from raw (C/O CIRCLE INTERNET GROUP ONE WORLD TRADE CENTER)"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "GROVE HOUSE C/O DAUD QADRI & CO 2 WOODBERRY GROVE",
+            "street1": "GRV HOUSE C/O DAUD QADRI & CO 2 WOODBERRY GRV",
+            "reason": "Care-of prefix was not wiped from street1"
           },
           {
-            "type": "SEVERE_STREET_TRUNCATION",
-            "raw_street": "RYE NH UNITED ESTS",
-            "street1": "RYE",
-            "reason": "Suspiciously short street1 (RYE) from raw (RYE NH UNITED ESTS)"
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "1 COTTAGES, SMITHS LAWN C/O ACACIA ACCOUNTANCY SERVICES",
+            "street1": "1 COTTAGES, SMITHS LAWN C/O ACACIA ACCOUNTANCY SERVICES",
+            "reason": "Care-of prefix was not wiped from street1"
+          },
+          {
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "MARLOWE INNOVATION CENTRE C/O CPM - MARLOWE INNOVATION CENTRE",
+            "street1": "MARLOWE INNOVATION CTR C/O CPM - MARLOWE INNOVATION CTR",
+            "reason": "Care-of prefix was not wiped from street1"
+          },
+          {
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "331 LINEN HALL C/O STONELINK INTERNATIONAL (LONDON) LIMITED",
+            "street1": "331 LINEN HALL C/O STONELINK INTERNATIONAL (LONDON) LIMITED",
+            "reason": "Care-of prefix was not wiped from street1"
+          },
+          {
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "MICHELIN HOUSE C/O AVERYS PROPERTY MANAGEMENT",
+            "street1": "MICHELIN HOUSE C/O AVERYS PROPERTY MANAGEMENT",
+            "reason": "Care-of prefix was not wiped from street1"
+          },
+          {
+            "type": "CARE_OF_RETAINED_IN_STREET1",
+            "raw_street": "IZZARD COURT C/O : CONTAS UK",
+            "street1": "IZZARD CT C/O : CONTAS UK",
+            "reason": "Care-of prefix was not wiped from street1"
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (GBR) record assigned US spatial coordinates: lat=37.769337, lon=-78.169968",
+            "lat": 37.769337,
+            "lon": -78.169968
           }
         ]
       },
       "false_negatives": {
-        "total_count": 277,
+        "total_count": 0,
+        "breakdown": {},
+        "samples": []
+      },
+      "edge_cases": [
+        {
+          "input": "4 B\u00d6RSEPLATZ , WIEN,  1010 GBR",
+          "output": "4 B\u00d6RSEPLATZ |  | WIEN |  1010 | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (GBR) record assigned US spatial coordinates: lat=40.7549, lon=-73.984",
+              "lat": 40.7549,
+              "lon": -73.984
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "23 C/O SEVERIN FINANCE , LONDON,  SW8 1EF GBR",
+          "output": "23 C/O SEVERIN FINANCE |  | LONDON |  SW8 1EF | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "23 C/O SEVERIN FINANCE",
+              "street1": "23 C/O SEVERIN FINANCE",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT , HENLEY-IN-ARDEN,  B95 5AA GBR",
+          "output": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT |  | HENLEY-IN-ARDEN |  B95 5AA | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT",
+              "street1": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT , HENLEY-IN-ARDEN,  B95 5AA GBR",
+          "output": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT |  | HENLEY-IN-ARDEN |  B95 5AA | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT",
+              "street1": "FORWARD HOUSE OFFICE 114 C/O GIL INVESTMENTS LIMIT",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "107 IMAGE COURT C/O JPC FINANCIAL LTD , WALTON ON THAMES, SURREY KT12 3PD GBR",
+          "output": "107 IMAGE CT C/O JPC FINANCIAL LTD |  | WALTON ON THAMES | SURREY KT12 3PD | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "107 IMAGE COURT C/O JPC FINANCIAL LTD",
+              "street1": "107 IMAGE CT C/O JPC FINANCIAL LTD",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "TRUST HOUSE C/O ISAACS , BRADFORD,  BD1 5LL GBR",
+          "output": "TRUST HOUSE C/O ISAACS |  | BRADFORD |  BD1 5LL | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "TRUST HOUSE C/O ISAACS",
+              "street1": "TRUST HOUSE C/O ISAACS",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "9B CHURCHILL BUILDING C/O HOMEWISE ESTATES QUEEN STREET , TELFORD, SHROPSHIRE TF1 1SN GBR",
+          "output": "9B CHURCHILL BUILDING C/O HOMEWISE ESTS QUEEN ST |  | TELFORD | SHROPSHIRE TF1 1SN | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "9B CHURCHILL BUILDING C/O HOMEWISE ESTATES QUEEN STREET",
+              "street1": "9B CHURCHILL BUILDING C/O HOMEWISE ESTS QUEEN ST",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "1 BAKERS ROW RESIDENTS LTD C/O ERA PROPERTY SERVICES LTD , LONDON,  EC1R 0NE GBR",
+          "output": "1 BAKERS ROW RESIDENTS LTD C/O ERA PROPERTY SERVICES LTD |  | LONDON |  EC1R 0NE | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "1 BAKERS ROW RESIDENTS LTD C/O ERA PROPERTY SERVICES LTD",
+              "street1": "1 BAKERS ROW RESIDENTS LTD C/O ERA PROPERTY SERVICES LTD",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "GROVE HOUSE C/O DAUD QADRI & CO 2 WOODBERRY GROVE , LONDON,  N12 0DR GBR",
+          "output": "GRV HOUSE C/O DAUD QADRI & CO 2 WOODBERRY GRV |  | LONDON |  N12 0DR | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "GROVE HOUSE C/O DAUD QADRI & CO 2 WOODBERRY GROVE",
+              "street1": "GRV HOUSE C/O DAUD QADRI & CO 2 WOODBERRY GRV",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "1 COTTAGES, SMITHS LAWN C/O ACACIA ACCOUNTANCY SERVICES , EGAHM, SURREY TW20 0HP GBR",
+          "output": "1 COTTAGES, SMITHS LAWN C/O ACACIA ACCOUNTANCY SERVICES |  | EGAHM | SURREY TW20 0HP | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "1 COTTAGES, SMITHS LAWN C/O ACACIA ACCOUNTANCY SERVICES",
+              "street1": "1 COTTAGES, SMITHS LAWN C/O ACACIA ACCOUNTANCY SERVICES",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "MARLOWE INNOVATION CENTRE C/O CPM - MARLOWE INNOVATION CENTRE , RAMSGATE, KENT CT12 6FA GBR",
+          "output": "MARLOWE INNOVATION CTR C/O CPM - MARLOWE INNOVATION CTR |  | RAMSGATE | KENT CT12 6FA | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "MARLOWE INNOVATION CENTRE C/O CPM - MARLOWE INNOVATION CENTRE",
+              "street1": "MARLOWE INNOVATION CTR C/O CPM - MARLOWE INNOVATION CTR",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "331 LINEN HALL C/O STONELINK INTERNATIONAL (LONDON) LIMITED , 162-168 REGENT STREET, LONDON W1B 5TD GBR",
+          "output": "331 LINEN HALL C/O STONELINK INTERNATIONAL (LONDON) LIMITED |  | 162-168 REGENT STREET | LONDON W1B 5TD | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "331 LINEN HALL C/O STONELINK INTERNATIONAL (LONDON) LIMITED",
+              "street1": "331 LINEN HALL C/O STONELINK INTERNATIONAL (LONDON) LIMITED",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "MICHELIN HOUSE C/O AVERYS PROPERTY MANAGEMENT , LONDON,  SW3 6RD GBR",
+          "output": "MICHELIN HOUSE C/O AVERYS PROPERTY MANAGEMENT |  | LONDON |  SW3 6RD | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "MICHELIN HOUSE C/O AVERYS PROPERTY MANAGEMENT",
+              "street1": "MICHELIN HOUSE C/O AVERYS PROPERTY MANAGEMENT",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "IZZARD COURT C/O : CONTAS UK , THORNTON HEATH,  CR7 8JU GBR",
+          "output": "IZZARD CT C/O : CONTAS UK |  | THORNTON HEATH |  CR7 8JU | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "UNRESOLVED",
+          "fps": [
+            {
+              "type": "CARE_OF_RETAINED_IN_STREET1",
+              "raw_street": "IZZARD COURT C/O : CONTAS UK",
+              "street1": "IZZARD CT C/O : CONTAS UK",
+              "reason": "Care-of prefix was not wiped from street1"
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "MCGUIRREWOODS LLC , RICHMOND, VA 23219 GBR",
+          "output": "MCGUIRREWOODS LLC |  | RICHMOND | VA 23219 | GBR",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (GBR) record assigned US spatial coordinates: lat=37.769337, lon=-78.169968",
+              "lat": 37.769337,
+              "lon": -78.169968
+            }
+          ],
+          "fns": []
+        }
+      ]
+    },
+    "Firm Network Production Database": {
+      "total_records": 1425923,
+      "duration_seconds": 1240.92,
+      "throughput_rec_sec": 1149.1,
+      "status": {
+        "standardized": 1229586,
+        "locality_only": 45192,
+        "parse_failed": 151145,
+        "usable_yield_percent": 89.4
+      },
+      "routing_tiers": {
+        "auto_pass": 978732,
+        "fuzzy_review": 292654,
+        "manual_stewardship": 154537,
+        "auto_pass_pct": 68.64,
+        "fuzzy_review_pct": 20.52,
+        "manual_stewardship_pct": 10.84
+      },
+      "deliverability": {
+        "deliverable": 1210218,
+        "requires_secondary": 4147,
+        "undeliverable": 211558,
+        "deliverable_pct": 84.87,
+        "requires_secondary_pct": 0.29,
+        "undeliverable_pct": 14.84
+      },
+      "spatial_precision": {
+        "confirmed_rooftop": 600,
+        "range_interpolated": 19,
+        "postal_centroid": 372007,
+        "municipal_centroid": 887751,
+        "unresolved": 165546,
+        "confirmed_rooftop_pct": 0.04,
+        "range_interpolated_pct": 0.0,
+        "postal_centroid_pct": 26.09,
+        "municipal_centroid_pct": 62.26,
+        "unresolved_pct": 11.61
+      },
+      "rooftop_address_extracted_count": 1214859,
+      "entity_features": {
+        "private_residences": 12658,
+        "registered_agent_hubs": 2346,
+        "cmra": 938,
+        "vacant": 0
+      },
+      "geography": {
+        "us_count": 1410414,
+        "intl_count": 15509,
+        "jurisdictions_count": 100,
+        "top_jurisdictions": {
+          "USA": 1410408,
+          "CAN": 3753,
+          "GBR": 3306,
+          "HKG": 895,
+          "SGP": 691,
+          "ISR": 568,
+          "CYM": 549,
+          "IND": 521,
+          "CHE": 437,
+          "AUS": 353
+        }
+      },
+      "failure_reason_codes": {
+        "ERR_EMPTY_STREET": 151194,
+        "ERR_EMPTY_ADDRESS": 151145,
+        "NO_STREET_NUMBER": 45192,
+        "WARN_LOCALITY_ONLY": 45192,
+        "ERR_UNRESOLVED_SUFFIX": 16403,
+        "WARN_RESIDENTIAL_COMM": 12658,
+        "WARN_MISSING_SECONDARY_UNIT": 4147,
+        "ERR_ZIP_STATE_MISMATCH": 3714,
+        "WARN_CRA_HUB_DETECTED": 2346,
+        "WARN_TYPO_HEALED": 1932,
+        "WARN_LANDMARK_CAMPUS_PREMISE": 1322,
+        "ERR_MISSING_HOUSE_NUM": 1044,
+        "WARN_CMRA_DETECTED": 938,
+        "WARN_PMB_DISGUISED": 294,
+        "ERR_AMBIGUOUS_DUAL_ADDR": 124
+      },
+      "false_positives": {
+        "total_count": 1479,
         "breakdown": {
-          "FN_MANUAL_STEWARDSHIP_VALID_INPUT": 277
+          "CROSS_BORDER_CENTROID_MISMATCH": 1344,
+          "FP_PLAZA_STRIPPING": 97,
+          "SEVERE_STREET_TRUNCATION": 10,
+          "STREET_NUMBER_DROPPED": 18,
+          "CARE_OF_RETAINED_IN_STREET1": 10
         },
         "samples": [
           {
-            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-            "raw_input": "1959 CALLE LOIZA, SAN JUAN, PR  USA",
-            "reasons": [
-              "ERR_UNRESOLVED_SUFFIX"
-            ],
-            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Australia) record assigned US spatial coordinates: lat=38.9072, lon=-77.0369",
+            "lat": 38.9072,
+            "lon": -77.0369
           },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (CHN) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+            "lat": 40.7128,
+            "lon": -74.006
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "US record assigned non-US spatial coordinates: lat=18.335765, lon=-64.896335",
+            "lat": 18.335765,
+            "lon": -64.896335
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (China) record assigned US spatial coordinates: lat=38.9072, lon=-77.0369",
+            "lat": 38.9072,
+            "lon": -77.0369
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Cayman Islands) record assigned US spatial coordinates: lat=27.766279, lon=-81.686783",
+            "lat": 27.766279,
+            "lon": -81.686783
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Canada) record assigned US spatial coordinates: lat=39.318523, lon=-75.507141",
+            "lat": 39.318523,
+            "lon": -75.507141
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Mauritius) record assigned US spatial coordinates: lat=34.969704, lon=-92.373123",
+            "lat": 34.969704,
+            "lon": -92.373123
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Mauritius) record assigned US spatial coordinates: lat=42.165726, lon=-74.948051",
+            "lat": 42.165726,
+            "lon": -74.948051
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Hungary) record assigned US spatial coordinates: lat=42.230171, lon=-71.530106",
+            "lat": 42.230171,
+            "lon": -71.530106
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Vietnam) record assigned US spatial coordinates: lat=31.169546, lon=-91.867805",
+            "lat": 31.169546,
+            "lon": -91.867805
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (CHN) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+            "lat": 40.7128,
+            "lon": -74.006
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Estonia) record assigned US spatial coordinates: lat=40.8448, lon=-73.8648",
+            "lat": 40.8448,
+            "lon": -73.8648
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Japan) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+            "lat": 40.7128,
+            "lon": -74.006
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (Greece) record assigned US spatial coordinates: lat=40.590752, lon=-77.209755",
+            "lat": 40.590752,
+            "lon": -77.209755
+          },
+          {
+            "type": "CROSS_BORDER_CENTROID_MISMATCH",
+            "reason": "International (China) record assigned US spatial coordinates: lat=38.9072, lon=-77.0369",
+            "lat": 38.9072,
+            "lon": -77.0369
+          }
+        ]
+      },
+      "false_negatives": {
+        "total_count": 1928,
+        "breakdown": {
+          "FN_MANUAL_STEWARDSHIP_VALID_INPUT": 1914,
+          "FN_PR_URB_UNDELIVERABLE": 14
+        },
+        "samples": [
           {
             "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
             "raw_input": "101 S 200TH E, SALT LAKE CITY, UT  USA",
@@ -553,6 +1745,11 @@
             "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
           },
           {
+            "type": "FN_PR_URB_UNDELIVERABLE",
+            "raw_input": "URB LOMAS VERDES, BAYAMON, PR 00956",
+            "reason": "Puerto Rico Urbanization address marked UNDELIVERABLE"
+          },
+          {
             "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
             "raw_input": "32 OLD, NEW YORK, NY  USA",
             "reasons": [
@@ -561,29 +1758,9 @@
             "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
           },
           {
-            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-            "raw_input": "810 N TUMBLEWEED TR, AUSTIN, TX  USA",
-            "reasons": [
-              "ERR_UNRESOLVED_SUFFIX"
-            ],
-            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
-          },
-          {
-            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-            "raw_input": "5093 DRONNINGEN'S GADE SUITE #5 SUITE #5 ST THOMAS VI 802ND UNITED ESTS STE 5, ST THOMAS, VI 00802 USA",
-            "reasons": [
-              "ERR_UNRESOLVED_SUFFIX",
-              "ERR_ZIP_STATE_MISMATCH"
-            ],
-            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX', 'ERR_ZIP_STATE_MISMATCH']"
-          },
-          {
-            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-            "raw_input": "3340PEACHTREE ROAD SUITE 1400, ATLANTA, GA 30326 United States",
-            "reasons": [
-              "ERR_MISSING_HOUSE_NUM"
-            ],
-            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_MISSING_HOUSE_NUM']"
+            "type": "FN_PR_URB_UNDELIVERABLE",
+            "raw_input": "URB ALTURAS DE FLAMBOYAN, BAYAMON, PR 00960",
+            "reason": "Puerto Rico Urbanization address marked UNDELIVERABLE"
           },
           {
             "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
@@ -600,198 +1777,320 @@
               "ERR_UNRESOLVED_SUFFIX"
             ],
             "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "3707 DARTMOUTH, DALLAS, TX  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "141 W JACKSON, CHICAGO, IL  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "520 MADISON, NEW YORK, NY  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "141 W JACKSON, CHICAGO, IL  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "2300 E KATELLA, ANAHEIM, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "17630 EL VUELO, RANCHO SANTA FE, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+          },
+          {
+            "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
+            "raw_input": "16 N MARENGO, PASADENA, CA  USA",
+            "reasons": [
+              "ERR_UNRESOLVED_SUFFIX"
+            ],
+            "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
           }
         ]
       },
       "edge_cases": [
         {
-          "input": "1959 CALLE LOIZA , SAN JUAN, PR  USA",
-          "output": "1959 CALLE LOIZA |  | SAN JUAN | PR  | USA",
+          "input": "LEVEL 21, 8 CHIFLEY SQUARE LEVEL 21, SYDNEY NSW,  2000 Australia",
+          "output": "LEVEL 21, 8 CHIFLEY SQ | LEVEL 21 | SYDNEY NSW | NSW 2000 | AUS",
           "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
+          "tier": "AUTO_PASS",
           "deliv": "DELIVERABLE",
-          "prec": "MUNICIPAL_CENTROID",
-          "fps": [],
-          "fns": [
-            {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "1959 CALLE LOIZA, SAN JUAN, PR  USA",
-              "reasons": [
-                "ERR_UNRESOLVED_SUFFIX"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
-            }
-          ]
-        },
-        {
-          "input": "360 NORTH CRESCENT DRIVE SOUTH BUILDING, BEVERLY HILLS, CA 90210-2529 United States",
-          "output": "BUILDING 360 N CRESCENT DR S |  | BEVERLY HILLS | CA 90210-2529 | USA",
-          "status": "standardized",
-          "tier": "FUZZY_REVIEW",
-          "deliv": "UNDELIVERABLE",
           "prec": "POSTAL_CENTROID",
           "fps": [
             {
-              "type": "STREET_NUMBER_DROPPED",
-              "raw_street": "360 NORTH CRESCENT DRIVE",
-              "street1": "BUILDING 360 N CRESCENT DR S",
-              "reason": "Raw street had leading house number but standardized street1 has none"
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Australia) record assigned US spatial coordinates: lat=38.9072, lon=-77.0369",
+              "lat": 38.9072,
+              "lon": -77.0369
             }
           ],
           "fns": []
         },
         {
-          "input": "101 S 200TH E STE 300, SALT LAKE CITY, UT  USA",
-          "output": "101 S 200TH E | STE 300 | SALT LAKE CITY | UT  | USA",
+          "input": "SUITE 3102 FORTUNE FINANCIAL CTR NO 5 E THIRD RING MIDDLE RD NO 5 E THIRD RING MIDDLE RD NO 5 E THIRD RING MIDDLE RD BEIJING 100044 CHN NO 5 EAST THIRD RING MIDDLE ROAD NO. 5 EAST THIRD RING MIDDLE ROAD, BEIJING,  100044 CHN",
+          "output": "SUITE 3102 FORTUNE FINANCIAL CTR NO 5 E THIRD RING MIDDLE RD BEIJING 100044 CHN NO 5 EAST THIRD RING MIDDLE ROAD | NO. 5 EAST THIRD RING MIDDLE ROAD | BEIJING |  100044 | CHN",
           "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
+          "tier": "AUTO_PASS",
           "deliv": "DELIVERABLE",
-          "prec": "MUNICIPAL_CENTROID",
-          "fps": [],
-          "fns": [
-            {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "101 S 200TH E, SALT LAKE CITY, UT  USA",
-              "reasons": [
-                "ERR_UNRESOLVED_SUFFIX"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
-            }
-          ]
-        },
-        {
-          "input": "10 E 53RD STE 1200, NEW YORK, NY  USA",
-          "output": "10 E 53RD | STE 1200 | NEW YORK | NY  | USA",
-          "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
-          "deliv": "DELIVERABLE",
-          "prec": "MUNICIPAL_CENTROID",
-          "fps": [],
-          "fns": [
-            {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "10 E 53RD, NEW YORK, NY  USA",
-              "reasons": [
-                "ERR_UNRESOLVED_SUFFIX"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
-            }
-          ]
-        },
-        {
-          "input": "2875 RT 35TH STE 5C-2, KATONAH, NY  USA",
-          "output": "2875 RT 35TH | STE 5C-2 | KATONAH | NY  | USA",
-          "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
-          "deliv": "DELIVERABLE",
-          "prec": "MUNICIPAL_CENTROID",
-          "fps": [],
-          "fns": [
-            {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "2875 RT 35TH, KATONAH, NY  USA",
-              "reasons": [
-                "ERR_UNRESOLVED_SUFFIX"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
-            }
-          ]
-        },
-        {
-          "input": "32 OLD SLIP 34TH FL, NEW YORK, NY  USA",
-          "output": "32 OLD | SLIP FL 34 | NEW YORK | NY  | USA",
-          "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
-          "deliv": "DELIVERABLE",
-          "prec": "MUNICIPAL_CENTROID",
-          "fps": [],
-          "fns": [
-            {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "32 OLD, NEW YORK, NY  USA",
-              "reasons": [
-                "ERR_UNRESOLVED_SUFFIX"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
-            }
-          ]
-        },
-        {
-          "input": "810 N TUMBLEWEED TR , AUSTIN, TX  USA",
-          "output": "810 N TUMBLEWEED TR |  | AUSTIN | TX  | USA",
-          "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
-          "deliv": "DELIVERABLE",
-          "prec": "MUNICIPAL_CENTROID",
-          "fps": [],
-          "fns": [
-            {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "810 N TUMBLEWEED TR, AUSTIN, TX  USA",
-              "reasons": [
-                "ERR_UNRESOLVED_SUFFIX"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
-            }
-          ]
-        },
-        {
-          "input": "5093 DRONNINGEN'S GADE SUITE #5 SUITE #5 ST THOMAS VI 802ND UNITED ESTS STE 5 SUITE #5, ST THOMAS, VI 00802 USA",
-          "output": "5093 DRONNINGEN'S GADE | STE 5 | ST THOMAS | VI 00802 | USA",
-          "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
-          "deliv": "DELIVERABLE",
-          "prec": "MUNICIPAL_CENTROID",
-          "fps": [],
-          "fns": [
-            {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "5093 DRONNINGEN'S GADE SUITE #5 SUITE #5 ST THOMAS VI 802ND UNITED ESTS STE 5, ST THOMAS, VI 00802 USA",
-              "reasons": [
-                "ERR_UNRESOLVED_SUFFIX",
-                "ERR_ZIP_STATE_MISMATCH"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX', 'ERR_ZIP_STATE_MISMATCH']"
-            }
-          ]
-        },
-        {
-          "input": "3340PEACHTREE ROAD SUITE 1400 STE 1400, ATLANTA, GA 30326 United States",
-          "output": "PEACHTREE RD | STE 1400 | ATLANTA | GA 30326 | USA",
-          "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
-          "deliv": "UNDELIVERABLE",
           "prec": "POSTAL_CENTROID",
-          "fps": [],
-          "fns": [
+          "fps": [
             {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "3340PEACHTREE ROAD SUITE 1400, ATLANTA, GA 30326 United States",
-              "reasons": [
-                "ERR_MISSING_HOUSE_NUM"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_MISSING_HOUSE_NUM']"
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (CHN) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+              "lat": 40.7128,
+              "lon": -74.006
             }
-          ]
+          ],
+          "fns": []
         },
         {
-          "input": "57 W 57TH STE 4TH FL, NEW YORK, NY  USA",
-          "output": "57 W 57TH | FL 4 | NEW YORK | NY  | USA",
+          "input": "9800 BUCCANEER MALL SUITE 16, SAINT THOMAS, VI 00802 United States",
+          "output": "9800 BUCCANEER MALL | STE 16 | SAINT THOMAS | VI 00802 | USA",
           "status": "standardized",
-          "tier": "MANUAL_STEWARDSHIP",
+          "tier": "AUTO_PASS",
           "deliv": "DELIVERABLE",
           "prec": "MUNICIPAL_CENTROID",
-          "fps": [],
-          "fns": [
+          "fps": [
             {
-              "type": "FN_MANUAL_STEWARDSHIP_VALID_INPUT",
-              "raw_input": "57 W 57TH, NEW YORK, NY  USA",
-              "reasons": [
-                "ERR_UNRESOLVED_SUFFIX"
-              ],
-              "reason": "Clean address demoted to MANUAL_STEWARDSHIP: ['ERR_UNRESOLVED_SUFFIX']"
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "US record assigned non-US spatial coordinates: lat=18.335765, lon=-64.896335",
+              "lat": 18.335765,
+              "lon": -64.896335
             }
-          ]
+          ],
+          "fns": []
+        },
+        {
+          "input": "600 ZHONGSHAN NO.2 ROAD (E), BUND FINANCE CENTER 17/F, SHANGHAI,  200010 China",
+          "output": "600 ZHONGSHAN NO.2 ROAD (E), BUND FINANCE CENTER | 17/F | SHANGHAI |  200010 | CHN",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (China) record assigned US spatial coordinates: lat=38.9072, lon=-77.0369",
+              "lat": 38.9072,
+              "lon": -77.0369
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "ONE CAPITAL PLACE, 3RD FLOOR 136 SHEDDEN ROAD, GEORGE TOWN, GRAND CAYMAN, FL KY1-1110 Cayman Islands",
+          "output": "ONE CAPITAL PL 3RD FLOOR | 136 SHEDDEN ROAD | GEORGE TOWN GRAND CAYMAN | FL KY1-1110 | CYM",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Cayman Islands) record assigned US spatial coordinates: lat=27.766279, lon=-81.686783",
+              "lat": 27.766279,
+              "lon": -81.686783
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "980 HOWE ST SUITE 700, VANCOUVER, DE V6Z0C8 Canada",
+          "output": "980 HOWE ST | STE 700 | VANCOUVER | DE V6Z 0C8 | CAN",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Canada) record assigned US spatial coordinates: lat=39.318523, lon=-75.507141",
+              "lat": 39.318523,
+              "lon": -75.507141
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "6TH FLOOR, TWO TRIBECA TRIBECA CENTRAL, TRIANON, AR 72261 Mauritius",
+          "output": "TWO TRIBECA | FL 6TH TRIBECA CENTRAL | TRIANON | AR 72261 | MUS",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Mauritius) record assigned US spatial coordinates: lat=34.969704, lon=-92.373123",
+              "lat": 34.969704,
+              "lon": -92.373123
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "SUITE 218, 22 ST GEORGES STREET, PORT LOUIS, NY 11324 Mauritius",
+          "output": " | SUITE 218 22 ST GEORGES STREET | PORT LOUIS | NY 11324 | MUS",
+          "status": "locality_only",
+          "tier": "FUZZY_REVIEW",
+          "deliv": "UNDELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Mauritius) record assigned US spatial coordinates: lat=42.165726, lon=-74.948051",
+              "lat": 42.165726,
+              "lon": -74.948051
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "SZERVITA SQUARE 3. FLOOR 2.7 STE 3 FL 2.7 3 FL 2.7 BUDAPEST 1052 STE 3 FL 2.7 3 FL 2.7 BUDAPEST 1052 STE 3 FL 2.7 3 FL 2.7 BUDAPEST 1052 STE 3 FL 2.7 3 FL 2.7, BUDAPEST, MA 1052 Hungary",
+          "output": "SZERVITA SQ 3 FLOOR 2 7 | STE 3 FL 2 7 3 FL 2 7 BUDAPEST 1052 | BUDAPEST | MA 1052 | HUN",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Hungary) record assigned US spatial coordinates: lat=42.230171, lon=-71.530106",
+              "lat": 42.230171,
+              "lon": -71.530106
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "FLOOR 23, LIM TOWER 1 9-11 TON DUC THANG STREET, SAIGON WARD, HO CHI MINH CITY, LA 700000 Vietnam",
+          "output": "FLOOR 23 LIM TOWER 1 | 9-11 TON DUC THANG STREET SAIGON WARD | HO CHI MINH CITY | LA 700000 | VNM",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Vietnam) record assigned US spatial coordinates: lat=31.169546, lon=-91.867805",
+              "lat": 31.169546,
+              "lon": -91.867805
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "SUITE 2606 TWIN TOWERS W JIANGUOMENWAI AVE CHAYOANG DISTRICT BEIJING 100022 CHINA JIANGUOMENWAI AVENUE CHAYOANG DISTRICT, BEIJING,  100022 CHN",
+          "output": "SUITE 2606 TWIN TOWERS W JIANGUOMENWAI AVE CHAYOANG DISTRICT BEIJING 100022 CHINA | JIANGUOMENWAI AVENUE CHAYOANG DISTRICT | BEIJING |  100022 | CHN",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (CHN) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+              "lat": 40.7128,
+              "lon": -74.006
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "PEETRI TN. 11 PEETRI 11, TALLINN, NY 10415 Estonia",
+          "output": "PEETRI TN 11 | PEETRI 11 | TALLINN | NY 10415 | EST",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Estonia) record assigned US spatial coordinates: lat=40.8448, lon=-73.8648",
+              "lat": 40.8448,
+              "lon": -73.8648
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "OTEMACHI BUILDING 9F 1-6-1 OTEMACHI, CHIYODA-KU, TOKYO, TOKYO,  1000004 Japan",
+          "output": "OTEMACHI BUILDING 9F | 1-6-1 OTEMACHI, CHIYODA-KU | TOKYO TOKYO |  100-0004 | JPN",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Japan) record assigned US spatial coordinates: lat=40.7128, lon=-74.006",
+              "lat": 40.7128,
+              "lon": -74.006
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "50 XENOFONTOS & DAFNIS 42, VOULA , ATHENS, PA 16673 Greece",
+          "output": "50 XENOFONTOS & DAFNIS 42, VOULA |  | ATHENS | PA 166 73 | GRC",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "MUNICIPAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (Greece) record assigned US spatial coordinates: lat=40.590752, lon=-77.209755",
+              "lat": 40.590752,
+              "lon": -77.209755
+            }
+          ],
+          "fns": []
+        },
+        {
+          "input": "SUITE 3002, PINGAN RIVERFRONT FINANCIAL CENTER NO.757, MENGZI ROAD, HUANGPU, SHANGHAI,  200023 China",
+          "output": "SUITE 3002, PINGAN RIVERFRONT FINANCIAL CENTER | NO.757, MENGZI ROAD, HUANGPU | SHANGHAI |  200023 | CHN",
+          "status": "standardized",
+          "tier": "AUTO_PASS",
+          "deliv": "DELIVERABLE",
+          "prec": "POSTAL_CENTROID",
+          "fps": [
+            {
+              "type": "CROSS_BORDER_CENTROID_MISMATCH",
+              "reason": "International (China) record assigned US spatial coordinates: lat=38.9072, lon=-77.0369",
+              "lat": 38.9072,
+              "lon": -77.0369
+            }
+          ],
+          "fns": []
         }
       ]
     }

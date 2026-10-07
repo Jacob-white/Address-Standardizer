@@ -122,7 +122,7 @@ RE_DIGITS = re.compile(r"\d")
 
 # Care-of / In Care Of / Attention line (e.g. "c/o Ananym Capital Management, LP")
 RE_CARE_OF = re.compile(
-    r"^(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b.*?(?:,\s*(?:LLC|LP|INC|CORP|LTD|CO|P\.?C\.?|PLLC|SA|AG|NV|BV|GMBH|SGIIC|S\.?A\.?|S\.?L\.?))?(?:,\s*|$)",
+    r"(?:^|[\s,])(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b.*?(?:,\s*(?:LLC|LP|INC|CORP|LTD|CO|P\.?C\.?|PLLC|SA|AG|NV|BV|GMBH|SGIIC|S\.?A\.?|S\.?L\.?))?(?:,\s*|$)",
     re.IGNORECASE,
 )
 
@@ -374,8 +374,15 @@ def clean_redundant_street_tail(
                 if m_city:
                     cand = curr[:m_city.start()].rstrip(" ,.-")
                     tokens_cand = cand.split()
-                    has_street_words = any(t.isalpha() and t.upper() not in ("ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN") for t in tokens_cand)
-                    if has_street_words or not tokens_cand:
+                    DANGLING_PREPOSITIONS = {"DE", "DEL", "OF", "LA", "EL", "DU", "VON", "VAN"}
+                    if tokens_cand and tokens_cand[-1].upper() in DANGLING_PREPOSITIONS:
+                        cand_no_prep = " ".join(tokens_cand[:-1]).rstrip(" ,.-")
+                        cand_tokens_check = cand_no_prep.split()
+                        has_street_words = any(t.isalpha() and t.upper() not in ("ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN") for t in cand_tokens_check)
+                        if has_street_words:
+                            cand = cand_no_prep
+                    has_street_words = any(t.isalpha() and t.upper() not in ("ONE", "TWO", "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "TEN") for t in cand.split())
+                    if has_street_words or not cand.split():
                         curr = cand
                 if curr.upper() == city_clean:
                     curr = ""

@@ -743,10 +743,15 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
         p_st = m_sz.group(1)
         p_zp = m_sz.group(2)
         before_sz = clean_input[:m_sz.start()].rstrip(" ,")
+        DANGLING_PREPOSITIONS = {"DE", "DEL", "OF", "LA", "EL", "DU", "VON", "VAN"}
         if "," in before_sz:
             st_part, city_cand = before_sz.rsplit(",", 1)
             p_city = city_cand.strip()
-            clean_input = st_part.strip()
+            st_clean = st_part.strip()
+            st_tokens = st_clean.split()
+            if st_tokens and st_tokens[-1].upper() in DANGLING_PREPOSITIONS:
+                st_clean = " ".join(st_tokens[:-1]).rstrip(" ,.-")
+            clean_input = st_clean
         else:
             tokens_raw = before_sz.split()
             tokens_upper = before_sz.upper().split()
@@ -754,8 +759,11 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 if len(tokens_upper) > num_words:
                     cand_city = " ".join(tokens_upper[-num_words:])
                     if cand_city in MULTI_WORD_CITIES:
+                        cand_street_tokens = tokens_raw[:-num_words]
+                        if cand_street_tokens and cand_street_tokens[-1].upper() in DANGLING_PREPOSITIONS:
+                            cand_street_tokens = cand_street_tokens[:-1]
                         p_city = " ".join(tokens_raw[-num_words:])
-                        clean_input = " ".join(tokens_raw[:-num_words])
+                        clean_input = " ".join(cand_street_tokens)
                         break
 
     # Execute CRF parser
@@ -906,7 +914,11 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 else:
                     street_parts.append(clean)
         elif label == "OccupancyType":
-            sec_parts.append(SECONDARY_UNITS.get(clean, clean))
+            SPANISH_PREFIX_THOROUGHFARES = {"CALLE", "AVENIDA", "CARR", "RUTA", "CAMINO", "PASEO", "CALZADA", "CARRETERA"}
+            if clean.upper() in SPANISH_PREFIX_THOROUGHFARES and not street_parts:
+                street_parts.append(clean.upper())
+            else:
+                sec_parts.append(SECONDARY_UNITS.get(clean, clean))
         elif label in ("OccupancyIdentifier", "SubaddressIdentifier"):
             clean_id = clean.lstrip("#-").strip()
             if clean_id:
@@ -1516,8 +1528,9 @@ def standardize_address(
         s1_in = ""
 
     # Care-Of / Attention Prefix Cleaner
-    # Strips the leading "c/o <Company Name>" segment and any legal entity suffix, preserving all subsequent address parts
-    if re.match(r"^(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b", s1_in, re.IGNORECASE):
+    # Strips "c/o <Company Name>" segment and legal entity suffixes, preserving physical address parts before or after
+    m_co = re.search(r"(?:^|[\s,])(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[:\s\-]*", s1_in, re.IGNORECASE)
+    if m_co:
         LEGAL_SUFFIXES_CLEAN = {
             "LLC", "LP", "LLP", "LLLPO", "INC", "CORP", "LTD", "CO", "PLLC", "PC",
             "SA", "AG", "NV", "BV", "GMBH", "PLC", "FSB", "ESQ", "CPA", "MD", "PA",
@@ -1525,10 +1538,10 @@ def standardize_address(
             "PARTNERSHIP", "SGIIC", "SL", "SRL", "SARL", "SAS", "SP", "SPA", "PTY",
             "BHD", "SDN", "KGAA", "SE", "QC", "SC", "EIRL", "SCOP", "JR", "SR", "II", "III", "IV", "LPA", "APC",
             "GROUP", "DEPARTMENT", "DEPT", "DIVISION", "DIV", "OFFICE", "HOLDINGS", "VENTURES", "CAPITAL",
-            "MANAGEMENT", "PARTNERS", "FINANCIAL", "SERVICES", "SOLUTIONS"
+            "MANAGEMENT", "PARTNERS", "FINANCIAL", "SERVICES", "SOLUTIONS", "ESTATES", "PROPERTY", "PROPERTIES"
         }
-        m_co_head = re.match(r"^(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[:\s\-]*", s1_in, re.IGNORECASE)
-        after_co = s1_in[m_co_head.end():].strip() if m_co_head else s1_in
+        prefix = s1_in[:m_co.start()].strip(" ,.-")
+        after_co = s1_in[m_co.end():].strip()
 
         re_street_boundary = re.compile(
             r"""(?:\b|(?<=[\s,]))(?:
@@ -1552,9 +1565,13 @@ def standardize_address(
             extracted_street = m_boundary.group(0).strip(" ,.-")
         else:
             for suf in LEGAL_SUFFIXES_CLEAN:
-                m_suf = re.search(rf"\b{suf}\b[\s,]+(\d+\s+[A-Za-z].*)$", after_co, re.IGNORECASE)
+                m_suf = re.search(rf"\b{suf}\b[\s,]+([A-Za-z0-9].*)$", after_co, re.IGNORECASE)
                 if m_suf:
-                    extracted_street = m_suf.group(1).strip(" ,.-")
+                    cand_st = m_suf.group(1).strip(" ,.-")
+                    cand_words = [w.upper() for w in re.findall(r"\w+", cand_st)]
+                    if cand_words and all(w in LEGAL_SUFFIXES_CLEAN for w in cand_words):
+                        continue
+                    extracted_street = cand_st
                     break
 
         if not extracted_street:
@@ -1562,7 +1579,13 @@ def standardize_address(
             if m_fb:
                 extracted_street = m_fb.group(1).strip(" ,.-")
 
-        if not extracted_street:
+        if prefix and extracted_street:
+            s1_in = f"{prefix}, {extracted_street}"
+        elif extracted_street:
+            s1_in = extracted_street
+        elif prefix:
+            s1_in = prefix
+        else:
             co_parts = [p.strip() for p in s1_in.split(",") if p.strip()]
             rem_co = co_parts[1:]
             while rem_co and rem_co[0].upper().replace(".", "").replace("&", "").replace(" ", "").strip() in LEGAL_SUFFIXES_CLEAN:
@@ -1572,9 +1595,8 @@ def standardize_address(
                 has_street_word = bool(words & {"ST", "STREET", "RD", "ROAD", "AVE", "AVENUE", "BLVD", "BOULEVARD", "DR", "DRIVE", "LN", "LANE", "WAY", "CT", "COURT", "PL", "PLACE", "BOX", "HWY", "HIGHWAY", "PKWY", "PARKWAY", "CIR", "CIRCLE"})
                 if not has_street_word:
                     rem_co = []
-            extracted_street = ", ".join(rem_co)
+            s1_in = ", ".join(rem_co)
 
-        s1_in = extracted_street
         if not s1_in and s2_in:
             s1_in = s2_in
             s2_in = ""

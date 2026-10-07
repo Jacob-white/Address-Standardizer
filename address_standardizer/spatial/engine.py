@@ -579,10 +579,15 @@ class SpatialEngine:
             city = getattr(address, "city", None)
             state = getattr(address, "state", None)
             post = getattr(address, "postal_code", None)
+            is_us = getattr(address, "is_us", None)
+            country = getattr(address, "country", None)
 
             if isinstance(address, str):
                 if "|" in address:
                     norm_key = address
+                    parts = address.split("|")
+                    if len(parts) >= 6 and parts[5].strip():
+                        country = parts[5].strip()
                 else:
                     from address_standardizer.standardizer import standardize_address
                     std = standardize_address(address)
@@ -596,6 +601,16 @@ class SpatialEngine:
                 city = address.get("city")
                 state = address.get("state")
                 post = address.get("postal_code")
+                if "is_us" in address and address["is_us"] is not None:
+                    is_us = bool(address["is_us"])
+                country = address.get("country") or address.get("country_code") or country
+
+            if is_us is None:
+                if country:
+                    c_clean = str(country).strip().upper()
+                    is_us = c_clean in ("USA", "US", "UNITED STATES", "UNITED STATES OF AMERICA", "PRI", "VIR", "GUM", "MNP", "ASM")
+                else:
+                    is_us = True
 
             # Stage 1: Rooftop / Parcel Match
             if norm_key:
@@ -658,8 +673,8 @@ class SpatialEngine:
                         execution_time_ms=round(ms, 4),
                     )
 
-            # Stage 2: Street Centerline Range Interpolation
-            if st1:
+            # Stage 2: Street Centerline Range Interpolation (US only)
+            if is_us and st1:
                 st1_clean = st1.strip().upper()
                 tokens = st1_clean.split()
                 if tokens and tokens[0].isdigit():
@@ -713,8 +728,8 @@ class SpatialEngine:
                                 execution_time_ms=round(ms, 4),
                             )
 
-            # Stage 3: Postal Centroid Match
-            if post:
+            # Stage 3: Postal Centroid Match (US only)
+            if is_us and post:
                 clean_p = post.strip().upper()
                 cur = self._conn.execute(
                     "SELECT * FROM postal_centroids WHERE postal_code = ? LIMIT 1",
@@ -758,8 +773,8 @@ class SpatialEngine:
                         execution_time_ms=round(ms, 4),
                     )
 
-            # Stage 4: Administrative / Municipal Centroid Match
-            if city and state:
+            # Stage 4: Administrative / Municipal Centroid Match (US only)
+            if is_us and city and state:
                 cur = self._conn.execute(
                     "SELECT * FROM municipal_centroids WHERE state = ? AND name = ? LIMIT 1",
                     (state.strip().upper(), city.strip().upper()),
@@ -778,7 +793,7 @@ class SpatialEngine:
                         execution_time_ms=round(ms, 4),
                     )
 
-            if state:
+            if is_us and state:
                 st_clean = state.strip().upper()
                 st_code = US_STATES.get(st_clean, st_clean[:2] if len(st_clean) == 2 else st_clean)
                 cur = self._conn.execute(
