@@ -58,6 +58,7 @@ from address_standardizer._patterns import (
     RE_PMB,
     RE_QUEENS_BOROUGH,
     RE_URBANIZATION,
+    RE_PRIVATE_RESIDENCE,
     RE_UK_POSTCODE,
     RE_CAN_POSTCODE,
     RE_NUMBERED_STREET,
@@ -672,6 +673,14 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
     return st1, sec_unit, bool(st1)
 
 
+class USStreetParseResult(tuple):
+    """Subclass of tuple for US street parse results, preserving 6-element unpacking while exposing building_name."""
+    def __new__(cls, st1: str, st2: str, ok: bool, p_city: str, p_state: str, p_zip: str, building_name: Optional[str] = None):
+        inst = super().__new__(cls, (st1, st2, ok, p_city, p_state, p_zip))
+        inst.building_name = building_name
+        return inst
+
+
 def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
     """Parse address string using usaddress with rule-based fallback and USPS Pub 28 mapping."""
     clean_input = _pre_normalize_address_string(address_str)
@@ -700,7 +709,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 before_sz = clean_input[:m_sz.start()].rstrip(" ,")
                 after_rr = before_sz[m_rr.end():].strip(" ,")
                 p_city = after_rr
-            return st1_rr, "", True, p_city, p_st, p_zp
+            return USStreetParseResult(st1_rr, "", True, p_city, p_st, p_zp)
 
     m_hc = RE_HIGHWAY_CONTRACT.search(clean_input)
     if m_hc and not RE_PHYSICAL_STREET_INDICATOR.search(clean_input):
@@ -717,7 +726,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 before_sz = clean_input[:m_sz.start()].rstrip(" ,")
                 after_hc = before_sz[m_hc.end():].strip(" ,")
                 p_city = after_hc
-            return st1_hc, "", True, p_city, p_st, p_zp
+            return USStreetParseResult(st1_hc, "", True, p_city, p_st, p_zp)
 
     # Check for Military Unit Box
     m_mil = RE_MILITARY_UNIT_BOX.search(clean_input)
@@ -733,7 +742,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 before_sz = clean_input[:m_sz.start()].rstrip(" ,")
                 after_mil = before_sz[m_mil.end():].strip(" ,")
                 p_city = after_mil
-            return st1_mil, "", True, p_city, p_st, p_zp
+            return USStreetParseResult(st1_mil, "", True, p_city, p_st, p_zp)
 
     p_city = ""
     p_st = ""
@@ -827,7 +836,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
             rb_st1 = f"{urb_prefix} {rb_st1}".strip()
         rb_st1 = re.sub(r"[\s,.\-#;:]+$", "", rb_st1).strip()
         rb_st2 = _standardize_secondary_unit(rb_st2)
-        return rb_st1, rb_st2, ok, p_city, p_st, p_zp
+        return USStreetParseResult(rb_st1, rb_st2, ok, p_city, p_st, p_zp)
 
     # Process CRF tags
     street_parts: List[str] = []
@@ -913,10 +922,17 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                     street_parts.append(h_name if h_name else clean)
                 else:
                     street_parts.append(clean)
-        elif label == "OccupancyType":
+        elif label in ("OccupancyType", "SubaddressType"):
             SPANISH_PREFIX_THOROUGHFARES = {"CALLE", "AVENIDA", "CARR", "RUTA", "CAMINO", "PASEO", "CALZADA", "CARRETERA"}
+            has_existing_suf = any(
+                p in STREET_SUFFIXES or p in STREET_SUFFIXES.values()
+                for p in street_parts[1:]
+            ) if len(street_parts) >= 2 else False
+
             if clean.upper() in SPANISH_PREFIX_THOROUGHFARES and not street_parts:
                 street_parts.append(clean.upper())
+            elif clean.upper() == "SLIP" and not has_existing_suf and street_parts:
+                street_parts.append("SLIP")
             else:
                 sec_parts.append(SECONDARY_UNITS.get(clean, clean))
         elif label in ("OccupancyIdentifier", "SubaddressIdentifier"):
@@ -935,8 +951,6 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                     if not sec_parts and not starts_with_unit_prefix:
                         sec_parts.append("STE")
                     sec_parts.append(clean_id)
-        elif label == "SubaddressType":
-            sec_parts.append(SECONDARY_UNITS.get(clean, clean))
         elif label == "BuildingName":
             building_parts.append(clean)
         elif label in ("USPSBoxGroupType", "USPSBoxGroupID"):
@@ -1080,11 +1094,12 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
         st1 = f"{urb_prefix} {st1}".strip() if st1 else urb_prefix
 
     # If street_parts was empty but building_parts exists (e.g. "One Financial Plaza")
+    bldg_name = None
     if not st1 and building_parts:
         st1 = " ".join(building_parts).strip()
     elif st1 and building_parts:
-        b_name = " ".join(building_parts).strip()
-        st2 = f"{b_name} {st2}".strip() if st2 else b_name
+        bldg_name = " ".join(building_parts).strip()
+        st2 = f"{bldg_name} {st2}".strip() if st2 else bldg_name
 
     # Bare commercial premise followed by secondary units or cataloged commercial hubs
     if not st1 and st2 and city_parts:
@@ -1155,9 +1170,9 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
     # Ultimate fallback to rule-based parser if empty
     if not st1 and not st2 and not (p_city or p_state or p_zip):
         rb_st1, rb_st2, ok = _rule_based_us_street_parse(address_str, enable_fuzzy=enable_fuzzy)
-        return rb_st1, rb_st2, ok, p_city, p_state, p_zip
+        return USStreetParseResult(rb_st1, rb_st2, ok, p_city, p_state, p_zip)
 
-    return st1, st2, True, p_city, p_state, p_zip
+    return USStreetParseResult(st1, st2, True, p_city, p_state, p_zip, building_name=bldg_name)
 
 
 def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
@@ -1175,12 +1190,13 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
 
     if m_s2_po and not m_s1_po:
         # Street1 has physical street, Street2 has PO Box
-        st1, st2, ok, p_city, p_state, p_zip = _parse_us_street_tokens(s1_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+        parse_res = _parse_us_street_tokens(s1_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+        st1, st2, ok, p_city, p_state, p_zip = parse_res
         po_box_str = f"PO BOX {m_s2_po.group(1).upper()}"
         combined_st2 = f"{st2} {po_box_str}".strip() if st2 else po_box_str
         combined_st2 = _standardize_secondary_unit(combined_st2)
         st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
-        return st1, combined_st2, True, p_city, p_state, p_zip
+        return USStreetParseResult(st1, combined_st2, True, p_city, p_state, p_zip, building_name=getattr(parse_res, "building_name", None))
 
     # Puerto Rico Highway Mile/Kilometer Markers (e.g. "PR #2 KM 82 HM. 2", "PR-2 KM 82.2", "CARR 167 KM 15")
     m_pr_hwy = RE_PR_HIGHWAY.match(s1_clean)
@@ -1193,11 +1209,11 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
         hwy_prefix = "PR" if s1_clean.upper().startswith("PR") else "CARR"
         st1_res = f"{hwy_prefix}-{hwy} KM {km_str}"
         st2_res = _standardize_secondary_unit(rest) if rest else ""
-        return st1_res, st2_res, True, "", "", ""
+        return USStreetParseResult(st1_res, st2_res, True, "", "", "")
 
     combined = " ".join(filter(None, [s1_clean, s2_clean]))
     if not combined:
-        return "", "", False, "", "", ""
+        return USStreetParseResult("", "", False, "", "", "")
 
     # Check for PO Box in combined string
     po_box_match = RE_PO_BOX.search(combined)
@@ -1206,23 +1222,25 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
         remaining = combined[:po_box_match.start()] + combined[po_box_match.end():]
         remaining = remaining.strip(" ,.-")
         if remaining:
-            st1, st2, _, p_city, p_state, p_zip = _parse_us_street_tokens(remaining, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+            parse_res = _parse_us_street_tokens(remaining, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+            st1, st2, _, p_city, p_state, p_zip = parse_res
             if st1:
                 combined_st2 = f"{st2} PO BOX {po_box_num}".strip() if st2 else f"PO BOX {po_box_num}"
                 combined_st2 = _standardize_secondary_unit(combined_st2)
                 st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
-                return st1, combined_st2, True, p_city, p_state, p_zip
+                return USStreetParseResult(st1, combined_st2, True, p_city, p_state, p_zip, building_name=getattr(parse_res, "building_name", None))
             else:
                 combined_st2 = _standardize_secondary_unit(st2)
-                return f"PO BOX {po_box_num}", combined_st2, True, p_city, p_state, p_zip
-        return f"PO BOX {po_box_num}", "", True, "", "", ""
+                return USStreetParseResult(f"PO BOX {po_box_num}", combined_st2, True, p_city, p_state, p_zip)
+        return USStreetParseResult(f"PO BOX {po_box_num}", "", True, "", "", "")
 
-    st1, st2, ok, p_city, p_state, p_zip = _parse_us_street_tokens(combined, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+    parse_res = _parse_us_street_tokens(combined, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+    st1, st2, ok, p_city, p_state, p_zip = parse_res
     if st1 and city_raw and st1.upper() == city_raw.strip().upper():
         st1 = ""
     st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
     st2 = _standardize_secondary_unit(st2)
-    return st1, st2, ok, p_city, p_state, p_zip
+    return USStreetParseResult(st1, st2, ok, p_city, p_state, p_zip, building_name=getattr(parse_res, "building_name", None))
 
 
 def _parse_us_street_lines(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool]:
@@ -1698,6 +1716,7 @@ def standardize_address(
         # US Pipeline (USPS Pub 28)
         s1_clean = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
         s2_clean = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_raw, postal_code=postal_raw) if s2_raw else s2_raw
+        bldg_name = None
         if not s1_clean:
             norm_s1 = ""
             norm_s2 = _standardize_secondary_unit(s2_clean) if s2_clean else ""
@@ -1711,9 +1730,11 @@ def standardize_address(
                 success = True
                 p_city = p_state = p_zip = None
             else:
-                norm_s1, norm_s2, success, p_city, p_state, p_zip = _parse_us_address_components(
+                parsed_res = _parse_us_address_components(
                     s1_clean, s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw
                 )
+                norm_s1, norm_s2, success, p_city, p_state, p_zip = parsed_res
+                bldg_name = getattr(parsed_res, "building_name", None)
         if is_invalid_thoroughfare(norm_s1):
             if norm_s1:
                 norm_s2 = f"{norm_s1} {norm_s2}".strip() if norm_s2 else norm_s1
@@ -1749,9 +1770,7 @@ def standardize_address(
 
         # Detect private residence indicators
         raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
-        is_priv = any(p in raw_combined_upper for p in [
-            "PRIVATE RESIDENCE", "RESIDENTIAL", "PRIVATE ADDRESS", "CONFIDENTIAL", "RESIDENCE ONLY", "PERSONAL RESIDENCE"
-        ])
+        is_priv = bool(RE_PRIVATE_RESIDENCE.search(raw_combined_upper))
         if is_priv:
             norm_s1 = "PRIVATE RESIDENCE"
             norm_s2 = ""
@@ -1821,6 +1840,7 @@ def standardize_address(
             phonetic_key=p_key,
             is_registered_agent_hub=is_hub,
             rooftop_address=rooftop_addr,
+            building_name=bldg_name,
         )
         std_us.country_iso3 = country_iso
         return _finalize_standardized_address(std_us, raw_dict, cache_key, enable_geocoding=enable_geocoding)
@@ -1835,9 +1855,7 @@ def standardize_address(
         dep_loc = None
         bldg_name = None
         raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
-        is_priv = any(p in raw_combined_upper for p in [
-            "PRIVATE RESIDENCE", "RESIDENTIAL", "PRIVATE ADDRESS", "CONFIDENTIAL", "RESIDENCE ONLY", "PERSONAL RESIDENCE"
-        ])
+        is_priv = bool(RE_PRIVATE_RESIDENCE.search(raw_combined_upper))
         if is_priv:
             norm_s1 = "PRIVATE RESIDENCE"
             norm_s2 = ""

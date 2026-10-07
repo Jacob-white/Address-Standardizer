@@ -125,3 +125,68 @@ class TestDefectCorrections:
         assert r3.street1 == "57 W 57TH"
         assert "ERR_UNRESOLVED_SUFFIX" not in r3.failure_reason_codes
         assert r3.routing_tier == "AUTO_PASS"
+
+    def test_spanish_subaddress_type_thoroughfare(self):
+        """Phase 1: Spanish thoroughfares tagged as SubaddressType or following block numbers must standardize and auto-pass."""
+        r_pr = standardize_address("URB. FLAMBOYAN D-12 CALLE 3, MANATI, PR 00674")
+        assert r_pr.address_status == "standardized"
+        assert r_pr.street1 == "URB FLAMBOYAN CALLE 3"
+        assert "D-12" in r_pr.street2
+        assert r_pr.routing_tier == "AUTO_PASS"
+        assert r_pr.deliverability.value == "DELIVERABLE"
+
+        r_glad = standardize_address("URB LAS GLADIOLAS 150 CALLE A, SAN JUAN, PR 00926")
+        assert r_glad.address_status == "standardized"
+        assert "CALLE A" in r_glad.street1
+        assert r_glad.routing_tier == "AUTO_PASS"
+
+    def test_residential_corporate_entity_not_wiped(self):
+        """Phase 1: Addresses containing 'RESIDENTIAL' followed by corporate designations must not be wiped as private residences."""
+        r_corp1 = standardize_address("1 STRATTON PLACE RESIDENTIAL LTD, LONDON, UK")
+        assert r_corp1.street1 == "1 STRATTON PL RESIDENTIAL LTD"
+        assert not r_corp1.is_private_residence
+
+        r_corp2 = standardize_address("100 MAIN ST, RESIDENTIAL PROPERTIES LLC, BOSTON, MA 02110")
+        assert r_corp2.street1 == "100 MAIN ST"
+        assert not r_corp2.is_private_residence
+
+        # Pure privacy redactions must still be detected
+        r_priv = standardize_address("PRIVATE RESIDENCE, NEW YORK, NY 10001")
+        assert r_priv.street1 == "PRIVATE RESIDENCE"
+        assert r_priv.is_private_residence
+
+        r_priv2 = standardize_address("RESIDENTIAL, NEW YORK, NY 10001")
+        assert r_priv2.street1 == "PRIVATE RESIDENCE"
+        assert r_priv2.is_private_residence
+
+    def test_slip_street_suffix_recognition(self):
+        """Phase 2: SLIP must be recognized as a valid street suffix without misclassifying marina boat slips."""
+        r_slip = standardize_address("32 OLD SLIP 34TH FL, NEW YORK, NY 10005")
+        assert r_slip.street1 == "32 OLD SLIP"
+        assert r_slip.street2 == "FL 34"
+        assert "ERR_UNRESOLVED_SUFFIX" not in r_slip.failure_reason_codes
+        assert r_slip.routing_tier == "AUTO_PASS"
+
+        # Marina boat berth with preceding street suffix
+        r_marina = standardize_address("100 MARINA BLVD SLIP 42, MIAMI, FL 33133")
+        assert r_marina.street1 == "100 MARINA BLVD"
+        assert r_marina.street2 == "SLIP 42"
+        assert r_marina.routing_tier == "AUTO_PASS"
+
+    def test_missing_zip_confidence_calibration(self):
+        """Phase 2: Commercial filings with valid city and state but missing postal code should calibrate to FUZZY_REVIEW."""
+        r_no_zip = standardize_address("141 W JACKSON, CHICAGO, IL")
+        assert r_no_zip.street1 == "141 W JACKSON"
+        assert r_no_zip.city == "CHICAGO"
+        assert r_no_zip.state == "IL"
+        assert r_no_zip.postal_code == ""
+        assert r_no_zip.routing_tier == "FUZZY_REVIEW"
+        assert r_no_zip.confidence_score >= 0.80
+
+    def test_us_building_name_populated(self):
+        """Phase 3: Building names in US addresses must populate building_name attribute."""
+        r_bldg = standardize_address("FOSTER PLAZA 6, 681 ANDERSEN DRIVE SUITE 100, PITTSBURGH, PA 15220")
+        assert r_bldg.street1 == "681 ANDERSEN DR"
+        assert "FOSTER PLAZA 6" in r_bldg.street2
+        assert r_bldg.building_name == "FOSTER PLAZA 6"
+        assert r_bldg.routing_tier == "AUTO_PASS"

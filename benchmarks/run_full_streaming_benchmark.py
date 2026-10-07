@@ -233,7 +233,8 @@ def inspect_anomalies(
                 (24.0 <= std.latitude <= 50.0 and -125.0 <= std.longitude <= -66.0)
                 or (51.0 <= std.latitude <= 72.0 and (-180.0 <= std.longitude <= -129.0 or 170.0 <= std.longitude <= 180.0))
                 or (18.0 <= std.latitude <= 23.0 and -161.0 <= std.longitude <= -154.0)
-                or (17.5 <= std.latitude <= 18.7 and -67.5 <= std.longitude <= -65.0)
+                or (17.5 <= std.latitude <= 18.8 and -67.5 <= std.longitude <= -64.4)  # Puerto Rico & US Virgin Islands
+                or (13.2 <= std.latitude <= 15.5 and 144.5 <= std.longitude <= 146.0)  # Guam & CNMI
             )
             if std.is_us and not in_us_bounds and std.precision not in (None, "UNRESOLVED"):
                 fps.append({
@@ -252,8 +253,8 @@ def inspect_anomalies(
 
     # 1H. Plaza Box Stripping
     if "PLAZA" in raw_s1_upper and "PLAZA" not in (std.street1 or "").upper() and "PLZ" not in (std.street1 or "").upper():
-        # Check if it was legitimately moved to building_name
-        if not (std.building_name and "PLAZA" in std.building_name.upper()):
+        # Check if it was legitimately moved to building_name or secondary delivery line (Pub 28 Line 2)
+        if not ((std.building_name and "PLAZA" in std.building_name.upper()) or (std.street2 and "PLAZA" in std.street2.upper())):
             fps.append({
                 "type": "FP_PLAZA_STRIPPING",
                 "raw_street": raw_street1,

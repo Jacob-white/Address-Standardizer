@@ -259,7 +259,12 @@ class ConfidenceScorer:
             # Check postal code format
             zip_clean = re.sub(r"[^\d]", "", std_address.postal_code or "")
             if len(zip_clean) != 5 and len(zip_clean) != 9:
-                s_ref -= 0.30
+                is_valid_state = std_address.state in US_STATES.values() or std_address.state in US_STATES
+                has_city = bool(std_address.city and len(std_address.city.strip()) >= 2)
+                if is_valid_state and has_city:
+                    s_ref -= 0.15
+                else:
+                    s_ref -= 0.30
 
             # Check suffix recognition
             st1 = std_address.street1.strip().upper() if std_address.street1 else ""

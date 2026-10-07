@@ -190,6 +190,7 @@ STREET_SUFFIXES: Dict[str, str] = {
     "SHORE": "SHR", "SHR": "SHR", "SHOAR": "SHR",
     "SHORES": "SHRS", "SHRS": "SHRS",
     "SKYWAY": "SKWY", "SKWY": "SKWY",
+    "SLIP": "SLIP",
     "SPRING": "SPG", "SPG": "SPG", "SPRG": "SPG",
     "SPRINGS": "SPGS", "SPGS": "SPGS", "SPRGS": "SPGS",
     "SPUR": "SPUR", "SPURS": "SPUR",
