@@ -16,7 +16,8 @@ Categories (1,000 ground-truth records total):
 Architectural Invariant:
 This generator is decoupled from runtime standardizer implementation to prevent
 circular validation. All expected outputs derive from authoritative domain templates
-and canonical ground-truth specifications.
+and canonical ground-truth specifications, plus the reviewed corrections in
+data/multinational_expected_overrides.json (applied last, so the output is reproducible).
 """
 
 import json
@@ -369,6 +370,31 @@ def generate_multinational_golden_dataset(seed: int = 42) -> List[Dict[str, Any]
     if len(records) != 1000:
         raise ValueError(f"Expected exactly 1,000 records, generated {len(records)}")
 
+    return apply_expected_overrides(records)
+
+
+OVERRIDES_PATH = os.path.join(os.path.dirname(__file__), "data", "multinational_expected_overrides.json")
+
+
+def apply_expected_overrides(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Apply reviewed corrections (data/multinational_expected_overrides.json) on top of the template expectations.
+
+    The overlay records every place where a template expectation encoded a bug and was corrected after review, so
+    the committed dataset is exactly reproducible: ``generate -> compare`` must be a no-op.
+    """
+    with open(OVERRIDES_PATH, encoding="utf-8") as f:
+        overrides = json.load(f)["overrides"]
+    known = {r["test_id"] for r in records}
+    unknown = sorted(set(overrides) - known)
+    if unknown:
+        raise ValueError(f"Overrides reference unknown test ids: {unknown[:5]}")
+    for rec in records:
+        patch = overrides.get(rec["test_id"])
+        if patch:
+            unexpected = set(patch) - set(rec["expected_output"])
+            if unexpected:
+                raise ValueError(f"{rec['test_id']}: override sets unknown fields {sorted(unexpected)}")
+            rec["expected_output"].update(patch)
     return records
 
 

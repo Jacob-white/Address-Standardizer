@@ -1,0 +1,1351 @@
+{
+  "_comment": "Expected-output corrections applied on top of the generator's canonical templates. Each entry replaces the listed expected_output fields; they record places where the original template expectation encoded a bug (street-type abbreviation, locality splits, hub flags, ...) and were corrected after review. Edit here, then run generate_multinational_golden_dataset.py.",
+  "overrides": {
+    "INTL-01-002": {
+      "phonetic_key": "17|S335|EC1A 1BB"
+    },
+    "INTL-01-004": {
+      "phonetic_key": "31|M560|NW1 4NP"
+    },
+    "INTL-01-006": {
+      "phonetic_key": "45|B632|E1 6AN"
+    },
+    "INTL-01-022": {
+      "phonetic_key": "157|S335|BS8 1TH"
+    },
+    "INTL-01-024": {
+      "phonetic_key": "171|M560|BT2 8DN"
+    },
+    "INTL-01-026": {
+      "phonetic_key": "185|B632|CF11 9BZ"
+    },
+    "INTL-01-044": {
+      "phonetic_key": "131|M560|WC2H 9JQ"
+    },
+    "INTL-01-046": {
+      "phonetic_key": "145|B632|LS1 2TW"
+    },
+    "INTL-01-062": {
+      "phonetic_key": "77|S335|CF10 1AA"
+    },
+    "INTL-01-064": {
+      "phonetic_key": "91|M560|NE1 7RU"
+    },
+    "INTL-01-066": {
+      "phonetic_key": "105|B632|S1 2GE"
+    },
+    "INTL-01-082": {
+      "phonetic_key": "37|S335|LS6 2AA"
+    },
+    "INTL-01-084": {
+      "phonetic_key": "51|M560|LS2 9JT"
+    },
+    "INTL-01-086": {
+      "phonetic_key": "65|B632|M4 4BF"
+    },
+    "INTL-01-102": {
+      "phonetic_key": "177|S335|L1 8JQ"
+    },
+    "INTL-01-104": {
+      "phonetic_key": "11|M560|OX1 1DP"
+    },
+    "INTL-01-106": {
+      "phonetic_key": "25|B632|JE2 3XX"
+    },
+    "INTL-01-122": {
+      "phonetic_key": "137|S335|M1 1AA"
+    },
+    "INTL-01-124": {
+      "phonetic_key": "151|M560|M20 2RN"
+    },
+    "INTL-01-126": {
+      "phonetic_key": "165|B632|B1 1BB"
+    },
+    "INTL-01-142": {
+      "phonetic_key": "97|S335|CB2 1TN"
+    },
+    "INTL-01-144": {
+      "phonetic_key": "111|M560|JE1 1AA"
+    },
+    "INTL-01-146": {
+      "phonetic_key": "125|B632|GY1 1AA"
+    },
+    "INTL-01-162": {
+      "phonetic_key": "57|S335|B33 8TH"
+    },
+    "INTL-01-164": {
+      "phonetic_key": "71|M560|B15 2TT"
+    },
+    "INTL-01-166": {
+      "phonetic_key": "85|B632|EH2 2ER"
+    },
+    "INTL-01-182": {
+      "phonetic_key": "17|S335|GY1 2YY"
+    },
+    "INTL-01-184": {
+      "phonetic_key": "31|M560|IM1 1ZZ"
+    },
+    "INTL-01-186": {
+      "phonetic_key": "45|B632|SW1A 1AA"
+    },
+    "INTL-02-021": {
+      "street1": "STN MAIN",
+      "normalized_address_key": "STN MAIN|STE 400|TORONTO|ON|M5X 1A9|CAN",
+      "building_key": "STN MAIN||TORONTO|ON|M5X 1A9|CAN",
+      "phonetic_key": "S350|M5X 1A9"
+    },
+    "INTL-02-061": {
+      "street1": "STN MAIN",
+      "normalized_address_key": "STN MAIN|STE 400|TORONTO|ON|M5X 1A9|CAN",
+      "building_key": "STN MAIN||TORONTO|ON|M5X 1A9|CAN",
+      "phonetic_key": "S350|M5X 1A9"
+    },
+    "INTL-02-101": {
+      "street1": "STN MAIN",
+      "normalized_address_key": "STN MAIN|STE 400|TORONTO|ON|M5X 1A9|CAN",
+      "building_key": "STN MAIN||TORONTO|ON|M5X 1A9|CAN",
+      "phonetic_key": "S350|M5X 1A9"
+    },
+    "INTL-02-141": {
+      "street1": "STN MAIN",
+      "normalized_address_key": "STN MAIN|STE 400|TORONTO|ON|M5X 1A9|CAN",
+      "building_key": "STN MAIN||TORONTO|ON|M5X 1A9|CAN",
+      "phonetic_key": "S350|M5X 1A9"
+    },
+    "INTL-03-035": {
+      "street1": "UL. MARSZAŁKOWSKA 100",
+      "normalized_address_key": "UL. MARSZALKOWSKA 100||WARSZAWA||00-026|POL",
+      "building_key": "UL. MARSZALKOWSKA 100||WARSZAWA||00-026|POL"
+    },
+    "INTL-03-036": {
+      "city": "KRAKÓW",
+      "postal_code": "31-019",
+      "normalized_address_key": "UL. FLORIANSKA 15||KRAKOW||31-019|POL",
+      "building_key": "UL. FLORIANSKA 15||KRAKOW||31-019|POL",
+      "phonetic_key": "U400|31-01"
+    },
+    "INTL-03-075": {
+      "street1": "UL. MARSZAŁKOWSKA 110",
+      "normalized_address_key": "UL. MARSZALKOWSKA 110||WARSZAWA||00-026|POL",
+      "building_key": "UL. MARSZALKOWSKA 110||WARSZAWA||00-026|POL"
+    },
+    "INTL-03-076": {
+      "city": "KRAKÓW",
+      "postal_code": "31-019",
+      "normalized_address_key": "UL. FLORIANSKA 25||KRAKOW||31-019|POL",
+      "building_key": "UL. FLORIANSKA 25||KRAKOW||31-019|POL",
+      "phonetic_key": "U400|31-01"
+    },
+    "INTL-03-115": {
+      "street1": "UL. MARSZAŁKOWSKA 120",
+      "normalized_address_key": "UL. MARSZALKOWSKA 120||WARSZAWA||00-026|POL",
+      "building_key": "UL. MARSZALKOWSKA 120||WARSZAWA||00-026|POL"
+    },
+    "INTL-03-116": {
+      "city": "KRAKÓW",
+      "postal_code": "31-019",
+      "normalized_address_key": "UL. FLORIANSKA 35||KRAKOW||31-019|POL",
+      "building_key": "UL. FLORIANSKA 35||KRAKOW||31-019|POL",
+      "phonetic_key": "U400|31-01"
+    },
+    "INTL-03-155": {
+      "street1": "UL. MARSZAŁKOWSKA 130",
+      "normalized_address_key": "UL. MARSZALKOWSKA 130||WARSZAWA||00-026|POL",
+      "building_key": "UL. MARSZALKOWSKA 130||WARSZAWA||00-026|POL"
+    },
+    "INTL-03-156": {
+      "city": "KRAKÓW",
+      "postal_code": "31-019",
+      "normalized_address_key": "UL. FLORIANSKA 45||KRAKOW||31-019|POL",
+      "building_key": "UL. FLORIANSKA 45||KRAKOW||31-019|POL",
+      "phonetic_key": "U400|31-01"
+    },
+    "INTL-03-195": {
+      "street1": "UL. MARSZAŁKOWSKA 140",
+      "normalized_address_key": "UL. MARSZALKOWSKA 140||WARSZAWA||00-026|POL",
+      "building_key": "UL. MARSZALKOWSKA 140||WARSZAWA||00-026|POL"
+    },
+    "INTL-03-196": {
+      "city": "KRAKÓW",
+      "postal_code": "31-019",
+      "normalized_address_key": "UL. FLORIANSKA 55||KRAKOW||31-019|POL",
+      "building_key": "UL. FLORIANSKA 55||KRAKOW||31-019|POL",
+      "phonetic_key": "U400|31-01"
+    },
+    "INTL-04-002": {
+      "street1": "PASEO DE LA REFORMA 222, CIUDAD DE MÉXICO",
+      "city": "CDMX",
+      "state": "",
+      "postal_code": "06600",
+      "normalized_address_key": "PASEO DE LA REFORMA 222, CIUDAD DE MEXICO|PISO 12|CDMX||06600|MEX",
+      "building_key": "PASEO DE LA REFORMA 222, CIUDAD DE MEXICO||CDMX||06600|MEX",
+      "phonetic_key": "P200|06600"
+    },
+    "INTL-04-004": {
+      "street1": "AVE VALLARTA 1300, GUADALAJARA",
+      "street2": "OF 200",
+      "city": "JAL",
+      "state": "",
+      "postal_code": "44160",
+      "normalized_address_key": "AVE VALLARTA 1300, GUADALAJARA|OF 200|JAL||44160|MEX",
+      "building_key": "AVE VALLARTA 1300, GUADALAJARA||JAL||44160|MEX",
+      "phonetic_key": "A100|44160"
+    },
+    "INTL-04-006": {
+      "street2": "OF 401",
+      "city": "BOGOTÁ",
+      "state": "",
+      "postal_code": "110221",
+      "normalized_address_key": "CALLE 72 NO. 10-07|OF 401|BOGOTA||110221|COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA||110221|COL",
+      "phonetic_key": "C400|11022"
+    },
+    "INTL-04-008": {
+      "city": "MEDELLÍN",
+      "postal_code": "050021",
+      "normalized_address_key": "CARRERA 43A NO. 1-50|PISO 5|MEDELLIN||050021|COL",
+      "building_key": "CARRERA 43A NO. 1-50||MEDELLIN||050021|COL",
+      "phonetic_key": "C660|05002"
+    },
+    "INTL-04-010": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1043AAZ",
+      "normalized_address_key": "AV CORRIENTES 1234|PISO 4|BUENOS AIRES||C1043AAZ|ARG",
+      "building_key": "AV CORRIENTES 1234||BUENOS AIRES||C1043AAZ|ARG",
+      "phonetic_key": "A100|C1043AAZ"
+    },
+    "INTL-04-012": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1084AAD",
+      "normalized_address_key": "AV DE MAYO 869||BUENOS AIRES||C1084AAD|ARG",
+      "building_key": "AV DE MAYO 869||BUENOS AIRES||C1084AAD|ARG",
+      "phonetic_key": "A100|C1084AAD"
+    },
+    "INTL-04-014": {
+      "street1": "RUA OSCAR FREIRE 500, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01426-001",
+      "normalized_address_key": "RUA OSCAR FREIRE 500, SAO PAULO||SP||01426-001|BRA",
+      "building_key": "RUA OSCAR FREIRE 500, SAO PAULO||SP||01426-001|BRA",
+      "phonetic_key": "R000|01426"
+    },
+    "INTL-04-015": {
+      "street2": "APTO 302",
+      "normalized_address_key": "AV ATLANTICA 1500|APTO 302|RIO DE JANEIRO|RJ|22021-001|BRA"
+    },
+    "INTL-04-016": {
+      "street1": "AVE BRIGADEIRO FARIA LIMA 3000, ANDAR 8, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01451-000",
+      "normalized_address_key": "AVE BRIGADEIRO FARIA LIMA 3000, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "building_key": "AVE BRIGADEIRO FARIA LIMA 3000, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "phonetic_key": "A100|01451"
+    },
+    "INTL-04-017": {
+      "street1": "AV PROVIDENCIA 1208",
+      "normalized_address_key": "AV PROVIDENCIA 1208|OF 501|SANTIAGO||7500000|CHL",
+      "building_key": "AV PROVIDENCIA 1208||SANTIAGO||7500000|CHL"
+    },
+    "INTL-04-018": {
+      "street1": "AV APOQUINDO 4500",
+      "street2": "OF 1202",
+      "city": "SANTIAGO",
+      "postal_code": "7550000",
+      "normalized_address_key": "AV APOQUINDO 4500|OF 1202|SANTIAGO||7550000|CHL",
+      "building_key": "AV APOQUINDO 4500||SANTIAGO||7550000|CHL",
+      "phonetic_key": "A100|75500"
+    },
+    "INTL-04-024": {
+      "street1": "PASEO DE LA REFORMA 227, CIUDAD DE MÉXICO",
+      "city": "CDMX",
+      "state": "",
+      "postal_code": "06600",
+      "normalized_address_key": "PASEO DE LA REFORMA 227, CIUDAD DE MEXICO|PISO 12|CDMX||06600|MEX",
+      "building_key": "PASEO DE LA REFORMA 227, CIUDAD DE MEXICO||CDMX||06600|MEX",
+      "phonetic_key": "P200|06600"
+    },
+    "INTL-04-026": {
+      "street1": "AVE VALLARTA 1305, GUADALAJARA",
+      "street2": "OF 200",
+      "city": "JAL",
+      "state": "",
+      "postal_code": "44160",
+      "normalized_address_key": "AVE VALLARTA 1305, GUADALAJARA|OF 200|JAL||44160|MEX",
+      "building_key": "AVE VALLARTA 1305, GUADALAJARA||JAL||44160|MEX",
+      "phonetic_key": "A100|44160"
+    },
+    "INTL-04-028": {
+      "street2": "OF 401",
+      "city": "BOGOTÁ",
+      "state": "",
+      "postal_code": "110221",
+      "normalized_address_key": "CALLE 72 NO. 10-07|OF 401|BOGOTA||110221|COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA||110221|COL",
+      "phonetic_key": "C400|11022"
+    },
+    "INTL-04-030": {
+      "city": "MEDELLÍN",
+      "postal_code": "050021",
+      "normalized_address_key": "CARRERA 43A NO. 1-50|PISO 5|MEDELLIN||050021|COL",
+      "building_key": "CARRERA 43A NO. 1-50||MEDELLIN||050021|COL",
+      "phonetic_key": "C660|05002"
+    },
+    "INTL-04-032": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1043AAZ",
+      "normalized_address_key": "AV CORRIENTES 1239|PISO 4|BUENOS AIRES||C1043AAZ|ARG",
+      "building_key": "AV CORRIENTES 1239||BUENOS AIRES||C1043AAZ|ARG",
+      "phonetic_key": "A100|C1043AAZ"
+    },
+    "INTL-04-034": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1084AAD",
+      "normalized_address_key": "AV DE MAYO 874||BUENOS AIRES||C1084AAD|ARG",
+      "building_key": "AV DE MAYO 874||BUENOS AIRES||C1084AAD|ARG",
+      "phonetic_key": "A100|C1084AAD"
+    },
+    "INTL-04-036": {
+      "street1": "RUA OSCAR FREIRE 505, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01426-001",
+      "normalized_address_key": "RUA OSCAR FREIRE 505, SAO PAULO||SP||01426-001|BRA",
+      "building_key": "RUA OSCAR FREIRE 505, SAO PAULO||SP||01426-001|BRA",
+      "phonetic_key": "R000|01426"
+    },
+    "INTL-04-037": {
+      "street2": "APTO 302",
+      "normalized_address_key": "AV ATLANTICA 1505|APTO 302|RIO DE JANEIRO|RJ|22021-001|BRA"
+    },
+    "INTL-04-038": {
+      "street1": "AVE BRIGADEIRO FARIA LIMA 3005, ANDAR 8, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01451-000",
+      "normalized_address_key": "AVE BRIGADEIRO FARIA LIMA 3005, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "building_key": "AVE BRIGADEIRO FARIA LIMA 3005, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "phonetic_key": "A100|01451"
+    },
+    "INTL-04-039": {
+      "street1": "AV PROVIDENCIA 1213",
+      "normalized_address_key": "AV PROVIDENCIA 1213|OF 501|SANTIAGO||7500000|CHL",
+      "building_key": "AV PROVIDENCIA 1213||SANTIAGO||7500000|CHL"
+    },
+    "INTL-04-040": {
+      "street1": "AV APOQUINDO 4505",
+      "street2": "OF 1202",
+      "city": "SANTIAGO",
+      "postal_code": "7550000",
+      "normalized_address_key": "AV APOQUINDO 4505|OF 1202|SANTIAGO||7550000|CHL",
+      "building_key": "AV APOQUINDO 4505||SANTIAGO||7550000|CHL",
+      "phonetic_key": "A100|75500"
+    },
+    "INTL-04-046": {
+      "street1": "PASEO DE LA REFORMA 232, CIUDAD DE MÉXICO",
+      "city": "CDMX",
+      "state": "",
+      "postal_code": "06600",
+      "normalized_address_key": "PASEO DE LA REFORMA 232, CIUDAD DE MEXICO|PISO 12|CDMX||06600|MEX",
+      "building_key": "PASEO DE LA REFORMA 232, CIUDAD DE MEXICO||CDMX||06600|MEX",
+      "phonetic_key": "P200|06600"
+    },
+    "INTL-04-048": {
+      "street1": "AVE VALLARTA 1310, GUADALAJARA",
+      "street2": "OF 200",
+      "city": "JAL",
+      "state": "",
+      "postal_code": "44160",
+      "normalized_address_key": "AVE VALLARTA 1310, GUADALAJARA|OF 200|JAL||44160|MEX",
+      "building_key": "AVE VALLARTA 1310, GUADALAJARA||JAL||44160|MEX",
+      "phonetic_key": "A100|44160"
+    },
+    "INTL-04-050": {
+      "street2": "OF 401",
+      "city": "BOGOTÁ",
+      "state": "",
+      "postal_code": "110221",
+      "normalized_address_key": "CALLE 72 NO. 10-07|OF 401|BOGOTA||110221|COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA||110221|COL",
+      "phonetic_key": "C400|11022"
+    },
+    "INTL-04-052": {
+      "city": "MEDELLÍN",
+      "postal_code": "050021",
+      "normalized_address_key": "CARRERA 43A NO. 1-50|PISO 5|MEDELLIN||050021|COL",
+      "building_key": "CARRERA 43A NO. 1-50||MEDELLIN||050021|COL",
+      "phonetic_key": "C660|05002"
+    },
+    "INTL-04-054": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1043AAZ",
+      "normalized_address_key": "AV CORRIENTES 1244|PISO 4|BUENOS AIRES||C1043AAZ|ARG",
+      "building_key": "AV CORRIENTES 1244||BUENOS AIRES||C1043AAZ|ARG",
+      "phonetic_key": "A100|C1043AAZ"
+    },
+    "INTL-04-056": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1084AAD",
+      "normalized_address_key": "AV DE MAYO 879||BUENOS AIRES||C1084AAD|ARG",
+      "building_key": "AV DE MAYO 879||BUENOS AIRES||C1084AAD|ARG",
+      "phonetic_key": "A100|C1084AAD"
+    },
+    "INTL-04-058": {
+      "street1": "RUA OSCAR FREIRE 510, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01426-001",
+      "normalized_address_key": "RUA OSCAR FREIRE 510, SAO PAULO||SP||01426-001|BRA",
+      "building_key": "RUA OSCAR FREIRE 510, SAO PAULO||SP||01426-001|BRA",
+      "phonetic_key": "R000|01426"
+    },
+    "INTL-04-059": {
+      "street2": "APTO 302",
+      "normalized_address_key": "AV ATLANTICA 1510|APTO 302|RIO DE JANEIRO|RJ|22021-001|BRA"
+    },
+    "INTL-04-060": {
+      "street1": "AVE BRIGADEIRO FARIA LIMA 3010, ANDAR 8, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01451-000",
+      "normalized_address_key": "AVE BRIGADEIRO FARIA LIMA 3010, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "building_key": "AVE BRIGADEIRO FARIA LIMA 3010, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "phonetic_key": "A100|01451"
+    },
+    "INTL-04-061": {
+      "street1": "AV PROVIDENCIA 1218",
+      "normalized_address_key": "AV PROVIDENCIA 1218|OF 501|SANTIAGO||7500000|CHL",
+      "building_key": "AV PROVIDENCIA 1218||SANTIAGO||7500000|CHL"
+    },
+    "INTL-04-062": {
+      "street1": "AV APOQUINDO 4510",
+      "street2": "OF 1202",
+      "city": "SANTIAGO",
+      "postal_code": "7550000",
+      "normalized_address_key": "AV APOQUINDO 4510|OF 1202|SANTIAGO||7550000|CHL",
+      "building_key": "AV APOQUINDO 4510||SANTIAGO||7550000|CHL",
+      "phonetic_key": "A100|75500"
+    },
+    "INTL-04-068": {
+      "street1": "PASEO DE LA REFORMA 237, CIUDAD DE MÉXICO",
+      "city": "CDMX",
+      "state": "",
+      "postal_code": "06600",
+      "normalized_address_key": "PASEO DE LA REFORMA 237, CIUDAD DE MEXICO|PISO 12|CDMX||06600|MEX",
+      "building_key": "PASEO DE LA REFORMA 237, CIUDAD DE MEXICO||CDMX||06600|MEX",
+      "phonetic_key": "P200|06600"
+    },
+    "INTL-04-070": {
+      "street1": "AVE VALLARTA 1315, GUADALAJARA",
+      "street2": "OF 200",
+      "city": "JAL",
+      "state": "",
+      "postal_code": "44160",
+      "normalized_address_key": "AVE VALLARTA 1315, GUADALAJARA|OF 200|JAL||44160|MEX",
+      "building_key": "AVE VALLARTA 1315, GUADALAJARA||JAL||44160|MEX",
+      "phonetic_key": "A100|44160"
+    },
+    "INTL-04-072": {
+      "street2": "OF 401",
+      "city": "BOGOTÁ",
+      "state": "",
+      "postal_code": "110221",
+      "normalized_address_key": "CALLE 72 NO. 10-07|OF 401|BOGOTA||110221|COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA||110221|COL",
+      "phonetic_key": "C400|11022"
+    },
+    "INTL-04-074": {
+      "city": "MEDELLÍN",
+      "postal_code": "050021",
+      "normalized_address_key": "CARRERA 43A NO. 1-50|PISO 5|MEDELLIN||050021|COL",
+      "building_key": "CARRERA 43A NO. 1-50||MEDELLIN||050021|COL",
+      "phonetic_key": "C660|05002"
+    },
+    "INTL-04-076": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1043AAZ",
+      "normalized_address_key": "AV CORRIENTES 1249|PISO 4|BUENOS AIRES||C1043AAZ|ARG",
+      "building_key": "AV CORRIENTES 1249||BUENOS AIRES||C1043AAZ|ARG",
+      "phonetic_key": "A100|C1043AAZ"
+    },
+    "INTL-04-078": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1084AAD",
+      "normalized_address_key": "AV DE MAYO 884||BUENOS AIRES||C1084AAD|ARG",
+      "building_key": "AV DE MAYO 884||BUENOS AIRES||C1084AAD|ARG",
+      "phonetic_key": "A100|C1084AAD"
+    },
+    "INTL-04-080": {
+      "street1": "RUA OSCAR FREIRE 515, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01426-001",
+      "normalized_address_key": "RUA OSCAR FREIRE 515, SAO PAULO||SP||01426-001|BRA",
+      "building_key": "RUA OSCAR FREIRE 515, SAO PAULO||SP||01426-001|BRA",
+      "phonetic_key": "R000|01426"
+    },
+    "INTL-04-081": {
+      "street2": "APTO 302",
+      "normalized_address_key": "AV ATLANTICA 1515|APTO 302|RIO DE JANEIRO|RJ|22021-001|BRA"
+    },
+    "INTL-04-082": {
+      "street1": "AVE BRIGADEIRO FARIA LIMA 3015, ANDAR 8, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01451-000",
+      "normalized_address_key": "AVE BRIGADEIRO FARIA LIMA 3015, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "building_key": "AVE BRIGADEIRO FARIA LIMA 3015, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "phonetic_key": "A100|01451"
+    },
+    "INTL-04-083": {
+      "street1": "AV PROVIDENCIA 1223",
+      "normalized_address_key": "AV PROVIDENCIA 1223|OF 501|SANTIAGO||7500000|CHL",
+      "building_key": "AV PROVIDENCIA 1223||SANTIAGO||7500000|CHL"
+    },
+    "INTL-04-084": {
+      "street1": "AV APOQUINDO 4515",
+      "street2": "OF 1202",
+      "city": "SANTIAGO",
+      "postal_code": "7550000",
+      "normalized_address_key": "AV APOQUINDO 4515|OF 1202|SANTIAGO||7550000|CHL",
+      "building_key": "AV APOQUINDO 4515||SANTIAGO||7550000|CHL",
+      "phonetic_key": "A100|75500"
+    },
+    "INTL-04-090": {
+      "street1": "PASEO DE LA REFORMA 242, CIUDAD DE MÉXICO",
+      "city": "CDMX",
+      "state": "",
+      "postal_code": "06600",
+      "normalized_address_key": "PASEO DE LA REFORMA 242, CIUDAD DE MEXICO|PISO 12|CDMX||06600|MEX",
+      "building_key": "PASEO DE LA REFORMA 242, CIUDAD DE MEXICO||CDMX||06600|MEX",
+      "phonetic_key": "P200|06600"
+    },
+    "INTL-04-092": {
+      "street1": "AVE VALLARTA 1320, GUADALAJARA",
+      "street2": "OF 200",
+      "city": "JAL",
+      "state": "",
+      "postal_code": "44160",
+      "normalized_address_key": "AVE VALLARTA 1320, GUADALAJARA|OF 200|JAL||44160|MEX",
+      "building_key": "AVE VALLARTA 1320, GUADALAJARA||JAL||44160|MEX",
+      "phonetic_key": "A100|44160"
+    },
+    "INTL-04-094": {
+      "street2": "OF 401",
+      "city": "BOGOTÁ",
+      "state": "",
+      "postal_code": "110221",
+      "normalized_address_key": "CALLE 72 NO. 10-07|OF 401|BOGOTA||110221|COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA||110221|COL",
+      "phonetic_key": "C400|11022"
+    },
+    "INTL-04-096": {
+      "city": "MEDELLÍN",
+      "postal_code": "050021",
+      "normalized_address_key": "CARRERA 43A NO. 1-50|PISO 5|MEDELLIN||050021|COL",
+      "building_key": "CARRERA 43A NO. 1-50||MEDELLIN||050021|COL",
+      "phonetic_key": "C660|05002"
+    },
+    "INTL-04-098": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1043AAZ",
+      "normalized_address_key": "AV CORRIENTES 1254|PISO 4|BUENOS AIRES||C1043AAZ|ARG",
+      "building_key": "AV CORRIENTES 1254||BUENOS AIRES||C1043AAZ|ARG",
+      "phonetic_key": "A100|C1043AAZ"
+    },
+    "INTL-04-100": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1084AAD",
+      "normalized_address_key": "AV DE MAYO 889||BUENOS AIRES||C1084AAD|ARG",
+      "building_key": "AV DE MAYO 889||BUENOS AIRES||C1084AAD|ARG",
+      "phonetic_key": "A100|C1084AAD"
+    },
+    "INTL-04-102": {
+      "street1": "RUA OSCAR FREIRE 520, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01426-001",
+      "normalized_address_key": "RUA OSCAR FREIRE 520, SAO PAULO||SP||01426-001|BRA",
+      "building_key": "RUA OSCAR FREIRE 520, SAO PAULO||SP||01426-001|BRA",
+      "phonetic_key": "R000|01426"
+    },
+    "INTL-04-103": {
+      "street2": "APTO 302",
+      "normalized_address_key": "AV ATLANTICA 1520|APTO 302|RIO DE JANEIRO|RJ|22021-001|BRA"
+    },
+    "INTL-04-104": {
+      "street1": "AVE BRIGADEIRO FARIA LIMA 3020, ANDAR 8, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01451-000",
+      "normalized_address_key": "AVE BRIGADEIRO FARIA LIMA 3020, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "building_key": "AVE BRIGADEIRO FARIA LIMA 3020, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "phonetic_key": "A100|01451"
+    },
+    "INTL-04-105": {
+      "street1": "AV PROVIDENCIA 1228",
+      "normalized_address_key": "AV PROVIDENCIA 1228|OF 501|SANTIAGO||7500000|CHL",
+      "building_key": "AV PROVIDENCIA 1228||SANTIAGO||7500000|CHL"
+    },
+    "INTL-04-106": {
+      "street1": "AV APOQUINDO 4520",
+      "street2": "OF 1202",
+      "city": "SANTIAGO",
+      "postal_code": "7550000",
+      "normalized_address_key": "AV APOQUINDO 4520|OF 1202|SANTIAGO||7550000|CHL",
+      "building_key": "AV APOQUINDO 4520||SANTIAGO||7550000|CHL",
+      "phonetic_key": "A100|75500"
+    },
+    "INTL-04-112": {
+      "street1": "PASEO DE LA REFORMA 247, CIUDAD DE MÉXICO",
+      "city": "CDMX",
+      "state": "",
+      "postal_code": "06600",
+      "normalized_address_key": "PASEO DE LA REFORMA 247, CIUDAD DE MEXICO|PISO 12|CDMX||06600|MEX",
+      "building_key": "PASEO DE LA REFORMA 247, CIUDAD DE MEXICO||CDMX||06600|MEX",
+      "phonetic_key": "P200|06600"
+    },
+    "INTL-04-114": {
+      "street1": "AVE VALLARTA 1325, GUADALAJARA",
+      "street2": "OF 200",
+      "city": "JAL",
+      "state": "",
+      "postal_code": "44160",
+      "normalized_address_key": "AVE VALLARTA 1325, GUADALAJARA|OF 200|JAL||44160|MEX",
+      "building_key": "AVE VALLARTA 1325, GUADALAJARA||JAL||44160|MEX",
+      "phonetic_key": "A100|44160"
+    },
+    "INTL-04-116": {
+      "street2": "OF 401",
+      "city": "BOGOTÁ",
+      "state": "",
+      "postal_code": "110221",
+      "normalized_address_key": "CALLE 72 NO. 10-07|OF 401|BOGOTA||110221|COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA||110221|COL",
+      "phonetic_key": "C400|11022"
+    },
+    "INTL-04-118": {
+      "city": "MEDELLÍN",
+      "postal_code": "050021",
+      "normalized_address_key": "CARRERA 43A NO. 1-50|PISO 5|MEDELLIN||050021|COL",
+      "building_key": "CARRERA 43A NO. 1-50||MEDELLIN||050021|COL",
+      "phonetic_key": "C660|05002"
+    },
+    "INTL-04-120": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1043AAZ",
+      "normalized_address_key": "AV CORRIENTES 1259|PISO 4|BUENOS AIRES||C1043AAZ|ARG",
+      "building_key": "AV CORRIENTES 1259||BUENOS AIRES||C1043AAZ|ARG",
+      "phonetic_key": "A100|C1043AAZ"
+    },
+    "INTL-04-122": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1084AAD",
+      "normalized_address_key": "AV DE MAYO 894||BUENOS AIRES||C1084AAD|ARG",
+      "building_key": "AV DE MAYO 894||BUENOS AIRES||C1084AAD|ARG",
+      "phonetic_key": "A100|C1084AAD"
+    },
+    "INTL-04-124": {
+      "street1": "RUA OSCAR FREIRE 525, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01426-001",
+      "normalized_address_key": "RUA OSCAR FREIRE 525, SAO PAULO||SP||01426-001|BRA",
+      "building_key": "RUA OSCAR FREIRE 525, SAO PAULO||SP||01426-001|BRA",
+      "phonetic_key": "R000|01426"
+    },
+    "INTL-04-125": {
+      "street2": "APTO 302",
+      "normalized_address_key": "AV ATLANTICA 1525|APTO 302|RIO DE JANEIRO|RJ|22021-001|BRA"
+    },
+    "INTL-04-126": {
+      "street1": "AVE BRIGADEIRO FARIA LIMA 3025, ANDAR 8, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01451-000",
+      "normalized_address_key": "AVE BRIGADEIRO FARIA LIMA 3025, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "building_key": "AVE BRIGADEIRO FARIA LIMA 3025, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "phonetic_key": "A100|01451"
+    },
+    "INTL-04-127": {
+      "street1": "AV PROVIDENCIA 1233",
+      "normalized_address_key": "AV PROVIDENCIA 1233|OF 501|SANTIAGO||7500000|CHL",
+      "building_key": "AV PROVIDENCIA 1233||SANTIAGO||7500000|CHL"
+    },
+    "INTL-04-128": {
+      "street1": "AV APOQUINDO 4525",
+      "street2": "OF 1202",
+      "city": "SANTIAGO",
+      "postal_code": "7550000",
+      "normalized_address_key": "AV APOQUINDO 4525|OF 1202|SANTIAGO||7550000|CHL",
+      "building_key": "AV APOQUINDO 4525||SANTIAGO||7550000|CHL",
+      "phonetic_key": "A100|75500"
+    },
+    "INTL-04-134": {
+      "street1": "PASEO DE LA REFORMA 252, CIUDAD DE MÉXICO",
+      "city": "CDMX",
+      "state": "",
+      "postal_code": "06600",
+      "normalized_address_key": "PASEO DE LA REFORMA 252, CIUDAD DE MEXICO|PISO 12|CDMX||06600|MEX",
+      "building_key": "PASEO DE LA REFORMA 252, CIUDAD DE MEXICO||CDMX||06600|MEX",
+      "phonetic_key": "P200|06600"
+    },
+    "INTL-04-136": {
+      "street1": "AVE VALLARTA 1330, GUADALAJARA",
+      "street2": "OF 200",
+      "city": "JAL",
+      "state": "",
+      "postal_code": "44160",
+      "normalized_address_key": "AVE VALLARTA 1330, GUADALAJARA|OF 200|JAL||44160|MEX",
+      "building_key": "AVE VALLARTA 1330, GUADALAJARA||JAL||44160|MEX",
+      "phonetic_key": "A100|44160"
+    },
+    "INTL-04-138": {
+      "street2": "OF 401",
+      "city": "BOGOTÁ",
+      "state": "",
+      "postal_code": "110221",
+      "normalized_address_key": "CALLE 72 NO. 10-07|OF 401|BOGOTA||110221|COL",
+      "building_key": "CALLE 72 NO. 10-07||BOGOTA||110221|COL",
+      "phonetic_key": "C400|11022"
+    },
+    "INTL-04-140": {
+      "city": "MEDELLÍN",
+      "postal_code": "050021",
+      "normalized_address_key": "CARRERA 43A NO. 1-50|PISO 5|MEDELLIN||050021|COL",
+      "building_key": "CARRERA 43A NO. 1-50||MEDELLIN||050021|COL",
+      "phonetic_key": "C660|05002"
+    },
+    "INTL-04-142": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1043AAZ",
+      "normalized_address_key": "AV CORRIENTES 1264|PISO 4|BUENOS AIRES||C1043AAZ|ARG",
+      "building_key": "AV CORRIENTES 1264||BUENOS AIRES||C1043AAZ|ARG",
+      "phonetic_key": "A100|C1043AAZ"
+    },
+    "INTL-04-144": {
+      "city": "BUENOS AIRES",
+      "postal_code": "C1084AAD",
+      "normalized_address_key": "AV DE MAYO 899||BUENOS AIRES||C1084AAD|ARG",
+      "building_key": "AV DE MAYO 899||BUENOS AIRES||C1084AAD|ARG",
+      "phonetic_key": "A100|C1084AAD"
+    },
+    "INTL-04-146": {
+      "street1": "RUA OSCAR FREIRE 530, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01426-001",
+      "normalized_address_key": "RUA OSCAR FREIRE 530, SAO PAULO||SP||01426-001|BRA",
+      "building_key": "RUA OSCAR FREIRE 530, SAO PAULO||SP||01426-001|BRA",
+      "phonetic_key": "R000|01426"
+    },
+    "INTL-04-147": {
+      "street2": "APTO 302",
+      "normalized_address_key": "AV ATLANTICA 1530|APTO 302|RIO DE JANEIRO|RJ|22021-001|BRA"
+    },
+    "INTL-04-148": {
+      "street1": "AVE BRIGADEIRO FARIA LIMA 3030, ANDAR 8, SÃO PAULO",
+      "city": "SP",
+      "state": "",
+      "postal_code": "01451-000",
+      "normalized_address_key": "AVE BRIGADEIRO FARIA LIMA 3030, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "building_key": "AVE BRIGADEIRO FARIA LIMA 3030, ANDAR 8, SAO PAULO||SP||01451-000|BRA",
+      "phonetic_key": "A100|01451"
+    },
+    "INTL-04-149": {
+      "street1": "AV PROVIDENCIA 1238",
+      "normalized_address_key": "AV PROVIDENCIA 1238|OF 501|SANTIAGO||7500000|CHL",
+      "building_key": "AV PROVIDENCIA 1238||SANTIAGO||7500000|CHL"
+    },
+    "INTL-04-150": {
+      "street1": "AV APOQUINDO 4530",
+      "street2": "OF 1202",
+      "city": "SANTIAGO",
+      "postal_code": "7550000",
+      "normalized_address_key": "AV APOQUINDO 4530|OF 1202|SANTIAGO||7550000|CHL",
+      "building_key": "AV APOQUINDO 4530||SANTIAGO||7550000|CHL",
+      "phonetic_key": "A100|75500"
+    },
+    "INTL-05-004": {
+      "street1": "CRAIGMUIR CHAMBERS ROAD TOWN",
+      "normalized_address_key": "CRAIGMUIR CHAMBERS ROAD TOWN|PO BOX 71 SUITE 400|TORTOLA VG1110|||VGB",
+      "building_key": "CRAIGMUIR CHAMBERS ROAD TOWN||TORTOLA VG1110|||VGB"
+    },
+    "INTL-05-014": {
+      "city": "ZURICH",
+      "postal_code": "8001",
+      "normalized_address_key": "BAHNHOFSTRASSE 45|FL 2|ZURICH||8001|CHE",
+      "building_key": "BAHNHOFSTRASSE 45||ZURICH||8001|CHE",
+      "phonetic_key": "B512|ZURICH"
+    },
+    "INTL-05-024": {
+      "city": "TORTOLA",
+      "postal_code": "VG1110",
+      "normalized_address_key": "CRAIGMUIR CHAMBERS RD TOWN|PO BOX 71|TORTOLA||VG1110|VGB",
+      "building_key": "CRAIGMUIR CHAMBERS RD TOWN||TORTOLA||VG1110|VGB",
+      "phonetic_key": "C625|VG1110"
+    },
+    "INTL-05-034": {
+      "city": "ZURICH",
+      "postal_code": "8001",
+      "normalized_address_key": "BAHNHOFSTRASSE 45|STE 200|ZURICH||8001|CHE",
+      "building_key": "BAHNHOFSTRASSE 45||ZURICH||8001|CHE",
+      "phonetic_key": "B512|ZURICH"
+    },
+    "INTL-05-039": {
+      "street2": "STE 101 FL 3",
+      "normalized_address_key": "160 GREENTREE DR|STE 101 FL 3|DOVER|DE|19904|USA"
+    },
+    "INTL-05-044": {
+      "street1": "CRAIGMUIR CHAMBERS ROAD TOWN",
+      "normalized_address_key": "CRAIGMUIR CHAMBERS ROAD TOWN|PO BOX 71 SUITE 400|TORTOLA VG1110|||VGB",
+      "building_key": "CRAIGMUIR CHAMBERS ROAD TOWN||TORTOLA VG1110|||VGB"
+    },
+    "INTL-05-054": {
+      "city": "ZURICH",
+      "postal_code": "8001",
+      "normalized_address_key": "BAHNHOFSTRASSE 45|FL 2|ZURICH||8001|CHE",
+      "building_key": "BAHNHOFSTRASSE 45||ZURICH||8001|CHE",
+      "phonetic_key": "B512|ZURICH"
+    },
+    "INTL-05-064": {
+      "city": "TORTOLA",
+      "postal_code": "VG1110",
+      "normalized_address_key": "CRAIGMUIR CHAMBERS RD TOWN|PO BOX 71|TORTOLA||VG1110|VGB",
+      "building_key": "CRAIGMUIR CHAMBERS RD TOWN||TORTOLA||VG1110|VGB",
+      "phonetic_key": "C625|VG1110"
+    },
+    "INTL-05-074": {
+      "city": "ZURICH",
+      "postal_code": "8001",
+      "normalized_address_key": "BAHNHOFSTRASSE 45|STE 200|ZURICH||8001|CHE",
+      "building_key": "BAHNHOFSTRASSE 45||ZURICH||8001|CHE",
+      "phonetic_key": "B512|ZURICH"
+    },
+    "INTL-05-079": {
+      "street2": "STE 101 FL 3",
+      "normalized_address_key": "160 GREENTREE DR|STE 101 FL 3|DOVER|DE|19904|USA"
+    },
+    "INTL-05-084": {
+      "street1": "CRAIGMUIR CHAMBERS ROAD TOWN",
+      "normalized_address_key": "CRAIGMUIR CHAMBERS ROAD TOWN|PO BOX 71 SUITE 400|TORTOLA VG1110|||VGB",
+      "building_key": "CRAIGMUIR CHAMBERS ROAD TOWN||TORTOLA VG1110|||VGB"
+    },
+    "INTL-05-094": {
+      "city": "ZURICH",
+      "postal_code": "8001",
+      "normalized_address_key": "BAHNHOFSTRASSE 45|FL 2|ZURICH||8001|CHE",
+      "building_key": "BAHNHOFSTRASSE 45||ZURICH||8001|CHE",
+      "phonetic_key": "B512|ZURICH"
+    },
+    "INTL-05-104": {
+      "city": "TORTOLA",
+      "postal_code": "VG1110",
+      "normalized_address_key": "CRAIGMUIR CHAMBERS RD TOWN|PO BOX 71|TORTOLA||VG1110|VGB",
+      "building_key": "CRAIGMUIR CHAMBERS RD TOWN||TORTOLA||VG1110|VGB",
+      "phonetic_key": "C625|VG1110"
+    },
+    "INTL-05-114": {
+      "city": "ZURICH",
+      "postal_code": "8001",
+      "normalized_address_key": "BAHNHOFSTRASSE 45|STE 200|ZURICH||8001|CHE",
+      "building_key": "BAHNHOFSTRASSE 45||ZURICH||8001|CHE",
+      "phonetic_key": "B512|ZURICH"
+    },
+    "INTL-05-119": {
+      "street2": "STE 101 FL 3",
+      "normalized_address_key": "160 GREENTREE DR|STE 101 FL 3|DOVER|DE|19904|USA"
+    },
+    "INTL-05-124": {
+      "street1": "CRAIGMUIR CHAMBERS ROAD TOWN",
+      "normalized_address_key": "CRAIGMUIR CHAMBERS ROAD TOWN|PO BOX 71 SUITE 400|TORTOLA VG1110|||VGB",
+      "building_key": "CRAIGMUIR CHAMBERS ROAD TOWN||TORTOLA VG1110|||VGB"
+    },
+    "INTL-05-134": {
+      "city": "ZURICH",
+      "postal_code": "8001",
+      "normalized_address_key": "BAHNHOFSTRASSE 45|FL 2|ZURICH||8001|CHE",
+      "building_key": "BAHNHOFSTRASSE 45||ZURICH||8001|CHE",
+      "phonetic_key": "B512|ZURICH"
+    },
+    "INTL-05-144": {
+      "city": "TORTOLA",
+      "postal_code": "VG1110",
+      "normalized_address_key": "CRAIGMUIR CHAMBERS RD TOWN|PO BOX 71|TORTOLA||VG1110|VGB",
+      "building_key": "CRAIGMUIR CHAMBERS RD TOWN||TORTOLA||VG1110|VGB",
+      "phonetic_key": "C625|VG1110"
+    },
+    "INTL-06-002": {
+      "city": "HAMBURG",
+      "postal_code": "20354",
+      "normalized_address_key": "GROSSE BLEICHEN 21||HAMBURG||20354|DEU",
+      "building_key": "GROSSE BLEICHEN 21||HAMBURG||20354|DEU",
+      "phonetic_key": "G620|20354"
+    },
+    "INTL-06-004": {
+      "city": "NÜRNBERG",
+      "postal_code": "90402",
+      "normalized_address_key": "NURNBERGER STRASSE 18||NURNBERG||90402|DEU",
+      "building_key": "NURNBERGER STRASSE 18||NURNBERG||90402|DEU",
+      "phonetic_key": "N651|90402"
+    },
+    "INTL-06-006": {
+      "city": "PARIS",
+      "postal_code": "75008",
+      "normalized_address_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "building_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "phonetic_key": "80|R000|75008"
+    },
+    "INTL-06-008": {
+      "city": "PARIS",
+      "postal_code": "75116",
+      "normalized_address_key": "12 AV FOCH||PARIS||75116|FRA",
+      "building_key": "12 AV FOCH||PARIS||75116|FRA",
+      "phonetic_key": "12|A100|75116"
+    },
+    "INTL-06-012": {
+      "street1": "AVE CONSTITUCIÓN 400, MONTERREY",
+      "city": "NL",
+      "state": "",
+      "postal_code": "64060",
+      "normalized_address_key": "AVE CONSTITUCION 400, MONTERREY||NL||64060|MEX",
+      "building_key": "AVE CONSTITUCION 400, MONTERREY||NL||64060|MEX",
+      "phonetic_key": "A100|64060"
+    },
+    "INTL-06-014": {
+      "city": "KØBENHAVN",
+      "postal_code": "1150",
+      "normalized_address_key": "KOBMAGERGADE 52||KOBENHAVN||1150|DNK",
+      "building_key": "KOBMAGERGADE 52||KOBENHAVN||1150|DNK",
+      "phonetic_key": "K152|KOBENHAVN"
+    },
+    "INTL-06-016": {
+      "city": "MALMÖ",
+      "postal_code": "211 18",
+      "normalized_address_key": "MALMOVAGEN 10||MALMO||211 18|SWE",
+      "building_key": "MALMOVAGEN 10||MALMO||211 18|SWE",
+      "phonetic_key": "M451|211 1"
+    },
+    "INTL-06-017": {
+      "street1": "UL. ŚWIĘTOKRZYSKA 12",
+      "normalized_address_key": "UL. SWIETOKRZYSKA 12||WARSZAWA||00-048|POL",
+      "building_key": "UL. SWIETOKRZYSKA 12||WARSZAWA||00-048|POL"
+    },
+    "INTL-06-018": {
+      "city": "GDAŃSK",
+      "postal_code": "80-827",
+      "normalized_address_key": "UL. DLUGA 25||GDANSK||80-827|POL",
+      "building_key": "UL. DLUGA 25||GDANSK||80-827|POL",
+      "phonetic_key": "U400|80-82"
+    },
+    "INTL-06-019": {
+      "street1": "UL. PIOTRKOWSKA 80",
+      "normalized_address_key": "UL. PIOTRKOWSKA 80||LODZ||90-102|POL",
+      "building_key": "UL. PIOTRKOWSKA 80||LODZ||90-102|POL"
+    },
+    "INTL-06-022": {
+      "city": "BERLIN",
+      "postal_code": "10115",
+      "normalized_address_key": "MUSTERSTRASSE 12||BERLIN||10115|DEU",
+      "building_key": "MUSTERSTRASSE 12||BERLIN||10115|DEU",
+      "phonetic_key": "M236|10115"
+    },
+    "INTL-06-026": {
+      "city": "HAMBURG",
+      "postal_code": "20354",
+      "normalized_address_key": "GROSSE BLEICHEN 24||HAMBURG||20354|DEU",
+      "building_key": "GROSSE BLEICHEN 24||HAMBURG||20354|DEU",
+      "phonetic_key": "G620|20354"
+    },
+    "INTL-06-028": {
+      "city": "NÜRNBERG",
+      "postal_code": "90402",
+      "normalized_address_key": "NURNBERGER STRASSE 21||NURNBERG||90402|DEU",
+      "building_key": "NURNBERGER STRASSE 21||NURNBERG||90402|DEU",
+      "phonetic_key": "N651|90402"
+    },
+    "INTL-06-030": {
+      "city": "PARIS",
+      "postal_code": "75008",
+      "normalized_address_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "building_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "phonetic_key": "80|R000|75008"
+    },
+    "INTL-06-032": {
+      "city": "PARIS",
+      "postal_code": "75116",
+      "normalized_address_key": "12 AV FOCH||PARIS||75116|FRA",
+      "building_key": "12 AV FOCH||PARIS||75116|FRA",
+      "phonetic_key": "12|A100|75116"
+    },
+    "INTL-06-036": {
+      "street1": "AVE CONSTITUCIÓN 403, MONTERREY",
+      "city": "NL",
+      "state": "",
+      "postal_code": "64060",
+      "normalized_address_key": "AVE CONSTITUCION 403, MONTERREY||NL||64060|MEX",
+      "building_key": "AVE CONSTITUCION 403, MONTERREY||NL||64060|MEX",
+      "phonetic_key": "A100|64060"
+    },
+    "INTL-06-038": {
+      "city": "KØBENHAVN",
+      "postal_code": "1150",
+      "normalized_address_key": "KOBMAGERGADE 55||KOBENHAVN||1150|DNK",
+      "building_key": "KOBMAGERGADE 55||KOBENHAVN||1150|DNK",
+      "phonetic_key": "K152|KOBENHAVN"
+    },
+    "INTL-06-040": {
+      "city": "MALMÖ",
+      "postal_code": "211 18",
+      "normalized_address_key": "MALMOVAGEN 13||MALMO||211 18|SWE",
+      "building_key": "MALMOVAGEN 13||MALMO||211 18|SWE",
+      "phonetic_key": "M451|211 1"
+    },
+    "INTL-06-041": {
+      "street1": "UL. ŚWIĘTOKRZYSKA 15",
+      "normalized_address_key": "UL. SWIETOKRZYSKA 15||WARSZAWA||00-048|POL",
+      "building_key": "UL. SWIETOKRZYSKA 15||WARSZAWA||00-048|POL"
+    },
+    "INTL-06-042": {
+      "city": "GDAŃSK",
+      "postal_code": "80-827",
+      "normalized_address_key": "UL. DLUGA 28||GDANSK||80-827|POL",
+      "building_key": "UL. DLUGA 28||GDANSK||80-827|POL",
+      "phonetic_key": "U400|80-82"
+    },
+    "INTL-06-043": {
+      "street1": "UL. PIOTRKOWSKA 83",
+      "normalized_address_key": "UL. PIOTRKOWSKA 83||LODZ||90-102|POL",
+      "building_key": "UL. PIOTRKOWSKA 83||LODZ||90-102|POL"
+    },
+    "INTL-06-046": {
+      "city": "BERLIN",
+      "postal_code": "10115",
+      "normalized_address_key": "MUSTERSTRASSE 15||BERLIN||10115|DEU",
+      "building_key": "MUSTERSTRASSE 15||BERLIN||10115|DEU",
+      "phonetic_key": "M236|10115"
+    },
+    "INTL-06-050": {
+      "city": "HAMBURG",
+      "postal_code": "20354",
+      "normalized_address_key": "GROSSE BLEICHEN 27||HAMBURG||20354|DEU",
+      "building_key": "GROSSE BLEICHEN 27||HAMBURG||20354|DEU",
+      "phonetic_key": "G620|20354"
+    },
+    "INTL-06-052": {
+      "city": "NÜRNBERG",
+      "postal_code": "90402",
+      "normalized_address_key": "NURNBERGER STRASSE 24||NURNBERG||90402|DEU",
+      "building_key": "NURNBERGER STRASSE 24||NURNBERG||90402|DEU",
+      "phonetic_key": "N651|90402"
+    },
+    "INTL-06-054": {
+      "city": "PARIS",
+      "postal_code": "75008",
+      "normalized_address_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "building_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "phonetic_key": "80|R000|75008"
+    },
+    "INTL-06-056": {
+      "city": "PARIS",
+      "postal_code": "75116",
+      "normalized_address_key": "12 AV FOCH||PARIS||75116|FRA",
+      "building_key": "12 AV FOCH||PARIS||75116|FRA",
+      "phonetic_key": "12|A100|75116"
+    },
+    "INTL-06-060": {
+      "street1": "AVE CONSTITUCIÓN 406, MONTERREY",
+      "city": "NL",
+      "state": "",
+      "postal_code": "64060",
+      "normalized_address_key": "AVE CONSTITUCION 406, MONTERREY||NL||64060|MEX",
+      "building_key": "AVE CONSTITUCION 406, MONTERREY||NL||64060|MEX",
+      "phonetic_key": "A100|64060"
+    },
+    "INTL-06-062": {
+      "city": "KØBENHAVN",
+      "postal_code": "1150",
+      "normalized_address_key": "KOBMAGERGADE 58||KOBENHAVN||1150|DNK",
+      "building_key": "KOBMAGERGADE 58||KOBENHAVN||1150|DNK",
+      "phonetic_key": "K152|KOBENHAVN"
+    },
+    "INTL-06-064": {
+      "city": "MALMÖ",
+      "postal_code": "211 18",
+      "normalized_address_key": "MALMOVAGEN 16||MALMO||211 18|SWE",
+      "building_key": "MALMOVAGEN 16||MALMO||211 18|SWE",
+      "phonetic_key": "M451|211 1"
+    },
+    "INTL-06-065": {
+      "street1": "UL. ŚWIĘTOKRZYSKA 18",
+      "normalized_address_key": "UL. SWIETOKRZYSKA 18||WARSZAWA||00-048|POL",
+      "building_key": "UL. SWIETOKRZYSKA 18||WARSZAWA||00-048|POL"
+    },
+    "INTL-06-066": {
+      "city": "GDAŃSK",
+      "postal_code": "80-827",
+      "normalized_address_key": "UL. DLUGA 31||GDANSK||80-827|POL",
+      "building_key": "UL. DLUGA 31||GDANSK||80-827|POL",
+      "phonetic_key": "U400|80-82"
+    },
+    "INTL-06-067": {
+      "street1": "UL. PIOTRKOWSKA 86",
+      "normalized_address_key": "UL. PIOTRKOWSKA 86||LODZ||90-102|POL",
+      "building_key": "UL. PIOTRKOWSKA 86||LODZ||90-102|POL"
+    },
+    "INTL-06-070": {
+      "city": "BERLIN",
+      "postal_code": "10115",
+      "normalized_address_key": "MUSTERSTRASSE 18||BERLIN||10115|DEU",
+      "building_key": "MUSTERSTRASSE 18||BERLIN||10115|DEU",
+      "phonetic_key": "M236|10115"
+    },
+    "INTL-06-074": {
+      "city": "HAMBURG",
+      "postal_code": "20354",
+      "normalized_address_key": "GROSSE BLEICHEN 30||HAMBURG||20354|DEU",
+      "building_key": "GROSSE BLEICHEN 30||HAMBURG||20354|DEU",
+      "phonetic_key": "G620|20354"
+    },
+    "INTL-06-076": {
+      "city": "NÜRNBERG",
+      "postal_code": "90402",
+      "normalized_address_key": "NURNBERGER STRASSE 27||NURNBERG||90402|DEU",
+      "building_key": "NURNBERGER STRASSE 27||NURNBERG||90402|DEU",
+      "phonetic_key": "N651|90402"
+    },
+    "INTL-06-078": {
+      "city": "PARIS",
+      "postal_code": "75008",
+      "normalized_address_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "building_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "phonetic_key": "80|R000|75008"
+    },
+    "INTL-06-080": {
+      "city": "PARIS",
+      "postal_code": "75116",
+      "normalized_address_key": "12 AV FOCH||PARIS||75116|FRA",
+      "building_key": "12 AV FOCH||PARIS||75116|FRA",
+      "phonetic_key": "12|A100|75116"
+    },
+    "INTL-06-084": {
+      "street1": "AVE CONSTITUCIÓN 409, MONTERREY",
+      "city": "NL",
+      "state": "",
+      "postal_code": "64060",
+      "normalized_address_key": "AVE CONSTITUCION 409, MONTERREY||NL||64060|MEX",
+      "building_key": "AVE CONSTITUCION 409, MONTERREY||NL||64060|MEX",
+      "phonetic_key": "A100|64060"
+    },
+    "INTL-06-086": {
+      "city": "KØBENHAVN",
+      "postal_code": "1150",
+      "normalized_address_key": "KOBMAGERGADE 61||KOBENHAVN||1150|DNK",
+      "building_key": "KOBMAGERGADE 61||KOBENHAVN||1150|DNK",
+      "phonetic_key": "K152|KOBENHAVN"
+    },
+    "INTL-06-088": {
+      "city": "MALMÖ",
+      "postal_code": "211 18",
+      "normalized_address_key": "MALMOVAGEN 19||MALMO||211 18|SWE",
+      "building_key": "MALMOVAGEN 19||MALMO||211 18|SWE",
+      "phonetic_key": "M451|211 1"
+    },
+    "INTL-06-089": {
+      "street1": "UL. ŚWIĘTOKRZYSKA 21",
+      "normalized_address_key": "UL. SWIETOKRZYSKA 21||WARSZAWA||00-048|POL",
+      "building_key": "UL. SWIETOKRZYSKA 21||WARSZAWA||00-048|POL"
+    },
+    "INTL-06-090": {
+      "city": "GDAŃSK",
+      "postal_code": "80-827",
+      "normalized_address_key": "UL. DLUGA 34||GDANSK||80-827|POL",
+      "building_key": "UL. DLUGA 34||GDANSK||80-827|POL",
+      "phonetic_key": "U400|80-82"
+    },
+    "INTL-06-091": {
+      "street1": "UL. PIOTRKOWSKA 89",
+      "normalized_address_key": "UL. PIOTRKOWSKA 89||LODZ||90-102|POL",
+      "building_key": "UL. PIOTRKOWSKA 89||LODZ||90-102|POL"
+    },
+    "INTL-06-094": {
+      "city": "BERLIN",
+      "postal_code": "10115",
+      "normalized_address_key": "MUSTERSTRASSE 21||BERLIN||10115|DEU",
+      "building_key": "MUSTERSTRASSE 21||BERLIN||10115|DEU",
+      "phonetic_key": "M236|10115"
+    },
+    "INTL-06-098": {
+      "city": "HAMBURG",
+      "postal_code": "20354",
+      "normalized_address_key": "GROSSE BLEICHEN 33||HAMBURG||20354|DEU",
+      "building_key": "GROSSE BLEICHEN 33||HAMBURG||20354|DEU",
+      "phonetic_key": "G620|20354"
+    },
+    "INTL-06-100": {
+      "city": "NÜRNBERG",
+      "postal_code": "90402",
+      "normalized_address_key": "NURNBERGER STRASSE 30||NURNBERG||90402|DEU",
+      "building_key": "NURNBERGER STRASSE 30||NURNBERG||90402|DEU",
+      "phonetic_key": "N651|90402"
+    },
+    "INTL-06-102": {
+      "city": "PARIS",
+      "postal_code": "75008",
+      "normalized_address_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "building_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "phonetic_key": "80|R000|75008"
+    },
+    "INTL-06-104": {
+      "city": "PARIS",
+      "postal_code": "75116",
+      "normalized_address_key": "12 AV FOCH||PARIS||75116|FRA",
+      "building_key": "12 AV FOCH||PARIS||75116|FRA",
+      "phonetic_key": "12|A100|75116"
+    },
+    "INTL-06-108": {
+      "street1": "AVE CONSTITUCIÓN 412, MONTERREY",
+      "city": "NL",
+      "state": "",
+      "postal_code": "64060",
+      "normalized_address_key": "AVE CONSTITUCION 412, MONTERREY||NL||64060|MEX",
+      "building_key": "AVE CONSTITUCION 412, MONTERREY||NL||64060|MEX",
+      "phonetic_key": "A100|64060"
+    },
+    "INTL-06-110": {
+      "city": "KØBENHAVN",
+      "postal_code": "1150",
+      "normalized_address_key": "KOBMAGERGADE 64||KOBENHAVN||1150|DNK",
+      "building_key": "KOBMAGERGADE 64||KOBENHAVN||1150|DNK",
+      "phonetic_key": "K152|KOBENHAVN"
+    },
+    "INTL-06-112": {
+      "city": "MALMÖ",
+      "postal_code": "211 18",
+      "normalized_address_key": "MALMOVAGEN 22||MALMO||211 18|SWE",
+      "building_key": "MALMOVAGEN 22||MALMO||211 18|SWE",
+      "phonetic_key": "M451|211 1"
+    },
+    "INTL-06-113": {
+      "street1": "UL. ŚWIĘTOKRZYSKA 24",
+      "normalized_address_key": "UL. SWIETOKRZYSKA 24||WARSZAWA||00-048|POL",
+      "building_key": "UL. SWIETOKRZYSKA 24||WARSZAWA||00-048|POL"
+    },
+    "INTL-06-114": {
+      "city": "GDAŃSK",
+      "postal_code": "80-827",
+      "normalized_address_key": "UL. DLUGA 37||GDANSK||80-827|POL",
+      "building_key": "UL. DLUGA 37||GDANSK||80-827|POL",
+      "phonetic_key": "U400|80-82"
+    },
+    "INTL-06-115": {
+      "street1": "UL. PIOTRKOWSKA 92",
+      "normalized_address_key": "UL. PIOTRKOWSKA 92||LODZ||90-102|POL",
+      "building_key": "UL. PIOTRKOWSKA 92||LODZ||90-102|POL"
+    },
+    "INTL-06-118": {
+      "city": "BERLIN",
+      "postal_code": "10115",
+      "normalized_address_key": "MUSTERSTRASSE 24||BERLIN||10115|DEU",
+      "building_key": "MUSTERSTRASSE 24||BERLIN||10115|DEU",
+      "phonetic_key": "M236|10115"
+    },
+    "INTL-06-122": {
+      "city": "HAMBURG",
+      "postal_code": "20354",
+      "normalized_address_key": "GROSSE BLEICHEN 36||HAMBURG||20354|DEU",
+      "building_key": "GROSSE BLEICHEN 36||HAMBURG||20354|DEU",
+      "phonetic_key": "G620|20354"
+    },
+    "INTL-06-124": {
+      "city": "NÜRNBERG",
+      "postal_code": "90402",
+      "normalized_address_key": "NURNBERGER STRASSE 33||NURNBERG||90402|DEU",
+      "building_key": "NURNBERGER STRASSE 33||NURNBERG||90402|DEU",
+      "phonetic_key": "N651|90402"
+    },
+    "INTL-06-126": {
+      "city": "PARIS",
+      "postal_code": "75008",
+      "normalized_address_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "building_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "phonetic_key": "80|R000|75008"
+    },
+    "INTL-06-128": {
+      "city": "PARIS",
+      "postal_code": "75116",
+      "normalized_address_key": "12 AV FOCH||PARIS||75116|FRA",
+      "building_key": "12 AV FOCH||PARIS||75116|FRA",
+      "phonetic_key": "12|A100|75116"
+    },
+    "INTL-06-132": {
+      "street1": "AVE CONSTITUCIÓN 415, MONTERREY",
+      "city": "NL",
+      "state": "",
+      "postal_code": "64060",
+      "normalized_address_key": "AVE CONSTITUCION 415, MONTERREY||NL||64060|MEX",
+      "building_key": "AVE CONSTITUCION 415, MONTERREY||NL||64060|MEX",
+      "phonetic_key": "A100|64060"
+    },
+    "INTL-06-134": {
+      "city": "KØBENHAVN",
+      "postal_code": "1150",
+      "normalized_address_key": "KOBMAGERGADE 67||KOBENHAVN||1150|DNK",
+      "building_key": "KOBMAGERGADE 67||KOBENHAVN||1150|DNK",
+      "phonetic_key": "K152|KOBENHAVN"
+    },
+    "INTL-06-136": {
+      "city": "MALMÖ",
+      "postal_code": "211 18",
+      "normalized_address_key": "MALMOVAGEN 25||MALMO||211 18|SWE",
+      "building_key": "MALMOVAGEN 25||MALMO||211 18|SWE",
+      "phonetic_key": "M451|211 1"
+    },
+    "INTL-06-137": {
+      "street1": "UL. ŚWIĘTOKRZYSKA 27",
+      "normalized_address_key": "UL. SWIETOKRZYSKA 27||WARSZAWA||00-048|POL",
+      "building_key": "UL. SWIETOKRZYSKA 27||WARSZAWA||00-048|POL"
+    },
+    "INTL-06-138": {
+      "city": "GDAŃSK",
+      "postal_code": "80-827",
+      "normalized_address_key": "UL. DLUGA 40||GDANSK||80-827|POL",
+      "building_key": "UL. DLUGA 40||GDANSK||80-827|POL",
+      "phonetic_key": "U400|80-82"
+    },
+    "INTL-06-139": {
+      "street1": "UL. PIOTRKOWSKA 95",
+      "normalized_address_key": "UL. PIOTRKOWSKA 95||LODZ||90-102|POL",
+      "building_key": "UL. PIOTRKOWSKA 95||LODZ||90-102|POL"
+    },
+    "INTL-06-142": {
+      "city": "BERLIN",
+      "postal_code": "10115",
+      "normalized_address_key": "MUSTERSTRASSE 27||BERLIN||10115|DEU",
+      "building_key": "MUSTERSTRASSE 27||BERLIN||10115|DEU",
+      "phonetic_key": "M236|10115"
+    },
+    "INTL-06-146": {
+      "city": "HAMBURG",
+      "postal_code": "20354",
+      "normalized_address_key": "GROSSE BLEICHEN 39||HAMBURG||20354|DEU",
+      "building_key": "GROSSE BLEICHEN 39||HAMBURG||20354|DEU",
+      "phonetic_key": "G620|20354"
+    },
+    "INTL-06-148": {
+      "city": "NÜRNBERG",
+      "postal_code": "90402",
+      "normalized_address_key": "NURNBERGER STRASSE 36||NURNBERG||90402|DEU",
+      "building_key": "NURNBERGER STRASSE 36||NURNBERG||90402|DEU",
+      "phonetic_key": "N651|90402"
+    },
+    "INTL-06-150": {
+      "city": "PARIS",
+      "postal_code": "75008",
+      "normalized_address_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "building_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
+      "phonetic_key": "80|R000|75008"
+    }
+  }
+}

@@ -13,13 +13,13 @@ Open items from the whole-codebase review. The review's other findings are fixed
 
 ## Tests and benchmarks
 
-- [ ] `benchmarks/run_benchmarks.py::benchmark_accuracy` skips expected keys not in its hard-coded dict (`address_status`, `is_us` are never compared): compare every expected key, fail on unknown ones.
-- [ ] Mark wall-clock assertions as `perf` (`tests/test_m32*`, `tests/test_autocomplete.py`, `tests/spatial/test_integration.py`, ReDoS timings in `tests/test_phase6*`).
-- [ ] Make hypothesis fuzz tests deterministic (derandomize / fixed seed).
-- [ ] Add arrow, polars and duckdb to the dev extras, or fail CI when their tests skip.
-- [ ] SDK contract test (`tests/test_sdk_contract.py`) only checks names: extend to types, nullability and defaults; make its regex parsers fail loudly when they match nothing.
-- [ ] H3 tests need known vectors.
-- [ ] `generate_multinational_golden_dataset.py` does not reproduce the committed JSON: fix it, or document why.
+- [x] `benchmarks/run_benchmarks.py::benchmark_accuracy` skips expected keys not in its hard-coded dict (`address_status`, `is_us` are never compared): compare every expected key, fail on unknown ones.
+- [x] Mark wall-clock assertions as `perf` (`tests/test_m32*`, `tests/test_autocomplete.py`, `tests/spatial/test_integration.py`, ReDoS timings in `tests/test_phase6*`).
+- [x] Make hypothesis fuzz tests deterministic (derandomize / fixed seed).
+- [x] Add arrow, polars and duckdb to the dev extras, or fail CI when their tests skip.
+- [x] SDK contract test (`tests/test_sdk_contract.py`) only checks names: extend to types, nullability and defaults; make its regex parsers fail loudly when they match nothing.
+- [x] H3 tests need known vectors.
+- [x] `generate_multinational_golden_dataset.py` does not reproduce the committed JSON: fix it, or document why.
 
 ## Docs (verified wrong, high severity)
 
