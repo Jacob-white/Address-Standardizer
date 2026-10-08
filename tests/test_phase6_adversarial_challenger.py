@@ -12,6 +12,7 @@ import time
 import tracemalloc
 
 import pytest
+from tests._sla import SLA_SCALE
 
 from address_standardizer import (
     standardize_address,
@@ -453,6 +454,7 @@ class TestInvariantsAndContracts:
 class TestPerformanceAndMemorySLA:
     """Verify latency, throughput, and memory bounds for international standardization."""
 
+    @pytest.mark.perf
     def test_batch_latency_and_memory_sla(self):
         """Verify sub-millisecond execution and bounded RSS across 1,000 international records."""
         records = [
@@ -483,5 +485,5 @@ class TestPerformanceAndMemorySLA:
         avg_lat_ms = (total_time / N) * 1000
         peak_mb = peak / (1024 * 1024)
 
-        assert avg_lat_ms < 6.0, f"Average latency SLA violated: {avg_lat_ms:.3f}ms (threshold: < 6.0ms)"
-        assert peak_mb < 50.0, f"Peak memory SLA violated: {peak_mb:.2f}MB (threshold: < 50.0MB)"
+        assert avg_lat_ms < 6.0 / SLA_SCALE, f"Average latency SLA violated: {avg_lat_ms:.3f}ms (threshold: < 6.0ms)"
+        assert peak_mb < 50.0 / SLA_SCALE, f"Peak memory SLA violated: {peak_mb:.2f}MB (threshold: < 50.0MB)"

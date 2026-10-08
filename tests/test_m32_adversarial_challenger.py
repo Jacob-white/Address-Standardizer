@@ -13,6 +13,7 @@ import threading
 import time
 import tracemalloc
 import pytest
+from tests._sla import SLA_SCALE
 
 from address_standardizer import (
     StandardizedAddress,
@@ -80,6 +81,7 @@ def _get_process_hwm_mb() -> float:
 # ==============================================================================
 
 class TestSpatialLatencySLA:
+    @pytest.mark.perf
     def test_1000_cascade_queries_p99_under_one_millisecond(self):
         """
         Stress benchmark 1,000 diverse cascade queries across all 4 stages + fallback.
@@ -147,10 +149,10 @@ class TestSpatialLatencySLA:
         max_lat = latencies_ms[-1]
 
         # Empirical latency SLA assertions
-        assert p99 < 1.0, f"p99 latency SLA breached: p99={p99:.4f}ms >= 1.0ms"
-        assert p95 < 0.5, f"p95 latency high: p95={p95:.4f}ms"
-        assert p50 < 0.2, f"Median latency unexpectedly high: p50={p50:.4f}ms"
-        assert max_lat < 5.0, f"Max latency spike exceeded 5.0ms: {max_lat:.4f}ms"
+        assert p99 < 1.0 / SLA_SCALE, f"p99 latency SLA breached: p99={p99:.4f}ms >= 1.0ms"
+        assert p95 < 0.5 / SLA_SCALE, f"p95 latency high: p95={p95:.4f}ms"
+        assert p50 < 0.2 / SLA_SCALE, f"Median latency unexpectedly high: p50={p50:.4f}ms"
+        assert max_lat < 5.0 / SLA_SCALE, f"Max latency spike exceeded 5.0ms: {max_lat:.4f}ms"
 
 
 # ==============================================================================
@@ -158,6 +160,7 @@ class TestSpatialLatencySLA:
 # ==============================================================================
 
 class TestSpatialMemoryConstraints:
+    @pytest.mark.perf
     def test_memory_ceiling_under_continuous_streaming(self):
         """
         Verify memory footprint stays strictly < 120MB heap and < 500MB RAM
@@ -220,12 +223,12 @@ class TestSpatialMemoryConstraints:
         peak_heap_mb = peak_heap_bytes / (1024.0 * 1024.0)
 
         # Assertions compliant with Blueprint Section 3.3.3
-        assert peak_heap_mb < 120.0, f"Heap exceeded 120MB limit: {peak_heap_mb:.2f}MB"
-        assert peak_hwm_mb < 500.0, f"RAM HWM exceeded 500MB limit: {peak_hwm_mb:.2f}MB"
+        assert peak_heap_mb < 120.0 / SLA_SCALE, f"Heap exceeded 120MB limit: {peak_heap_mb:.2f}MB"
+        assert peak_hwm_mb < 500.0 / SLA_SCALE, f"RAM HWM exceeded 500MB limit: {peak_hwm_mb:.2f}MB"
 
         # Assert no runaway memory growth during streaming
         rss_delta_streaming = final_rss_mb - post_ingest_rss_mb
-        assert rss_delta_streaming < 15.0, f"Excessive streaming RSS accumulation: {rss_delta_streaming:.2f}MB"
+        assert rss_delta_streaming < 15.0 / SLA_SCALE, f"Excessive streaming RSS accumulation: {rss_delta_streaming:.2f}MB"
 
     def test_sqlite_memory_pragmas(self):
         """Verify operating PRAGMAs enforce memory constraints."""

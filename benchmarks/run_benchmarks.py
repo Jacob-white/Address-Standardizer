@@ -46,6 +46,7 @@ def benchmark_accuracy(golden_records: List[Dict[str, Any]]) -> Dict[str, Any]:
         "country": 0, "normalized_address_key": 0, "building_key": 0,
         "phonetic_key": 0, "is_registered_agent_hub": 0,
         "dependent_locality": 0, "building_name": 0, "is_private_residence": 0,
+        "address_status": 0, "is_us": 0,
     }
 
     mismatches: List[Dict[str, Any]] = []
@@ -83,11 +84,18 @@ def benchmark_accuracy(golden_records: List[Dict[str, Any]]) -> Dict[str, Any]:
             "dependent_locality": result.dependent_locality,
             "building_name": result.building_name,
             "is_private_residence": result.is_private_residence,
+            "address_status": result.address_status,
+            "is_us": result.is_us,
         }
 
         all_fields_match = True
         field_diffs = {}
         for f, exp_val in expected.items():
+            if f not in actual_dict:
+                # A golden field the benchmark cannot evaluate must fail loudly, never be skipped silently.
+                all_fields_match = False
+                field_diffs[f] = {"expected": exp_val, "actual": "<field not evaluated by the benchmark>"}
+                continue
             if f in actual_dict:
                 act_val = actual_dict[f]
                 # Boolean normalization
