@@ -8,10 +8,26 @@ Validates Blueprint Section 6.3.3:
 
 import csv
 import os
-import resource
+
 import tempfile
 
 from address_standardizer.batch import stream_standardize_csv
+
+
+try:
+    import resource
+except ImportError:  # Windows has no `resource` module
+    resource = None
+
+
+def _peak_rss_kb():
+    """Peak resident set size in KB (stdlib `resource` on POSIX, psutil elsewhere)."""
+    if resource is not None:
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    import psutil
+
+    info = psutil.Process().memory_info()
+    return getattr(info, "peak_wset", info.rss) / 1024.0
 
 
 def get_rss_mb() -> float:
@@ -24,7 +40,7 @@ def get_rss_mb() -> float:
                     return float(parts[1]) / 1024.0
     except Exception:
         pass
-    usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    usage_kb = _peak_rss_kb()
     return usage_kb / 1024.0
 
 

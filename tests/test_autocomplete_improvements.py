@@ -8,11 +8,9 @@ Tests:
   - Reference index streaming
 """
 
-import pytest
 
 from address_standardizer.autocomplete import (
     AutocompleteEngine,
-    autocomplete_address,
     calculate_haversine_distance_meters,
     damerau_levenshtein_distance,
 )

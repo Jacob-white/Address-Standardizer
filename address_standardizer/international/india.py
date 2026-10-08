@@ -12,13 +12,11 @@ from __future__ import annotations
 import re
 from typing import ClassVar, Dict, List, Optional, Tuple
 
-from address_standardizer._patterns import RE_COMMA_DOT, RE_WHITESPACE
 from address_standardizer.international.base import (
     CountryGrammar,
     ParsedAddressComponents,
     split_intl_secondary_unit,
 )
-from address_standardizer.international.diacritics import normalize_to_canonical_unicode
 
 
 # Indian States and Union Territories

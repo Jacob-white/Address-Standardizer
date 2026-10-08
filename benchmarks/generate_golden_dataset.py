@@ -838,9 +838,10 @@ def main():
     for cat, cnt in counts.items():
         print(f"  - {cat}: {cnt}")
 
-    os.makedirs("/home/jwhite/Address-Standardizer/benchmarks/data", exist_ok=True)
-    target_1 = "/home/jwhite/Address-Standardizer/benchmarks/golden_dataset.json"
-    target_2 = "/home/jwhite/Address-Standardizer/benchmarks/data/golden_evaluation_dataset.json"
+    bench_dir = os.path.dirname(os.path.abspath(__file__))
+    os.makedirs(os.path.join(bench_dir, "data"), exist_ok=True)
+    target_1 = os.path.join(bench_dir, "golden_dataset.json")
+    target_2 = os.path.join(bench_dir, "data", "golden_evaluation_dataset.json")
 
     with open(target_1, "w", encoding="utf-8") as f:
         json.dump(records, f, indent=2)

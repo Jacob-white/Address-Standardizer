@@ -7,7 +7,7 @@ High-performance analytical dataset processing for large address tables:
   - Embedded DuckDB SQL scalar and struct UDFs for in-database standardization
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 try:
     import pyarrow as pa
@@ -25,7 +25,6 @@ except ImportError:
     duckdb = None
 
 from address_standardizer.standardizer import (
-    generate_normalized_address_key,
     standardize_address,
 )
 

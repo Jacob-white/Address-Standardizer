@@ -193,7 +193,8 @@ def test_metrics_json_and_prometheus(client):
 
 def test_cli_serve_subcommand_help():
     import subprocess
-    cmd = [".venv/bin/python", "-m", "address_standardizer.cli", "serve", "--help"]
+    import sys
+    cmd = [sys.executable, "-m", "address_standardizer.cli", "serve", "--help"]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     assert proc.returncode == 0
     assert "--host" in proc.stdout

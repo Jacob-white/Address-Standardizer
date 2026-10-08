@@ -10,12 +10,10 @@ Covers:
 - Spanish thoroughfare preservation
 """
 
-import pytest
 
 from address_standardizer import standardize_address
 from address_standardizer.delivery import DPVFootnote, evaluate_delivery_intelligence
 from address_standardizer.geocoder import OfflineGeocoder
-from address_standardizer.models import StandardizedAddress
 from address_standardizer.offline_index import get_default_offline_index
 
 

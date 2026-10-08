@@ -34,9 +34,9 @@ import struct
 import zipfile
 import urllib.request
 import psycopg2
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 
 # Ensure Address-Standardizer is in path
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,7 +44,6 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from address_standardizer import standardize_address, StandardizedAddress, RoutingTier
-from address_standardizer.tables import US_STATES
 
 
 @dataclass
@@ -53,32 +52,32 @@ class DatasetBenchmarkResult:
     total_records: int = 0
     duration_seconds: float = 0.0
     throughput_rec_sec: float = 0.0
-    
+
     # Status counts
     standardized_count: int = 0
     locality_only_count: int = 0
     parse_failed_count: int = 0
-    
+
     # Routing tier counts
     auto_pass_count: int = 0
     fuzzy_review_count: int = 0
     manual_stewardship_count: int = 0
-    
+
     # Feature flags
     rooftop_extracted_count: int = 0
     private_residence_count: int = 0
     registered_agent_hub_count: int = 0
     cmra_count: int = 0
     vacant_count: int = 0
-    
+
     # International & Country stats
     country_distribution: Counter = field(default_factory=Counter)
     us_records: int = 0
     intl_records: int = 0
-    
+
     # Error & Failure reasons
     failure_reasons: Counter = field(default_factory=Counter)
-    
+
     # False Positive tracking
     false_positives: List[Dict[str, Any]] = field(default_factory=list)
     edge_cases: List[Dict[str, Any]] = field(default_factory=list)
@@ -97,7 +96,7 @@ def check_false_positives(raw_street: str, raw_city: str, raw_state: str, raw_po
     """
     fps = []
     raw_s_upper = (raw_street or "").upper().strip()
-    
+
     # 1. False Positive Private Residence
     if std.is_private_residence:
         legit_priv_terms = ["PRIVATE RESIDENCE", "RESIDENTIAL", "PRIVATE ADDRESS", "CONFIDENTIAL", "RESIDENCE ONLY", "PERSONAL RESIDENCE"]
@@ -107,7 +106,7 @@ def check_false_positives(raw_street: str, raw_city: str, raw_state: str, raw_po
                 "raw_street": raw_street,
                 "reason": "Flagged as PRIVATE RESIDENCE without standard privacy keyword in raw input"
             })
-            
+
     # 2. Rooftop Invariant Checks (PO Box, Private Residence, Locality-Only must NOT have rooftop address)
     if std.rooftop_address is not None:
         if std.is_private_residence:
@@ -144,7 +143,7 @@ def check_false_positives(raw_street: str, raw_city: str, raw_state: str, raw_po
             rf_words = set(re.findall(r"\w+", std.rooftop_address.upper()))
             dropped_words = s1_words - rf_words
             core_street_types = {"WAY", "CREEK", "HILL", "ROAD", "STREET", "AVENUE", "BOULEVARD", "BLVD", "LANE", "DRIVE", "PARK", "COURT", "PLACE", "TERRACE", "ROW", "MEWS", "CLOSE", "PLAZA", "SQUARE", "HIGHWAY", "HIGH"}
-            
+
             if dropped_words.intersection(core_street_types) and not has_unit_ind:
                 fps.append({
                     "type": "FALSE_POSITIVE_ROOFTOP_STRIPPING",
@@ -206,11 +205,11 @@ def check_false_positives(raw_street: str, raw_city: str, raw_state: str, raw_po
 # DATASET 1: GLEIF Global Legal Entities (Golden Copy LEI-CDF)
 # ==============================================================================
 def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
-    print(f"\n========================================================")
-    print(f"Dataset 1: GLEIF Global Legal Entities (Golden Copy)")
+    print("\n========================================================")
+    print("Dataset 1: GLEIF Global Legal Entities (Golden Copy)")
     print(f"Target sample: {sample_limit} records across 50+ countries")
-    print(f"========================================================")
-    
+    print("========================================================")
+
     url = "https://goldencopy.gleif.org/storage/golden-copy-files/2026/10/06/1285298/20261006-1600-gleif-goldencopy-lei2-last-week.csv.zip"
     try:
         api_req = urllib.request.Request("https://goldencopy.gleif.org/api/v2/golden-copies/publishes", headers={"User-Agent": "Mozilla/5.0"})
@@ -228,16 +227,16 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
 
     print(f"Streaming from: {url} ...")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    
+
     t0 = time.time()
     with urllib.request.urlopen(req) as resp:
         zf = zipfile.ZipFile(io.BytesIO(resp.read()))
         csv_file = zf.namelist()[0]
         f = zf.open(csv_file)
         reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8"))
-        
+
         result = DatasetBenchmarkResult(dataset_name="GLEIF Global Legal Entities")
-        
+
         records_to_test = []
         for i, row in enumerate(reader):
             if i >= sample_limit:
@@ -249,12 +248,12 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
             reg = row.get("Entity.LegalAddress.Region") or ""
             post = row.get("Entity.LegalAddress.PostalCode") or ""
             name = row.get("Entity.LegalName") or ""
-            
+
             street_input = f"{num} {addr1}".strip() if num and num not in addr1 else addr1.strip()
             records_to_test.append((name, street_input, city, reg, post, c))
 
     print(f"Loaded {len(records_to_test)} GLEIF records in {time.time() - t0:.2f}s. Benchmarking standardization...")
-    
+
     t_start = time.time()
     for name, street, city, state, post, country in records_to_test:
         std = standardize_address(
@@ -267,7 +266,7 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
             use_cache=False,
         )
         result.total_records += 1
-        
+
         # Status
         if std.is_locality_only:
             result.locality_only_count += 1
@@ -275,7 +274,7 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
             result.standardized_count += 1
         else:
             result.parse_failed_count += 1
-            
+
         # Routing tier
         if std.routing_tier == RoutingTier.AUTO_PASS:
             result.auto_pass_count += 1
@@ -283,7 +282,7 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
             result.fuzzy_review_count += 1
         else:
             result.manual_stewardship_count += 1
-            
+
         # Features
         if std.rooftop_address:
             result.rooftop_extracted_count += 1
@@ -293,7 +292,7 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
             result.registered_agent_hub_count += 1
         if std.cmra:
             result.cmra_count += 1
-            
+
         # Country
         iso = std.country_iso3 or std.country
         result.country_distribution[iso] += 1
@@ -301,12 +300,12 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
             result.us_records += 1
         else:
             result.intl_records += 1
-            
+
         # Failures
         if std.failure_reason_codes:
             for code in std.failure_reason_codes:
                 result.failure_reasons[code] += 1
-                
+
         # False positives check
         fps = check_false_positives(street, city, state, post, country, std)
         if fps:
@@ -320,7 +319,7 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
                     "tier": str(std.routing_tier),
                     "fps": fps
                 })
-                
+
     result.duration_seconds = time.time() - t_start
     result.throughput_rec_sec = result.total_records / max(result.duration_seconds, 0.001)
     return result
@@ -330,14 +329,14 @@ def run_gleif_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
 # DATASET 2: OpenAddresses (Physical Rooftop & Delivery Points)
 # ==============================================================================
 def run_openaddresses_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
-    print(f"\n========================================================")
-    print(f"Dataset 2: OpenAddresses / Physical Delivery Points")
+    print("\n========================================================")
+    print("Dataset 2: OpenAddresses / Physical Delivery Points")
     print(f"Target sample: {sample_limit} records (San Francisco + Paris BAN)")
-    print(f"========================================================")
-    
+    print("========================================================")
+
     result = DatasetBenchmarkResult(dataset_name="OpenAddresses Physical Rooftop Points")
     records_to_test = []
-    
+
     # 2A. San Francisco Physical Addresses with Units
     half = sample_limit // 2
     sf_url = "https://data.sf.gov/api/views/ramy-di5m/rows.csv?accessType=DOWNLOAD&api_foundry=true"
@@ -355,13 +354,13 @@ def run_openaddresses_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRe
                 st_type = row.get("Street Type") or ""
                 unit = row.get("Unit Number") or ""
                 zip_code = row.get("ZIP Code") or ""
-                
+
                 street1 = f"{num} {st_name} {st_type}".strip()
                 street2 = f"APT {unit}" if unit else ""
                 records_to_test.append((street1, street2, "San Francisco", "CA", zip_code, "USA"))
     except Exception as e:
         print(f"SF OpenData fetch notice: {e}")
-        
+
     # 2B. Paris BAN Physical Addresses (International Europe)
     paris_url = "https://adresse.data.gouv.fr/data/ban/adresses/latest/csv/adresses-75.csv.gz"
     print(f"Streaming International Rooftop points from Paris BAN ({paris_url})...")
@@ -378,12 +377,12 @@ def run_openaddresses_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRe
                 voie = row.get("nom_voie") or ""
                 cp = row.get("code_postal") or ""
                 commune = row.get("nom_commune") or "Paris"
-                
+
                 street = f"{num} {voie}".strip()
                 records_to_test.append((street, "", commune, "IDF", cp, "FRA"))
     except Exception as e:
         print(f"Paris BAN fetch notice: {e}")
-        
+
     print(f"Loaded {len(records_to_test)} physical address points. Benchmarking standardization...")
     t_start = time.time()
     for street1, street2, city, state, post, country in records_to_test:
@@ -398,21 +397,21 @@ def run_openaddresses_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRe
             use_cache=False,
         )
         result.total_records += 1
-        
+
         if std.is_locality_only:
             result.locality_only_count += 1
         elif std.address_status == "standardized":
             result.standardized_count += 1
         else:
             result.parse_failed_count += 1
-            
+
         if std.routing_tier == RoutingTier.AUTO_PASS:
             result.auto_pass_count += 1
         elif std.routing_tier == RoutingTier.FUZZY_REVIEW:
             result.fuzzy_review_count += 1
         else:
             result.manual_stewardship_count += 1
-            
+
         if std.rooftop_address:
             result.rooftop_extracted_count += 1
         if std.is_private_residence:
@@ -421,18 +420,18 @@ def run_openaddresses_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRe
             result.registered_agent_hub_count += 1
         if std.cmra:
             result.cmra_count += 1
-            
+
         iso = std.country_iso3 or std.country
         result.country_distribution[iso] += 1
         if std.is_us:
             result.us_records += 1
         else:
             result.intl_records += 1
-            
+
         if std.failure_reason_codes:
             for code in std.failure_reason_codes:
                 result.failure_reasons[code] += 1
-                
+
         fps = check_false_positives(street1, city, state, post, country, std)
         if fps:
             result.false_positives.extend(fps)
@@ -445,7 +444,7 @@ def run_openaddresses_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRe
                     "tier": str(std.routing_tier),
                     "fps": fps
                 })
-                
+
     result.duration_seconds = time.time() - t_start
     result.throughput_rec_sec = result.total_records / max(result.duration_seconds, 0.001)
     return result
@@ -455,19 +454,19 @@ def run_openaddresses_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRe
 # DATASET 3: UK Companies House Free Data Product
 # ==============================================================================
 def run_uk_companies_house_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
-    print(f"\n========================================================")
-    print(f"Dataset 3: UK Companies House Free Company Data Product")
+    print("\n========================================================")
+    print("Dataset 3: UK Companies House Free Company Data Product")
     print(f"Target sample: {sample_limit} British corporate addresses")
-    print(f"========================================================")
-    
+    print("========================================================")
+
     result = DatasetBenchmarkResult(dataset_name="UK Companies House Corporate Data")
     url = "http://download.companieshouse.gov.uk/BasicCompanyData-2026-10-01-part1_7.zip"
     print(f"Streaming from: {url} ...")
-    
+
     t0 = time.time()
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     records_to_test = []
-    
+
     with urllib.request.urlopen(req) as resp:
         zf = zipfile.ZipFile(io.BytesIO(resp.read()))
         csv_file = zf.namelist()[0]
@@ -483,9 +482,9 @@ def run_uk_companies_house_benchmark(sample_limit: int = 10000) -> DatasetBenchm
                 county = row.get("RegAddress.County") or ""
                 postcode = row.get("RegAddress.PostCode") or ""
                 country = row.get("RegAddress.Country") or "United Kingdom"
-                
+
                 records_to_test.append((name, addr1, addr2, town, county, postcode, country))
-                
+
     print(f"Loaded {len(records_to_test)} UK corporate records in {time.time() - t0:.2f}s. Benchmarking standardization...")
     t_start = time.time()
     for name, addr1, addr2, town, county, postcode, country in records_to_test:
@@ -500,21 +499,21 @@ def run_uk_companies_house_benchmark(sample_limit: int = 10000) -> DatasetBenchm
             use_cache=False,
         )
         result.total_records += 1
-        
+
         if std.is_locality_only:
             result.locality_only_count += 1
         elif std.address_status == "standardized":
             result.standardized_count += 1
         else:
             result.parse_failed_count += 1
-            
+
         if std.routing_tier == RoutingTier.AUTO_PASS:
             result.auto_pass_count += 1
         elif std.routing_tier == RoutingTier.FUZZY_REVIEW:
             result.fuzzy_review_count += 1
         else:
             result.manual_stewardship_count += 1
-            
+
         if std.rooftop_address:
             result.rooftop_extracted_count += 1
         if std.is_private_residence:
@@ -523,18 +522,18 @@ def run_uk_companies_house_benchmark(sample_limit: int = 10000) -> DatasetBenchm
             result.registered_agent_hub_count += 1
         if std.cmra:
             result.cmra_count += 1
-            
+
         iso = std.country_iso3 or std.country
         result.country_distribution[iso] += 1
         if std.is_us:
             result.us_records += 1
         else:
             result.intl_records += 1
-            
+
         if std.failure_reason_codes:
             for code in std.failure_reason_codes:
                 result.failure_reasons[code] += 1
-                
+
         fps = check_false_positives(addr1, town, county, postcode, "GBR", std)
         if fps:
             result.false_positives.extend(fps)
@@ -548,7 +547,7 @@ def run_uk_companies_house_benchmark(sample_limit: int = 10000) -> DatasetBenchm
                     "tier": str(std.routing_tier),
                     "fps": fps
                 })
-                
+
     result.duration_seconds = time.time() - t_start
     result.throughput_rec_sec = result.total_records / max(result.duration_seconds, 0.001)
     return result
@@ -558,19 +557,19 @@ def run_uk_companies_house_benchmark(sample_limit: int = 10000) -> DatasetBenchm
 # DATASET 4: SEC EDGAR Corporate Filings (SEC Raw & Registrant Filings)
 # ==============================================================================
 def run_sec_edgar_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
-    print(f"\n========================================================")
-    print(f"Dataset 4: SEC EDGAR Corporate Filings")
+    print("\n========================================================")
+    print("Dataset 4: SEC EDGAR Corporate Filings")
     print(f"Target sample: {sample_limit} corporate filer addresses")
-    print(f"========================================================")
-    
+    print("========================================================")
+
     result = DatasetBenchmarkResult(dataset_name="SEC EDGAR Corporate Filings")
     records_to_test = []
-    
+
     # 4A. Query local PostgreSQL firm_association.staging.sec_raw_firms and form_d_related_person
     try:
         conn = psycopg2.connect("dbname=firm_association user=daas_user password=change-me host=127.0.0.1 port=5434")
         cur = conn.cursor()
-        
+
         # 1. SEC Raw Firms (headquarters)
         cur.execute("""
             SELECT raw_business_name, raw_street_address, raw_city, raw_state, raw_country, raw_extra_metadata
@@ -589,7 +588,7 @@ def run_sec_edgar_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult
             if isinstance(meta, dict) and "MainAddr" in meta:
                 post = meta["MainAddr"].get("PostlCd") or ""
             records_to_test.append((name, street, "", city, state, post, country))
-            
+
         # 2. Form D Related Persons (executives, corporate offices)
         remaining = sample_limit - len(records_to_test)
         if remaining > 0:
@@ -607,7 +606,7 @@ def run_sec_edgar_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult
         print(f"Loaded {len(records_to_test)} SEC corporate records from database.")
     except Exception as e:
         print(f"Database query notice: {e}")
-        
+
     t_start = time.time()
     for name, street1, street2, city, state, post, country in records_to_test:
         std = standardize_address(
@@ -621,21 +620,21 @@ def run_sec_edgar_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult
             use_cache=False,
         )
         result.total_records += 1
-        
+
         if std.is_locality_only:
             result.locality_only_count += 1
         elif std.address_status == "standardized":
             result.standardized_count += 1
         else:
             result.parse_failed_count += 1
-            
+
         if std.routing_tier == RoutingTier.AUTO_PASS:
             result.auto_pass_count += 1
         elif std.routing_tier == RoutingTier.FUZZY_REVIEW:
             result.fuzzy_review_count += 1
         else:
             result.manual_stewardship_count += 1
-            
+
         if std.rooftop_address:
             result.rooftop_extracted_count += 1
         if std.is_private_residence:
@@ -644,18 +643,18 @@ def run_sec_edgar_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult
             result.registered_agent_hub_count += 1
         if std.cmra:
             result.cmra_count += 1
-            
+
         iso = std.country_iso3 or std.country
         result.country_distribution[iso] += 1
         if std.is_us:
             result.us_records += 1
         else:
             result.intl_records += 1
-            
+
         if std.failure_reason_codes:
             for code in std.failure_reason_codes:
                 result.failure_reasons[code] += 1
-                
+
         fps = check_false_positives(street1, city, state, post, country, std)
         if fps:
             result.false_positives.extend(fps)
@@ -669,7 +668,7 @@ def run_sec_edgar_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult
                     "tier": str(std.routing_tier),
                     "fps": fps
                 })
-                
+
     result.duration_seconds = time.time() - t_start
     result.throughput_rec_sec = result.total_records / max(result.duration_seconds, 0.001)
     return result
@@ -679,17 +678,17 @@ def run_sec_edgar_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult
 # DATASET 5: US Census TIGER 2024 (Address Ranges & Edges)
 # ==============================================================================
 def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkResult:
-    print(f"\n========================================================")
-    print(f"Dataset 5: US Census TIGER 2024 Address Ranges & Edges")
+    print("\n========================================================")
+    print("Dataset 5: US Census TIGER 2024 Address Ranges & Edges")
     print(f"Target sample: {sample_limit} nationwide road address points")
-    print(f"========================================================")
-    
+    print("========================================================")
+
     result = DatasetBenchmarkResult(dataset_name="US Census TIGER 2024 Address Ranges")
-    
+
     # We stream Alameda (06001), San Francisco (06075), and Los Angeles (06037) TIGER EDGES
     counties = [("06075", "San Francisco", "CA"), ("06001", "Oakland", "CA"), ("06037", "Los Angeles", "CA")]
     records_to_test = []
-    
+
     for fips, city_def, state_def in counties:
         url = f"https://www2.census.gov/geo/tiger/TIGER2024/EDGES/tl_2024_{fips}_edges.zip"
         print(f"Streaming Census TIGER Edges ({url})...")
@@ -703,7 +702,7 @@ def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRes
                     num_records = struct.unpack("<I", header[4:8])[0]
                     header_len = struct.unpack("<H", header[8:10])[0]
                     record_len = struct.unpack("<H", header[10:12])[0]
-                    
+
                     fields = []
                     while True:
                         field_data = f.read(32)
@@ -712,7 +711,7 @@ def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRes
                         fname = field_data[:11].split(b"\x00")[0].decode("ascii")
                         flen = field_data[16]
                         fields.append((fname, flen))
-                        
+
                     f.seek(header_len)
                     for _ in range(num_records):
                         if len(records_to_test) >= sample_limit:
@@ -726,7 +725,7 @@ def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRes
                             val = rec_bytes[offset:offset+flen].decode("latin1").strip()
                             rec[fname] = val
                             offset += flen
-                            
+
                         fullname = rec.get("FULLNAME")
                         from_add = rec.get("LFROMADD") or rec.get("RFROMADD")
                         zip_code = rec.get("ZIPL") or rec.get("ZIPR")
@@ -735,7 +734,7 @@ def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRes
                             records_to_test.append((fullname, st1, "", city_def, state_def, zip_code, "USA"))
         except Exception as e:
             print(f"TIGER Edges fetch notice for {fips}: {e}")
-            
+
     print(f"Loaded {len(records_to_test)} Census TIGER address points. Benchmarking standardization...")
     t_start = time.time()
     for name, street1, street2, city, state, post, country in records_to_test:
@@ -750,21 +749,21 @@ def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRes
             use_cache=False,
         )
         result.total_records += 1
-        
+
         if std.is_locality_only:
             result.locality_only_count += 1
         elif std.address_status == "standardized":
             result.standardized_count += 1
         else:
             result.parse_failed_count += 1
-            
+
         if std.routing_tier == RoutingTier.AUTO_PASS:
             result.auto_pass_count += 1
         elif std.routing_tier == RoutingTier.FUZZY_REVIEW:
             result.fuzzy_review_count += 1
         else:
             result.manual_stewardship_count += 1
-            
+
         if std.rooftop_address:
             result.rooftop_extracted_count += 1
         if std.is_private_residence:
@@ -773,18 +772,18 @@ def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRes
             result.registered_agent_hub_count += 1
         if std.cmra:
             result.cmra_count += 1
-            
+
         iso = std.country_iso3 or std.country
         result.country_distribution[iso] += 1
         if std.is_us:
             result.us_records += 1
         else:
             result.intl_records += 1
-            
+
         if std.failure_reason_codes:
             for code in std.failure_reason_codes:
                 result.failure_reasons[code] += 1
-                
+
         fps = check_false_positives(street1, city, state, post, country, std)
         if fps:
             result.false_positives.extend(fps)
@@ -798,7 +797,7 @@ def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRes
                     "tier": str(std.routing_tier),
                     "fps": fps
                 })
-                
+
     result.duration_seconds = time.time() - t_start
     result.throughput_rec_sec = result.total_records / max(result.duration_seconds, 0.001)
     return result
@@ -806,24 +805,24 @@ def run_census_tiger_benchmark(sample_limit: int = 10000) -> DatasetBenchmarkRes
 
 def main():
     sample_size = int(sys.argv[1]) if len(sys.argv) > 1 else 5000
-    print(f"================================================================================")
-    print(f"GLOBAL ADDRESS VALIDATION HARNESS: 5 DIVERSE REAL-WORLD BENCHMARK DATASETS")
+    print("================================================================================")
+    print("GLOBAL ADDRESS VALIDATION HARNESS: 5 DIVERSE REAL-WORLD BENCHMARK DATASETS")
     print(f"Sample size per dataset: {sample_size} records (Total ~{sample_size * 5} records)")
-    print(f"================================================================================")
-    
+    print("================================================================================")
+
     overall_start = time.time()
-    
+
     # Run all 5 sequentially (preserving RAM & CPU according to resource_throttling rule)
     res_gleif = run_gleif_benchmark(sample_limit=sample_size)
     res_oa = run_openaddresses_benchmark(sample_limit=sample_size)
     res_uk = run_uk_companies_house_benchmark(sample_limit=sample_size)
     res_sec = run_sec_edgar_benchmark(sample_limit=sample_size)
     res_tiger = run_census_tiger_benchmark(sample_limit=sample_size)
-    
+
     results = [res_gleif, res_oa, res_uk, res_sec, res_tiger]
     total_time = time.time() - overall_start
     total_records = sum(r.total_records for r in results)
-    
+
     # Generate structured summary output
     summary_path = os.path.join(REPO_ROOT, "benchmarks", "multi_dataset_benchmark_results.json")
     summary_data = {
@@ -833,16 +832,16 @@ def main():
         "overall_throughput_rec_sec": total_records / max(total_time, 0.001),
         "datasets": {}
     }
-    
+
     print("\n" + "="*80)
-    print(f"MULTI-DATASET GLOBAL BENCHMARK SUMMARY REPORT")
+    print("MULTI-DATASET GLOBAL BENCHMARK SUMMARY REPORT")
     print("="*80)
-    
+
     for r in results:
         pass_rate = (r.standardized_count + r.locality_only_count) / max(r.total_records, 1) * 100.0
         auto_pass_rate = r.auto_pass_count / max(r.total_records, 1) * 100.0
         rooftop_rate = r.rooftop_extracted_count / max(r.total_records, 1) * 100.0
-        
+
         print(f"\n[{r.dataset_name}]")
         print(f"  Records Processed: {r.total_records:,} in {r.duration_seconds:.2f}s ({r.throughput_rec_sec:,.0f} rec/s)")
         print(f"  Valid Delivery Points (Standardized): {r.standardized_count:,} ({r.standardized_count/max(r.total_records,1)*100:.1f}%)")
@@ -854,11 +853,11 @@ def main():
         print(f"  Private Residences: {r.private_residence_count:,} | Reg Agent Hubs: {r.registered_agent_hub_count:,} | CMRA: {r.cmra_count:,}")
         print(f"  Countries Represented:                {len(r.country_distribution)} countries (Top 5: {', '.join(f'{k}:{v}' for k, v in r.country_distribution.most_common(5))})")
         print(f"  False Positives Detected:             {len(r.false_positives)}")
-        
+
         if r.false_positives:
             fp_types = Counter(fp.get("type") for fp in r.false_positives)
             print(f"    FP Breakdown: {dict(fp_types)}")
-            
+
         summary_data["datasets"][r.dataset_name] = {
             "total_records": r.total_records,
             "duration_seconds": r.duration_seconds,
@@ -880,7 +879,7 @@ def main():
             "false_positive_types": dict(Counter(fp.get("type") for fp in r.false_positives)),
             "sample_edge_cases": r.edge_cases[:10]
         }
-        
+
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2)
     print(f"\nFull detailed JSON benchmark results saved to: {summary_path}")

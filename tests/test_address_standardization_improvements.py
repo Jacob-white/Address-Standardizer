@@ -1,3 +1,5 @@
+import pytest
+
 from address_standardizer import standardize_address
 from address_standardizer.international.countries import CountryRegistry
 from address_standardizer.international.postal import (
@@ -642,6 +644,7 @@ def test_queens_hyphenated_and_fractional_numbers_and_multitier():
 
 def test_native_rust_core_availability_and_dispatch():
     """Verify that native Rust PyO3 core is compiled, active, and dispatches correctly."""
+    pytest.importorskip("_address_standardizer_rs", reason="native Rust extension not built (maturin develop)")
     from address_standardizer._native_dispatch import is_native_available, get_active_engine
     import _address_standardizer_rs
 

@@ -17,9 +17,7 @@ from address_standardizer._native_dispatch import (
     fast_tokenize_dispatch,
     force_pure_python,
     get_capabilities,
-    get_engine_info,
     is_native_available,
-    is_using_native,
     reset_engine,
 )
 

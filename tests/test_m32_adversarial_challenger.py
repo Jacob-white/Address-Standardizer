@@ -65,7 +65,12 @@ def _get_process_rss_mb() -> float:
                     return float(line.split()[1]) / 1024.0
     except (FileNotFoundError, IndexError, ValueError):
         pass
-    import resource
+    try:
+        import resource
+    except ImportError:  # Windows
+        import psutil
+
+        return psutil.Process().memory_info().rss / (1024.0 * 1024.0)
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
 
 
@@ -78,7 +83,12 @@ def _get_process_hwm_mb() -> float:
                     return float(line.split()[1]) / 1024.0
     except (FileNotFoundError, IndexError, ValueError):
         pass
-    import resource
+    try:
+        import resource
+    except ImportError:  # Windows
+        import psutil
+
+        return psutil.Process().memory_info().rss / (1024.0 * 1024.0)
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
 
 

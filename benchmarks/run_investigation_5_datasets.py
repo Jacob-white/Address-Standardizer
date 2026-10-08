@@ -30,8 +30,8 @@ import re
 import struct
 import zipfile
 import urllib.request
-from collections import Counter, defaultdict
-from dataclasses import dataclass, field, asdict
+from collections import Counter
+from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,7 +40,6 @@ if REPO_ROOT not in sys.path:
 
 import psycopg2
 from address_standardizer import standardize_address, StandardizedAddress, RoutingTier
-from address_standardizer.tables import US_STATES
 
 
 @dataclass
@@ -331,10 +330,10 @@ def record_result(metrics: DatasetMetrics, raw_tuple: Tuple[str, str, str, str, 
 # DATASET 1: OpenAddresses Global (SF OpenData + Paris BAN)
 # ==============================================================================
 def benchmark_openaddresses(sample_limit: int = 50000) -> DatasetMetrics:
-    print(f"\n================================================================================")
-    print(f"DATASET 1: OpenAddresses Global (US & International Rooftop / Physical Points)")
+    print("\n================================================================================")
+    print("DATASET 1: OpenAddresses Global (US & International Rooftop / Physical Points)")
     print(f"Target: {sample_limit:,} records (SF OpenData + Paris BAN)")
-    print(f"================================================================================")
+    print("================================================================================")
     metrics = DatasetMetrics(dataset_name="OpenAddresses Global")
     records: List[Tuple[str, str, str, str, str, str]] = []
 
@@ -410,10 +409,10 @@ def benchmark_openaddresses(sample_limit: int = 50000) -> DatasetMetrics:
 # DATASET 2: Overture Maps Foundation Global Addresses & Worldwide Entities
 # ==============================================================================
 def benchmark_overture_global(sample_limit: int = 50000) -> DatasetMetrics:
-    print(f"\n================================================================================")
-    print(f"DATASET 2: Overture Maps Foundation Global Addresses & Worldwide Entities")
+    print("\n================================================================================")
+    print("DATASET 2: Overture Maps Foundation Global Addresses & Worldwide Entities")
     print(f"Target: {sample_limit:,} records (GLEIF LEI-CDF Golden Copy + Global Schema)")
-    print(f"================================================================================")
+    print("================================================================================")
     metrics = DatasetMetrics(dataset_name="Overture Maps Global / Worldwide Entities")
     records: List[Tuple[str, str, str, str, str, str]] = []
 
@@ -479,10 +478,10 @@ def benchmark_overture_global(sample_limit: int = 50000) -> DatasetMetrics:
 # DATASET 3: US Census TIGER/Line Addresses (Edges & Ranges)
 # ==============================================================================
 def benchmark_census_tiger(sample_limit: int = 50000) -> DatasetMetrics:
-    print(f"\n================================================================================")
-    print(f"DATASET 3: US Census TIGER/Line Addresses (Edges & Address Ranges)")
+    print("\n================================================================================")
+    print("DATASET 3: US Census TIGER/Line Addresses (Edges & Address Ranges)")
     print(f"Target: {sample_limit:,} records (SF, Alameda, LA Counties)")
-    print(f"================================================================================")
+    print("================================================================================")
     metrics = DatasetMetrics(dataset_name="US Census TIGER/Line Addresses")
     records: List[Tuple[str, str, str, str, str, str]] = []
 
@@ -566,10 +565,10 @@ def benchmark_census_tiger(sample_limit: int = 50000) -> DatasetMetrics:
 # DATASET 4: UK PAF / Open Postcode Geo & UPU Global Standards
 # ==============================================================================
 def benchmark_uk_paf_upu(sample_limit: int = 50000) -> DatasetMetrics:
-    print(f"\n================================================================================")
-    print(f"DATASET 4: UK PAF / Open Postcode Geo & UPU Global Standards")
+    print("\n================================================================================")
+    print("DATASET 4: UK PAF / Open Postcode Geo & UPU Global Standards")
     print(f"Target: {sample_limit:,} records (UK Companies House + UPU Multinational Golden)")
-    print(f"================================================================================")
+    print("================================================================================")
     metrics = DatasetMetrics(dataset_name="UK PAF & UPU Global Standards")
     records: List[Tuple[str, str, str, str, str, str]] = []
 
@@ -597,7 +596,7 @@ def benchmark_uk_paf_upu(sample_limit: int = 50000) -> DatasetMetrics:
         print(f"  UK Companies House notice: {e}")
 
     # 4B. UPU Global Standards / Canonical Multinational Data
-    print(f"  Loading UPU Global Standards from canonical multinational dataset...")
+    print("  Loading UPU Global Standards from canonical multinational dataset...")
     try:
         from benchmarks.canonical_multinational_data import CANONICAL_INTL_02_TO_06
         for rec in CANONICAL_INTL_02_TO_06:
@@ -651,10 +650,10 @@ def benchmark_firm_network(
     fdic_limit: Optional[int] = None,
     contact_limit: int = 25000,
 ) -> DatasetMetrics:
-    print(f"\n================================================================================")
-    print(f"DATASET 5: Firm Network Production Database (PostgreSQL 127.0.0.1:5434)")
-    print(f"Evaluating: firm_branch, firm_master, fdic_bank_branch, contact_association")
-    print(f"================================================================================")
+    print("\n================================================================================")
+    print("DATASET 5: Firm Network Production Database (PostgreSQL 127.0.0.1:5434)")
+    print("Evaluating: firm_branch, firm_master, fdic_bank_branch, contact_association")
+    print("================================================================================")
     metrics = DatasetMetrics(dataset_name="Firm Network Production Database")
 
     conn = psycopg2.connect(

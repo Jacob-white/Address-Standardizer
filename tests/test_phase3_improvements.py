@@ -7,7 +7,6 @@ Covers:
 - Resolution when secondary unit is supplied
 """
 
-import pytest
 
 from address_standardizer import standardize_address
 from address_standardizer.delivery import DPVFootnote, evaluate_delivery_intelligence

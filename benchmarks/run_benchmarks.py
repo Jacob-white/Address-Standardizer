@@ -15,13 +15,29 @@ Supports:
 import argparse
 import json
 import os
-import resource
+
 import sys
 import time
 import tracemalloc
 from typing import Any, Dict, List, Optional, Tuple
 
 # Ensure project root is in sys.path
+try:
+    import resource
+except ImportError:  # Windows has no `resource` module
+    resource = None
+
+
+def _peak_rss_kb():
+    """Peak resident set size in KB (stdlib `resource` on POSIX, psutil elsewhere)."""
+    if resource is not None:
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    import psutil
+
+    info = psutil.Process().memory_info()
+    return getattr(info, "peak_wset", info.rss) / 1024.0
+
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from address_standardizer import StandardizedAddress, standardize_address
@@ -37,7 +53,7 @@ def get_current_rss_mb() -> float:
                     return float(parts[1]) / 1024.0
     except Exception:
         pass
-    usage_kb = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    usage_kb = _peak_rss_kb()
     return usage_kb / 1024.0
 
 

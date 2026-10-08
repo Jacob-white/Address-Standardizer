@@ -6,7 +6,7 @@ multiprocessing throttling (<= 2 workers), and RSS memory bounds (< 85 MB).
 """
 
 import csv
-import resource
+
 
 from address_standardizer.batch import (
     buffered_chunk_generator,
@@ -14,6 +14,22 @@ from address_standardizer.batch import (
     process_chunk,
     stream_standardize_csv,
 )
+
+
+try:
+    import resource
+except ImportError:  # Windows has no `resource` module
+    resource = None
+
+
+def _peak_rss_kb():
+    """Peak resident set size in KB (stdlib `resource` on POSIX, psutil elsewhere)."""
+    if resource is not None:
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    import psutil
+
+    info = psutil.Process().memory_info()
+    return getattr(info, "peak_wset", info.rss) / 1024.0
 
 
 class TestBatchBufferChunking:
@@ -96,7 +112,7 @@ class TestBatchDispatchIntegration:
                             return float(line.split()[1]) / 1024.0
             except Exception:
                 pass
-            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+            return _peak_rss_kb() / 1024.0
 
         rss_start = _get_rss_mb()
 

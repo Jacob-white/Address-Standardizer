@@ -12,12 +12,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import ClassVar, Dict, List, Optional, Set, Tuple
+from typing import ClassVar, Dict, List, Optional, Tuple
 
 from address_standardizer._patterns import (
-    RE_COMMA_DOT,
     RE_NON_ALPHANUMERIC,
-    RE_WHITESPACE,
     is_invalid_thoroughfare,
 )
 from address_standardizer.international.base import (
@@ -25,7 +23,6 @@ from address_standardizer.international.base import (
     ParsedAddressComponents,
     split_intl_secondary_unit,
 )
-from address_standardizer.international.diacritics import normalize_to_canonical_unicode
 from address_standardizer.tables import DIRECTIONALS, SECONDARY_UNITS, STREET_SUFFIXES
 
 

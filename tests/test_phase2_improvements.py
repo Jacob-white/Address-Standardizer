@@ -7,7 +7,6 @@ Covers:
 - Spanish prefix thoroughfares in confidence score calculation
 """
 
-import pytest
 
 from address_standardizer import standardize_address
 from address_standardizer.confidence import (
@@ -15,7 +14,6 @@ from address_standardizer.confidence import (
     ERR_ZIP_STATE_MISMATCH,
     compute_confidence_score,
 )
-from address_standardizer.models import StandardizedAddress
 from address_standardizer.tables import STREET_SUFFIXES, ZIP3_TO_STATE
 
 

@@ -1,8 +1,8 @@
 # Address Standardizer
 
 [![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)](https://github.com/Jacob-white/Address-Standardizer)
-[![CI Tests](https://img.shields.io/badge/tests-950%2B%20passed-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
-[![Coverage](https://img.shields.io/badge/coverage-100%25%20(37%20modules)-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
+[![CI](https://github.com/Jacob-white/Address-Standardizer/actions/workflows/ci.yml/badge.svg)](https://github.com/Jacob-white/Address-Standardizer/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-~90%25-green.svg)](https://github.com/Jacob-white/Address-Standardizer)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Standards](https://img.shields.io/badge/Standards-USPS%20Pub%2028%20%7C%20UPU%20S42%20%7C%20ISO%2019160--4-orange.svg)](https://pe.usps.com/text/pub28/welcome.htm)

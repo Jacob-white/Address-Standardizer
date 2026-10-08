@@ -396,7 +396,7 @@ class UKGrammar(CountryGrammar):
                 if re.match(r"^\d+[A-Z]?$", p0) and (
                     p1_upper in STREET_SUFFIXES
                     or (p1_tokens and p1_tokens[-1] in STREET_SUFFIXES)
-                    or not (p1_upper in UK_POST_TOWNS)
+                    or p1_upper not in UK_POST_TOWNS
                 ):
                     street_line = f"{p0} {p1}"
                     city_raw = ""

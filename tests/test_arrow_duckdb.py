@@ -3,10 +3,11 @@ Test Suite for Modern Data Stack Plugins: Apache Arrow, Polars, and DuckDB.
 ===========================================================================
 """
 
-import duckdb
-import polars as pl
-import pyarrow as pa
 import pytest
+
+duckdb = pytest.importorskip("duckdb")
+pl = pytest.importorskip("polars")
+pa = pytest.importorskip("pyarrow")
 
 from address_standardizer.arrow import (
     register_duckdb_udfs,

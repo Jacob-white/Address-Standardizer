@@ -13,13 +13,11 @@ from dataclasses import dataclass
 import re
 from typing import ClassVar, List, Optional, Tuple
 
-from address_standardizer._patterns import RE_COMMA_DOT, RE_WHITESPACE
 from address_standardizer.international.base import (
     CountryGrammar,
     ParsedAddressComponents,
     split_intl_secondary_unit,
 )
-from address_standardizer.international.diacritics import normalize_to_canonical_unicode
 
 
 @dataclass(slots=True)
@@ -169,7 +167,6 @@ class HongKongGrammar(CountryGrammar):
         s2 = metadata.get("street2") or ""
         city_raw = metadata.get("city") or ""
         state_raw = metadata.get("state") or ""
-        post_raw = metadata.get("postal_code") or ""
         raw_full = metadata.get("raw_street_address") or ""
 
         combined = f"{s1} {s2}".strip()
@@ -177,8 +174,6 @@ class HongKongGrammar(CountryGrammar):
             combined = raw_full
 
         # Extract secondary unit: Floor / Flat
-        unit_type = None
-        unit_num = None
         sec_unit_str = ""
 
         m_ff = RE_HK_FLAT_AND_FLOOR.search(combined)

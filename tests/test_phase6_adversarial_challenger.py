@@ -11,6 +11,8 @@ Purpose: Comprehensive adversarial stress, property testing, ReDoS boundaries,
 import time
 import tracemalloc
 
+import pytest
+
 from address_standardizer import (
     standardize_address,
     validate_postal_code,
@@ -447,6 +449,7 @@ class TestInvariantsAndContracts:
 # Suite 5: Performance & Memory SLA Verification
 # ==============================================================================
 
+@pytest.mark.perf
 class TestPerformanceAndMemorySLA:
     """Verify latency, throughput, and memory bounds for international standardization."""
 

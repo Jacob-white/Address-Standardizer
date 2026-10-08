@@ -12,11 +12,14 @@ from benchmarks.run_benchmarks import (
 )
 
 
+BENCH_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "benchmarks")
+
+
 def test_golden_dataset_integrity():
     """Verify that the golden dataset file exists and contains 1,000 valid records."""
     paths = [
-        "/home/jwhite/Address-Standardizer/benchmarks/golden_dataset.json",
-        "/home/jwhite/Address-Standardizer/benchmarks/data/golden_evaluation_dataset.json",
+        os.path.join(BENCH_DIR, "golden_dataset.json"),
+        os.path.join(BENCH_DIR, "data", "golden_evaluation_dataset.json"),
     ]
     for p in paths:
         assert os.path.exists(p), f"Dataset file missing: {p}"
@@ -78,7 +81,7 @@ def test_run_all_benchmarks_execution():
 
 def test_multinational_golden_dataset_integrity():
     """Verify that the multinational golden dataset file exists and contains 1,000 valid records across INTL-01..06."""
-    p = "/home/jwhite/Address-Standardizer/benchmarks/data/golden_dataset_multinational.json"
+    p = os.path.join(BENCH_DIR, "data", "golden_dataset_multinational.json")
     assert os.path.exists(p), f"Multinational dataset file missing: {p}"
     with open(p, "r", encoding="utf-8") as f:
         records = json.load(f)

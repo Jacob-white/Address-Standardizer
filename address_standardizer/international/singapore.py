@@ -12,15 +12,12 @@ from __future__ import annotations
 import re
 from typing import ClassVar, List, Optional, Tuple
 
-from address_standardizer._patterns import RE_COMMA_DOT, RE_WHITESPACE
 from address_standardizer.international.base import (
     CountryGrammar,
     ParsedAddressComponents,
     split_intl_secondary_unit,
 )
-from address_standardizer.international.diacritics import normalize_to_canonical_unicode
 from address_standardizer.tables import DIRECTIONALS, STREET_SUFFIXES
-from address_standardizer.tables import STREET_SUFFIXES
 
 
 # Prominent Singapore Commercial Towers and Buildings
@@ -126,8 +123,6 @@ class SingaporeGrammar(CountryGrammar):
         """Parse tokenized lines into structured Singapore components."""
         s1 = metadata.get("street1") or ""
         s2 = metadata.get("street2") or ""
-        city_raw = metadata.get("city") or ""
-        state_raw = metadata.get("state") or ""
         post_raw = metadata.get("postal_code") or ""
         raw_full = metadata.get("raw_street_address") or ""
 

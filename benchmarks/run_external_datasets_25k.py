@@ -4,7 +4,6 @@ Run 25,000 samples for Datasets 1-4 and merge with Dataset 5 into investigation_
 """
 import os
 import sys
-import time
 import json
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +15,6 @@ from benchmarks.run_investigation_5_datasets import (
     benchmark_overture_global,
     benchmark_census_tiger,
     benchmark_uk_paf_upu,
-    DatasetMetrics,
 )
 from collections import Counter
 
@@ -40,9 +38,6 @@ def main():
 
     for r in external_results:
         tot = max(r.total_records, 1)
-        std_pct = r.standardized_count / tot * 100.0
-        loc_pct = r.locality_only_count / tot * 100.0
-        fail_pct = r.parse_failed_count / tot * 100.0
 
         auto_pct = r.auto_pass_count / tot * 100.0
         fuzzy_pct = r.fuzzy_review_count / tot * 100.0

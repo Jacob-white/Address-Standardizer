@@ -8,14 +8,12 @@ Tests:
   - Integration with StandardizedAddress and serialization
 """
 
-import pytest
 
 from address_standardizer.delivery import (
     Deliverability,
     DPVFootnote,
     evaluate_delivery_intelligence,
 )
-from address_standardizer.models import StandardizedAddress
 from address_standardizer.standardizer import standardize_address
 
 

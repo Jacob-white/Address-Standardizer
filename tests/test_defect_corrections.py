@@ -401,7 +401,6 @@ class TestDefectCorrections:
         spatial_mod._DEFAULT_SPATIAL_ENGINE = None
 
         # Test CLI build error on nonexistent input file
-        import pytest
         with patch("sys.argv", ["address-standardizer", "spatial", "build", "--openaddresses", "nonexistent_file.csv"]):
             with pytest.raises(SystemExit) as exc_info:
                 cli_main()

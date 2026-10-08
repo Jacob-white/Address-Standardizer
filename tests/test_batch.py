@@ -6,7 +6,7 @@ peak RSS memory invariance, custom column mapping, and Census geocoding enrichme
 """
 
 import csv
-import resource
+
 from unittest.mock import MagicMock
 
 from address_standardizer.batch import (
@@ -16,6 +16,22 @@ from address_standardizer.batch import (
     _process_row_dict,
 )
 from address_standardizer.geocoder import CensusGeocoder
+
+
+try:
+    import resource
+except ImportError:  # Windows has no `resource` module
+    resource = None
+
+
+def _peak_rss_kb():
+    """Peak resident set size in KB (stdlib `resource` on POSIX, psutil elsewhere)."""
+    if resource is not None:
+        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    import psutil
+
+    info = psutil.Process().memory_info()
+    return getattr(info, "peak_wset", info.rss) / 1024.0
 
 
 class TestChunkGenerator:
@@ -344,7 +360,7 @@ class TestStreamStandardizeCSV:
                             return float(line.split()[1]) / 1024.0
             except Exception:
                 pass
-            return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+            return _peak_rss_kb() / 1024.0
 
         mem_before = _get_rss_mb()
 

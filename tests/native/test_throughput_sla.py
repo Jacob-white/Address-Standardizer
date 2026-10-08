@@ -8,9 +8,12 @@ Validates Requirement R3 throughput SLA:
 import sys
 import time
 
+import pytest
+
 from address_standardizer import _pure_python_core
 
 
+@pytest.mark.perf
 class TestThroughputSLA:
     """Verifies that pure Python core processing comfortably exceeds > 2,000 rec/s."""
 
@@ -41,7 +44,11 @@ class TestThroughputSLA:
         print(f"\n[SLA Benchmark] Pure Python batch throughput (finalize=False): {throughput:.1f} rec/s ({n_records} records in {t_elapsed:.4f}s)")
 
         # Blueprint SLA Requirement: > 2,000 records/sec (adjusted to > 1,000 under coverage tracing)
-        is_traced = sys.gettrace() is not None
+        is_traced = (
+            sys.gettrace() is not None
+            or "coverage" in sys.modules
+            or "pytest_cov" in sys.modules
+        )
         min_sla = 1000.0 if is_traced else 2000.0
         assert throughput > min_sla, f"Throughput {throughput:.1f} rec/s failed SLA threshold (> {min_sla} rec/s)"
 

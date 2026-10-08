@@ -12,11 +12,10 @@ Production-grade FastAPI daemon exposing OpenAPI 3.1 endpoints for:
 import asyncio
 import json
 import logging
-import os
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
-from fastapi import Body, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -28,11 +27,9 @@ from address_standardizer._native_dispatch import (
     is_using_native,
 )
 from address_standardizer.autocomplete import (
-    AutocompleteSuggestion,
     autocomplete_address,
 )
 from address_standardizer.cache import get_cache_stats
-from address_standardizer.models import StandardizedAddress
 from address_standardizer.standardizer import standardize_address
 
 logger = logging.getLogger("address_standardizer.server")

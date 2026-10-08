@@ -35,9 +35,9 @@ import struct
 import zipfile
 import gzip
 import argparse
-from collections import Counter, defaultdict
+from collections import Counter
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional, Tuple, Iterator
+from typing import List, Dict, Any, Tuple
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
@@ -45,7 +45,6 @@ if REPO_ROOT not in sys.path:
 
 import psycopg2
 from address_standardizer import standardize_address, StandardizedAddress, RoutingTier
-from address_standardizer.tables import US_STATES
 
 LOCAL_DATA_DIR = "/tmp/address_benchmark_data"
 RESULTS_JSON_PATH = os.path.join(REPO_ROOT, "benchmarks", "investigation_5_datasets_results.json")
@@ -906,9 +905,6 @@ def save_dataset_to_report(r: DatasetMetrics):
         report["datasets"] = {}
 
     tot = max(r.total_records, 1)
-    std_pct = r.standardized_count / tot * 100.0
-    loc_pct = r.locality_only_count / tot * 100.0
-    fail_pct = r.parse_failed_count / tot * 100.0
 
     auto_pct = r.auto_pass_count / tot * 100.0
     fuzzy_pct = r.fuzzy_review_count / tot * 100.0

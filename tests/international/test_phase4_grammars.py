@@ -6,7 +6,6 @@
 - Ireland (IRL)
 """
 
-import pytest
 
 from address_standardizer import standardize_address
 from address_standardizer.international import (
