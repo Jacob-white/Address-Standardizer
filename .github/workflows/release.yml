@@ -2,72 +2,133 @@ name: Release
 
 # Push a tag like v3.3.1 to publish the Python package, the npm package and the NuGet package.
 # The Go SDK is released by pushing a `sdks/go/vX.Y.Z` tag (see sdks/README.md); no job is needed.
+# Account setup and the per-release checklist are in docs/RELEASING.md.
 #
-# One-time setup before the first release:
-#   - PyPI: add this repo as a trusted publisher for `address-standardizer` (no token needed).
-#   - npm: create the `@address-standardizer` scope and add an NPM_TOKEN secret.
-#   - NuGet: reserve the `AddressStandardizer.Client` id and add a NUGET_API_KEY secret.
-#   - Create a GitHub environment named `release` with required reviewers; every publish job waits on it.
+# Safety properties:
+#   * the tagged commit must be reachable from main and the versions in all manifests must match the tag;
+#   * the full CI workflow must pass on the tag;
+#   * artifacts are BUILT in a job that holds no publish credentials and are PUBLISHED from those exact files;
+#   * every publish job waits on the `release` environment (configure required reviewers there);
+#   * publishing is sequential (PyPI, then npm, then NuGet) so a failure stops the chain instead of racing.
 
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
-      - run: python scripts/check_versions.py "${GITHUB_REF_NAME}"
+      - name: Tag must be on main
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "Tagged commit is not on main"; exit 1; }
+      - name: Versions must match the tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python scripts/check_versions.py "$TAG"
 
   ci:
     needs: verify
     uses: ./.github/workflows/ci.yml
 
-  pypi:
+  build:
+    # No secrets and no publish permissions here: this job only produces the release artifacts.
     needs: ci
     runs-on: ubuntu-latest
-    environment: release
-    permissions:
-      id-token: write
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
-      - run: pip install build && python -m build
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Python sdist and wheel
+        run: |
+          pip install build twine
+          python -m build --outdir dist/python
+          twine check dist/python/*
+      - name: npm package
+        working-directory: sdks/typescript
+        run: |
+          npm ci
+          npm test
+          npm pack --pack-destination ../../dist/npm
+      - name: NuGet package
+        run: dotnet pack sdks/dotnet/AddressStandardizer.Client.csproj -c Release -o dist/nuget
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-artifacts
+          path: dist/
+          if-no-files-found: error
+
+  pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # PyPI trusted publishing
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-artifacts
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        with:
+          packages-dir: dist/python/
 
   npm:
-    needs: ci
+    needs: pypi
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: release
-    defaults:
-      run:
-        working-directory: sdks/typescript
+    permissions:
+      contents: read
+      id-token: write # npm provenance
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
-      - run: npm ci
-      - run: npm test
-      - run: npm publish --access public
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-artifacts
+          path: dist/
+      - run: npm publish --access public --provenance dist/npm/*.tgz
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   nuget:
-    needs: ci
+    needs: npm
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: release
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 8.0.x
-      - run: dotnet pack sdks/dotnet/AddressStandardizer.Client.csproj -c Release -o nupkgs
-      - run: dotnet nuget push "nupkgs/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-artifacts
+          path: dist/
+      - name: Publish
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: dotnet nuget push "dist/nuget/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json

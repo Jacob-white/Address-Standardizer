@@ -6,17 +6,27 @@ on:
   pull_request:
   workflow_call:
 
+# Least privilege: nothing in CI needs to write to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Third-party actions are pinned to commit SHAs (the comment names the tag/branch they were resolved from).
 jobs:
   python:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
         python: ["3.11", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -r requirements-dev.txt
@@ -32,35 +42,47 @@ jobs:
 
   rust:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --no-default-features
-        continue-on-error: true  # PyO3 extension-module crates may not link under `cargo test`; maturin job below is authoritative
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+        with:
+          toolchain: "1.82.0"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
-      - run: pip install maturin pytest hypothesis
-      - run: maturin build --release --out dist && pip install dist/*.whl && pip install -e .
-      - run: pytest tests/native tests/test_rust_acceleration.py tests/test_address_standardization_improvements.py
+      - run: pip install maturin
+      - run: pip install -r requirements-dev.txt
+      - run: pip install -e ".[server,arrow]"
+      - name: Build the native extension and place it next to the editable install
+        # maturin's wheel carries only the Rust module and shares the project name with the Python package, so it is
+        # unpacked into site-packages rather than pip-installed (which would replace the Python package).
+        run: |
+          maturin build --release --locked --out dist
+          python -m zipfile -e dist/*.whl native_x
+          cp -r native_x/_address_standardizer_rs "$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/"
+          python -c "from address_standardizer import _native_dispatch as n; assert n.is_native_available(), 'native extension not importable'"
+      - name: Native/pure parity and acceleration tests (must not skip)
+        run: pytest tests/native tests/test_rust_acceleration.py tests/test_address_standardization_improvements.py -rs
 
   sdks:
     # Builds and tests every client SDK, then runs each against a live server (contract + integration).
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       ADDRESS_STANDARDIZER_URL: http://127.0.0.1:8000
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "1.21"
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: 8.0.x
       - run: pip install -e ".[server,dev]"
@@ -87,3 +109,20 @@ jobs:
       - name: Server log
         if: failure()
         run: cat server.log
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build the image
+        run: docker build -t address-standardizer:ci .
+      - name: Smoke test (non-root, native core active, health and standardize)
+        run: |
+          docker run -d --name as-ci -p 127.0.0.1:8000:8000 address-standardizer:ci
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/health >/dev/null && break; sleep 1; done
+          test "$(docker exec as-ci id -u)" != "0"
+          docker exec as-ci python -c "from address_standardizer import _native_dispatch as n; assert n.is_native_available()"
+          curl -sf -X POST http://127.0.0.1:8000/v1/standardize -H 'content-type: application/json' \
+            -d '{"address":"100 Wall St, New York, NY 10005"}' | grep -q '"street1":"100 WALL ST"'
+          docker rm -f as-ci

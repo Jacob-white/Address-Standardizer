@@ -17,6 +17,14 @@ If the `@address-standardizer` npm scope or the NuGet id is unavailable, rename 
 `sdks/typescript/package.json` / `<PackageId>` in `sdks/dotnet/AddressStandardizer.Client.csproj` and update the
 install commands in `sdks/README.md`.
 
+## What the release workflow enforces
+
+- The tag must point at a commit reachable from `main`, and `scripts/check_versions.py` must agree with the tag.
+- The full CI workflow (including the Docker build and smoke test) must pass on the tag.
+- Artifacts are built by a job with no credentials; the publish jobs upload exactly those files, run behind the
+  `release` environment, and execute one after another (PyPI, then npm with provenance, then NuGet).
+- Third-party actions are pinned to commit SHAs; refresh them deliberately when upgrading.
+
 ## Per-release checklist
 
 1. Bump the version in `pyproject.toml`, `address_standardizer/__init__.py`, `sdks/typescript/package.json`
