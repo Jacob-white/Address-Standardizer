@@ -111,7 +111,7 @@ class TestSpatialIngestion:
         with open(csv_file, "w") as f:
             f.write(csv_content)
         count_file = ingestor.ingest_csv(csv_file)
-        assert count_file == 1
+        assert count_file == 0  # same address_key: re-ingesting must not duplicate points
 
         # Error on bad type
         with pytest.raises(TypeError, match="Expected file path or file-like buffer"):
@@ -256,7 +256,7 @@ class TestSpatialIngestion:
         g_file = str(tmp_path / "osm.geojson")
         with open(g_file, "w") as f:
             json.dump(geojson_data, f)
-        assert ingestor.ingest_geojson(g_file) == 1
+        assert ingestor.ingest_geojson(g_file) == 0  # already ingested: no duplicate points
 
         # Error
         with pytest.raises(TypeError, match="Expected file path or file-like buffer"):

@@ -7,6 +7,7 @@ with polygon Shoelace calculations and coordinate snapping.
 """
 
 import csv
+import math
 import json
 import logging
 from typing import List, Dict, Any, Optional, Iterable, Tuple
@@ -58,6 +59,15 @@ def calculate_polygon_centroid(coordinates: List[List[float]]) -> Tuple[float, f
     return snap_coordinate(cx), snap_coordinate(cy)
 
 
+def _valid_coordinate(lat: Any, lon: Any) -> bool:
+    """Finite and within WGS84 bounds; anything else (NaN, lat=200, empty geometry) is skipped, not stored."""
+    try:
+        lat_f, lon_f = float(lat), float(lon)
+    except (TypeError, ValueError):
+        return False
+    return math.isfinite(lat_f) and math.isfinite(lon_f) and -90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0
+
+
 class OpenAddressesIngestor:
     """ETL parser for OpenAddresses cadastral parcel points."""
 
@@ -85,6 +95,8 @@ class OpenAddressesIngestor:
                 lon_f = snap_coordinate(float(lon))
             except (ValueError, TypeError):
                 continue
+            if not _valid_coordinate(lat_f, lon_f):
+                continue
 
             num_str = str(number).strip() if number is not None else ""
             street_str = str(street).strip().upper()
@@ -98,8 +110,11 @@ class OpenAddressesIngestor:
             addr_key = f"{st_line}|{unit_str}|{c_str}|{s_str}|{p_str[:5] if p_str else ''}|{co_str}"
             bld_key = f"{st_line}||{c_str}|{s_str}|{p_str[:5] if p_str else ''}|{co_str}"
 
-            st_num_int = int(num_str) if num_str.isdigit() else None
+            st_num_int = int(num_str) if num_str.isascii() and num_str.isdigit() else None
             parcel_id = rec.get("ID") if "ID" in rec else rec.get("parcel_id")
+
+            if self.engine.has_address_key(addr_key):
+                continue  # re-running an ingest must not duplicate points
 
             self.engine.insert_point(
                 address_key=addr_key,
@@ -224,7 +239,7 @@ class OsmBuildingIngestor:
             elif g_type == "MultiPolygon" and coords and coords[0]:
                 lon, lat = calculate_polygon_centroid(coords[0][0])
 
-            if lat is None or lon is None:
+            if lat is None or lon is None or not _valid_coordinate(lat, lon):
                 continue
 
             num = props.get("addr:housenumber", "")
@@ -242,6 +257,9 @@ class OsmBuildingIngestor:
             addr_key = f"{st_line}|{unit}|{city}|{state}|{postcode[:5] if postcode else ''}|{country}".upper()
             bld_key = f"{st_line}||{city}|{state}|{postcode[:5] if postcode else ''}|{country}".upper()
 
+            if self.engine.has_address_key(addr_key):
+                continue
+
             self.engine.insert_point(
                 address_key=addr_key,
                 building_key=bld_key,
@@ -250,7 +268,7 @@ class OsmBuildingIngestor:
                 precision_code="CONFIRMED_ROOFTOP",
                 accuracy_radius_m=4.0,
                 source="OSM",
-                street_number=int(num) if str(num).isdigit() else None,
+                street_number=int(num) if str(num).isascii() and str(num).isdigit() else None,
                 street_name=str(street).strip().upper(),
                 city=str(city).strip().upper() if city else None,
                 state=str(state).strip().upper() if state else None,

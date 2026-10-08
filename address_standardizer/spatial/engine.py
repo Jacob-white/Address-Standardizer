@@ -295,6 +295,14 @@ class SpatialEngine:
         for st_code, coords in STATE_CENTROIDS.items():
             self.insert_municipal_centroid(name=st_code, state=st_code, latitude=coords[0], longitude=coords[1], accuracy_radius_m=50000.0)
 
+    def has_address_key(self, address_key: str) -> bool:
+        """True if a point with this (case-insensitive) address key is already stored."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT 1 FROM spatial_points WHERE address_key = ? LIMIT 1", (address_key.strip().upper(),)
+            ).fetchone()
+            return row is not None
+
     def insert_point(
         self,
         address_key: str,
@@ -314,6 +322,10 @@ class SpatialEngine:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> int:
         """Inserts a single spatial point into spatial_points and spatial_rtree."""
+        if not (math.isfinite(latitude) and math.isfinite(longitude)) or not (
+            -90.0 <= latitude <= 90.0 and -180.0 <= longitude <= 180.0
+        ):
+            raise ValueError(f"invalid coordinates: lat={latitude}, lon={longitude}")
         h3_idx = lat_lng_to_h3(latitude, longitude, resolution=10)
         meta_json = json.dumps(metadata or {})
         with self._lock, self._conn:
@@ -473,7 +485,24 @@ class SpatialEngine:
         max_lat: float,
         limit: int = 100,
     ) -> List[SpatialResolutionResult]:
-        """Queries points within a longitude/latitude bounding box using SQLite R*Tree."""
+        """Queries points within a longitude/latitude bounding box using SQLite R*Tree.
+
+        A box that crosses the antimeridian is given with ``min_lon > max_lon`` (e.g. 179.9 .. -179.9) and is
+        answered as the two boxes [min_lon, 180] and [-180, max_lon].
+        """
+        min_lat, max_lat = max(-90.0, min(min_lat, max_lat)), min(90.0, max(min_lat, max_lat))
+        if min_lon > max_lon:
+            east = self._query_box(min_lon, min_lat, 180.0, max_lat, limit)
+            west = self._query_box(-180.0, min_lat, max_lon, max_lat, max(0, limit - len(east)))
+            return east + west
+        return self._query_box(min_lon, min_lat, max_lon, max_lat, limit)
+
+    def _query_box(
+        self, min_lon: float, min_lat: float, max_lon: float, max_lat: float, limit: int
+    ) -> List[SpatialResolutionResult]:
+        """Single R*Tree box query (no wrapping)."""
+        if limit <= 0:
+            return []
         with self._lock:
             cur = self._conn.execute(
                 """
@@ -516,12 +545,29 @@ class SpatialEngine:
         limit: int = 50,
     ) -> List[SpatialResolutionResult]:
         """Queries points within a metric radius around (lon, lat)."""
+        if not (math.isfinite(lat) and math.isfinite(lon)) or not -90.0 <= lat <= 90.0:
+            raise ValueError("lat must be within [-90, 90] and lon finite")
+        lon = ((lon + 180.0) % 360.0) - 180.0
         deg_lat = radius_meters / 111320.0
-        deg_lon = radius_meters / (111320.0 * max(1e-6, math.cos(math.radians(lat))))
-        min_lon, max_lon = lon - deg_lon, lon + deg_lon
         min_lat, max_lat = lat - deg_lat, lat + deg_lat
+        if max_lat >= 90.0 or min_lat <= -90.0:
+            # The circle contains a pole: every longitude is in range.
+            min_lon, max_lon = -180.0, 180.0
+        else:
+            deg_lon = radius_meters / (111320.0 * max(1e-6, math.cos(math.radians(lat))))
+            if deg_lon >= 180.0:
+                min_lon, max_lon = -180.0, 180.0
+            else:
+                min_lon, max_lon = lon - deg_lon, lon + deg_lon
+                # Wrap across the antimeridian; query_bounding_box answers min_lon > max_lon as two boxes.
+                if min_lon < -180.0:
+                    min_lon += 360.0
+                if max_lon > 180.0:
+                    max_lon -= 360.0
 
-        candidates = self.query_bounding_box(min_lon, min_lat, max_lon, max_lat, limit=limit * 4)
+        # Fetch a generous candidate set, then order by true distance so `limit` returns the nearest points
+        # (R*Tree order is arbitrary).
+        candidates = self.query_bounding_box(min_lon, min_lat, max_lon, max_lat, limit=max(limit * 20, 1000))
         filtered = []
         for c in candidates:
             # Haversine distance check
@@ -533,10 +579,9 @@ class SpatialEngine:
             )
             dist = 2.0 * 6371000.0 * math.asin(math.sqrt(max(0.0, min(1.0, a))))
             if dist <= radius_meters:
-                filtered.append(c)
-                if len(filtered) >= limit:
-                    break
-        return filtered
+                filtered.append((dist, c))
+        filtered.sort(key=lambda pair: pair[0])
+        return [c for _, c in filtered[:limit]]
 
     def query_street_segments(
         self,
@@ -677,7 +722,7 @@ class SpatialEngine:
             if is_us and st1:
                 st1_clean = st1.strip().upper()
                 tokens = st1_clean.split()
-                if tokens and tokens[0].isdigit():
+                if tokens and tokens[0].isascii() and tokens[0].isdigit():
                     num = int(tokens[0])
                     street_name = " ".join(tokens[1:])
                     sql = "SELECT * FROM street_segments WHERE street_name = ?"
