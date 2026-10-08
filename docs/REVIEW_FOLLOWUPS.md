@@ -23,17 +23,17 @@ Open items from the whole-codebase review. The review's other findings are fixed
 
 ## Docs (verified wrong, high severity)
 
-- [ ] `docs/api_reference.md`: Python API names and signatures, REST paths (`/v1/*`), batch limit (10,000, 413), CLI syntax (`parse`, not `standardize`; `batch` positional args; `benchmark` flags).
-- [ ] `docs/quickstart.md`: almost every snippet fails; fix the curl path and the install extras (`[server]`, `[arrow]`).
-- [ ] `README.md`: wrong outputs; unclosed code fence (~line 504); false claims ("960+ tests", "100% coverage" (actual ~89.6%), "220,000 rec/sec native SIMD", "bit-for-bit"); wrong CLI flags (`--include-intl`, `spatial ingest`, `audit --summary`); wrong install steps.
-- [ ] SDK READMEs:
+- [x] `docs/api_reference.md`: Python API names and signatures, REST paths (`/v1/*`), batch limit (10,000, 413), CLI syntax (`parse`, not `standardize`; `batch` positional args; `benchmark` flags).
+- [x] `docs/quickstart.md`: almost every snippet fails; fix the curl path and the install extras (`[server]`, `[arrow]`).
+- [x] `README.md`: wrong outputs; unclosed code fence (~line 504); false claims ("960+ tests", "100% coverage" (actual ~89.6%), "220,000 rec/sec native SIMD", "bit-for-bit"); wrong CLI flags (`--include-intl`, `spatial ingest`, `audit --summary`); wrong install steps.
+- [x] SDK READMEs:
   - TypeScript: `RequestOptions`, `isStreamError`, typed errors, `react` peer dependency.
   - Go: `StreamBatchRecords`, `WithTimeout`, `AutocompleteGetRequest`, `*bool` CMRA/Vacant, `testdata` fixtures.
   - .NET: `StreamBatchRecordsAsync`, nullable flags, `AddressStandardizerRecordException` / `AddressStandardizerException`, `AutocompleteGetAsync`.
-- [ ] Document `correct_state_from_zip` (param, API field, CLI flag, env var). Streaming library functions only honor the env var.
-- [ ] Document the env vars: `ADDRESS_STANDARDIZER_MAX_BATCH`, `_MAX_BODY_BYTES`, `_CORS_ORIGINS`, `_DISABLE_DOCS`, `_FORCE_PURE`, `_AUDIT_MAX_ROWS`, `_CORRECT_STATE_FROM_ZIP`.
-- [ ] Document that the Rust module is Soundex-only.
-- [ ] `docs/RELEASING.md`.
+- [x] Document `correct_state_from_zip` (param, API field, CLI flag, env var). Streaming library functions only honor the env var.
+- [x] Document the env vars: `ADDRESS_STANDARDIZER_MAX_BATCH`, `_MAX_BODY_BYTES`, `_CORS_ORIGINS`, `_DISABLE_DOCS`, `_FORCE_PURE`, `_AUDIT_MAX_ROWS`, `_CORRECT_STATE_FROM_ZIP`.
+- [x] Document that the Rust module is Soundex-only.
+- [x] `docs/RELEASING.md`.
 
 ## International parsing
 
@@ -56,13 +56,13 @@ Open items from the whole-codebase review. The review's other findings are fixed
 
 ## US core
 
-- [ ] `enable_fuzzy=False` is not honored in `us_street_parser` (~line 466, `get_fuzzy_suffix` and the recursion).
-- [ ] RR box comma / `R.R.` normalization.
-- [ ] Ordinal word floors; `No.` / `Number` units.
-- [ ] Single-token street + unit duplication (`Acme` + `Suite 500`, lone numbers).
-- [ ] Dual-address / Urbanization branches lose data.
+- [x] `enable_fuzzy=False` is not honored in `us_street_parser` (~line 466, `get_fuzzy_suffix` and the recursion).
+- [x] RR box comma / `R.R.` normalization.
+- [x] Ordinal word floors; `No.` / `Number` units.
+- [x] Single-token street + unit duplication (`Acme` + `Suite 500`, lone numbers).
+- [x] Dual-address / Urbanization branches lose data.
 - [ ] CRF path splits a `St.` prefix.
-- [ ] `normalize_us_postal_code` with odd lengths.
+- [x] `normalize_us_postal_code` with odd lengths.
 - [ ] "Paris" with a TX ZIP resolves to FRA.
 - [ ] `LocalityOnlyStatus` eq/hash contract (`models.py`).
 - [ ] Dead code: `RE_ATTACHED_SEC_UNIT`, unused aliases.
@@ -74,6 +74,17 @@ Open items from the whole-codebase review. The review's other findings are fixed
 - [x] CLI csv output: neutralize formula injection (`cli_formatting._format_csv_row`).
 - [x] `parse --enable-geocoding --spatial-db <bad>`: confirm it fails cleanly, not with a traceback.
 - [x] Streaming library functions: accept `correct_state_from_zip` as a parameter.
+
+## Found while verifying (open)
+
+- [ ] `St. Louis Ave 100` (trailing house number) is parsed as street `LOUIS AVE ST` + unit `STE 100`.
+- [ ] `Urbanization ...` single-line input drops the urbanization name when no street follows.
+- [ ] Japanese single-line input: `normalized_address_key` loses city/state and mangles the street.
+- [ ] `audit` CLI always uses a fresh in-memory ledger, so it is always empty across invocations (documented, not fixed).
+- [ ] `standardize_address("xyz", city="Nowhere")` returns status `standardized` with routing tier MANUAL_STEWARDSHIP.
+- [ ] `phonetic_key` for "350 5th Ave" is `350|#5|10118` (odd token).
+- [ ] The `benchmark` command's SLA gate fails the mixed-throughput row on slow machines (1,729 rec/s vs a 2,000 target).
+- [ ] Verify the GitHub Actions run after pushing `9ef4553` (CI failures were reproduced and fixed locally in Linux containers; not yet confirmed on GitHub).
 
 ## Known behavior notes (for the release notes)
 
