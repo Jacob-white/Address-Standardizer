@@ -7,6 +7,7 @@ grid distance, parent hierarchy, bit packing, and pure-Python fallback.
 
 from unittest.mock import MagicMock, patch
 import pytest
+from tests._deps import require
 import address_standardizer.spatial.h3_indexer as mod
 
 from address_standardizer.spatial.h3_indexer import (
@@ -245,7 +246,7 @@ class TestH3Indexer:
 class TestRealH3KnownVectors:
     """Vectors from the H3 reference implementation; run whenever the ``h3`` package is installed (dev extra)."""
 
-    h3 = pytest.importorskip("h3")
+    h3 = require("h3")
 
     def test_known_cells(self):
         assert lat_lng_to_h3(37.3615593, -122.0553238, 5) == "85283473fffffff"
