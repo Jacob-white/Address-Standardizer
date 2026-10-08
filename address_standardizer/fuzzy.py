@@ -121,6 +121,11 @@ PROTECTED_STREET_WORDS: frozenset[str] = frozenset({
     "TREE", "PEACH", "ASH", "BIRCH", "FLOWER", "GRAND", "BROADWAY", "MARKET",
     "BELL", "BALL", "HALL", "CALL", "TALL", "BILL", "BULL", "DOLL", "POLL", "ROLL", "TOLL",
     "MICHIGAN", "PENNSYLVANIA", "CALIFORNIA",
+    # Common Spanish place/street names and surnames (Puerto Rico, Southwest) that resemble street suffixes
+    "FLORES", "TORRES", "MAYOR", "REAL", "NORTE", "SUR", "ESTE", "OESTE", "PRINCIPAL", "CENTRAL", "GRANDE",
+    "NUEVA", "NUEVO", "VIEJA", "VIEJO", "PALMAS", "ROBLES", "LOPEZ", "GARCIA", "MARTINEZ", "RODRIGUEZ",
+    "GONZALEZ", "PEREZ", "SANCHEZ", "RAMIREZ", "CRUZ", "REYES", "MORALES", "ORTIZ", "DIAZ", "VAZQUEZ",
+    "MARKS", "MARK", "PARKER", "MILLER", "BAKER", "FISHER", "TURNER", "WALKER", "HUNTER", "COOPER",
     # Sovereign country / territorial words
     "STATES", "UNITED", "AMERICA", "ISLANDS",
 })
@@ -147,7 +152,8 @@ def heal_street_suffix(token: str, max_distance: int = 2) -> Optional[str]:
         return None
 
     t_len = len(tok_clean)
-    allowed_distance = 1 if t_len <= 5 else max_distance
+    # Distance 2 only for long tokens: shorter words within 2 edits of a suffix are usually names (PARKER, MILLER).
+    allowed_distance = 1 if t_len <= 8 else min(max_distance, 2)
     best_match: Optional[str] = None
     min_dist = allowed_distance + 1
 
@@ -160,6 +166,9 @@ def heal_street_suffix(token: str, max_distance: int = 2) -> Optional[str]:
                 ):
                     continue
             d = damerau_levenshtein_distance(tok_clean, canonical)
+            # A same-length single edit that is not a transposition is a different word, not a typo.
+            if d == 1 and len(canonical) == t_len and sorted(tok_clean) != sorted(canonical):
+                continue
             if d <= allowed_distance and d < min_dist:
                 min_dist = d
                 best_match = abbr
@@ -196,31 +205,37 @@ def heal_city_token(
     if not target_state and zip3 and zip3 in ZIP3_TO_STATE:
         target_state = ZIP3_TO_STATE[zip3]
 
+    # A city that is itself a known city (in any state) is never rewritten into a different one.
+    all_known = {c for cities in PROMINENT_STATE_CITIES.values() for c in cities}
+    if clean_city in all_known:
+        return clean_city
+
     candidate_cities: List[str] = []
     if target_state in PROMINENT_STATE_CITIES:
         candidate_cities.extend(PROMINENT_STATE_CITIES[target_state])
-    else:
-        # Check all state cities if state is not specified
+    elif not target_state:
+        # Without any state context only a single, unambiguous edit is trusted.
+        max_distance = 1
         for cities in PROMINENT_STATE_CITIES.values():
             candidate_cities.extend(cities)
-
     # Add multi-word cities
-    candidate_cities.extend(MULTI_WORD_CITIES)
+    candidate_cities.extend(sorted(MULTI_WORD_CITIES))
 
-    best_match: Optional[str] = None
+    # Collect every candidate at the best distance; only a unique winner is a trustworthy correction
+    # (e.g. DEVER is equally close to DENVER and DOVER, so it is left alone).
+    best: List[str] = []
     min_dist = max_distance + 1
     c_len = len(clean_city)
-
-    for cand in candidate_cities:
+    for cand in dict.fromkeys(candidate_cities):
         if abs(len(cand) - c_len) <= max_distance:
             d = damerau_levenshtein_distance(clean_city, cand)
-            if d <= max_distance and d < min_dist:
-                min_dist = d
-                best_match = cand
-                if d == 1:
-                    break
+            if d <= max_distance:
+                if d < min_dist:
+                    min_dist, best = d, [cand]
+                elif d == min_dist:
+                    best.append(cand)
 
-    return best_match
+    return best[0] if len(best) == 1 else None
 
 
 @functools.lru_cache(maxsize=4096)
@@ -282,6 +297,9 @@ def heal_street_name(name_raw: str, max_distance: int = 1) -> Optional[str]:
             ):
                 continue
             if n_len < 5 and sorted(clean_name) != sorted(cand):
+                continue
+            # Same-length single edits that are not transpositions are different words (FROST/FRONT, MARKER/MARKET).
+            if n_len == len(cand) and sorted(clean_name) != sorted(cand):
                 continue
             d = damerau_levenshtein_distance(clean_name, cand)
             if d <= allowed_distance and d < min_dist:

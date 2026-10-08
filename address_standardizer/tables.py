@@ -40,7 +40,7 @@ STREET_SUFFIXES: Dict[str, str] = {
     "BURG": "BG", "BG": "BG",
     "BURGS": "BGS", "BGS": "BGS",
     "BYPASS": "BYP", "BYP": "BYP", "BYPA": "BYP", "BYPAS": "BYP", "BYPS": "BYP",
-    "CAMP": "CP", "CP": "CP", "CMP": "CP",
+    "CAMP": "CP", "CP": "CP", "CMP": "CP", "CAMPUS": "CP",
     "CANAL": "CNL", "CNL": "CNL",
     "CANYON": "CYN", "CYN": "CYN", "CANYN": "CYN", "CNYN": "CYN",
     "CAPE": "CPE", "CPE": "CPE",

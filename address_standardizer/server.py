@@ -123,7 +123,7 @@ async def _read_body_limited(request: Request) -> bytes:
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > limit:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=413,
             detail=f"Request body of {declared} bytes exceeds the limit of {limit} bytes.",
         )
     chunks: List[bytes] = []
@@ -132,7 +132,7 @@ async def _read_body_limited(request: Request) -> bytes:
         total += len(chunk)
         if total > limit:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=413,
                 detail=f"Request body exceeds the limit of {limit} bytes.",
             )
         chunks.append(chunk)
@@ -141,7 +141,7 @@ async def _read_body_limited(request: Request) -> bytes:
 
 def _batch_too_large(count: int, limit: int) -> HTTPException:
     return HTTPException(
-        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        status_code=413,
         detail=f"Batch of {count} addresses exceeds the limit of {limit}; split it or use NDJSON streaming in smaller requests.",
     )
 

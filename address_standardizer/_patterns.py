@@ -39,8 +39,8 @@ RE_STATE_ZIP = re.compile(r"\b([A-Z]{2})(?:,\s*|\s+)(\d{5}(?:-\d{4})?)\b", re.IG
 RE_TERMINAL_ZIP = re.compile(r"\b(\d{5})(?:-(\d{4}))?\b$")
 
 # PO Box
-RE_PO_BOX = re.compile(r"\b(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+([A-Z0-9\-]+)\b", re.IGNORECASE)
-RE_PO_BOX_START = re.compile(r"^(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+([A-Z0-9\-]+)", re.IGNORECASE)
+RE_PO_BOX = re.compile(r"\b(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+(\d[A-Z0-9\-]*|[A-Z](?![A-Z]))\b", re.IGNORECASE)
+RE_PO_BOX_START = re.compile(r"^(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+(\d[A-Z0-9\-]*|[A-Z](?![A-Z]))", re.IGNORECASE)
 
 # Secondary Units
 RE_SEC_UNIT = re.compile(
@@ -146,7 +146,7 @@ RE_INTL_SEC_START = re.compile(r"^(SUITE|STE|UNIT|APT|FLOOR|LEVEL|LVL|PO BOX|FLA
 RE_CAN_PROV_POSTAL = re.compile(r"^([A-Z]{2})\s+([A-Z]\d[A-Z]\s?\d[A-Z]\d)$")
 RE_NUMBER_HYPHEN_NUMBER = re.compile(r"^\d+-\d+$")
 RE_US_ZIP5_OR_9 = re.compile(r"^\d{5}(?:-\d{4})?$")
-RE_PO_BOX_KEY = re.compile(r"^(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+([A-Z0-9\-]+)")
+RE_PO_BOX_KEY = re.compile(r"^(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+(\d[A-Z0-9\-]*|[A-Z](?![A-Z]))")
 RE_NUMBERED_STREET_KEY = re.compile(r"^(\d+)(?:ST|ND|RD|TH)?$")
 
 # ---------------------------------------------------------------------------

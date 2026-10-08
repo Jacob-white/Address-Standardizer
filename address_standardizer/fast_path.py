@@ -35,11 +35,18 @@ from address_standardizer._patterns import (
     ROUTE_PREFIXES,
     get_fuzzy_suffix,
     get_fuzzy_directional,
+    RE_NON_ALPHANUMERIC,
+    RE_WHITESPACE,
     RE_TERMINAL_COUNTRY,
     clean_redundant_street_tail,
     clean_repetitive_cycles,
 )
 from address_standardizer.phonetics import generate_phonetic_address_key
+
+def _normalize_city(text: str) -> str:
+    """Same city normalization as the full pipeline (strip punctuation, collapse whitespace, upper-case)."""
+    return RE_WHITESPACE.sub(" ", RE_NON_ALPHANUMERIC.sub("", text).strip().upper())
+
 
 PRIVACY_PLACEHOLDERS: frozenset[str] = frozenset({
     "PRIVATE RESIDENCE", "CONFIDENTIAL", "PERSONAL RESIDENCE",
@@ -123,6 +130,11 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
     # Check for multi-tier secondary unit inside phrase
     sec_unit = ""
     matches = list(RE_SEC_UNIT.finditer(phrase_upper))
+    # Descriptive position words without an identifier (FRONT, UPPER, OFFICE, REAR...) are ambiguous with real
+    # street-name words ("100 Front Royal Pike"); the full parser decides those.
+    # A trailing one ("100 Main St Basement") is a real unit; one in the middle of the phrase is a street word.
+    if any(m.group(4) and phrase_upper[m.end():].strip(" ,.-") for m in matches):
+        return None
     if matches:
         sec_parts = []
         for m in matches:
@@ -160,7 +172,10 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
         return None
 
     # Route prefixes (e.g. County Road, CR, Route) -> delegate to Tier 2
+    route_scan = rem_tokens[1:] if (rem_tokens[0] in DIRECTIONALS or rem_tokens[0] in FROZEN_DIRECTIONAL_VALUES) else rem_tokens
     if rem_tokens[0] in ROUTE_PREFIXES or (len(rem_tokens) > 1 and f"{rem_tokens[0]} {rem_tokens[1]}" in ROUTE_PREFIXES):
+        return None
+    if route_scan and (route_scan[0] in ROUTE_PREFIXES or (len(route_scan) > 1 and f"{route_scan[0]} {route_scan[1]}" in ROUTE_PREFIXES)):
         return None
 
     # Directional ambiguity check: if remaining tokens are just e.g. ['SOUTH', 'ST']
@@ -314,7 +329,7 @@ def fast_path_parse(
             s2_raw = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_code, postal_code=zip_raw)
 
         # Validate ZIP5
-        zip_clean = zip_raw.strip()
+        zip_clean = re.sub(r"^(\d{5})\s+(\d{4})$", r"\1-\2", zip_raw.strip())  # "02101 1234" -> "02101-1234"
         if len(zip_clean) >= 5 and zip_clean[:5].isdigit():
             zip5 = zip_clean[:5]
             norm_postal = f"{zip5}-{zip_clean[6:10]}" if len(zip_clean) >= 10 and zip_clean[5] == "-" and zip_clean[6:10].isdigit() else (
@@ -360,7 +375,7 @@ def fast_path_parse(
             norm_s2 = _standardize_secondary_unit(norm_s2)
             norm_s1 = re.sub(r"[\s,.\-#;:]+$", "", norm_s1).strip()
 
-        norm_city = " ".join(city_raw.upper().replace(",", "").split())
+        norm_city = _normalize_city(city_raw)
         if enable_fuzzy:
             from address_standardizer.fuzzy import heal_city_token
             h_city = heal_city_token(norm_city, state=state_code, zip3=zip5[:3])
@@ -405,7 +420,7 @@ def fast_path_parse(
             state_cand = m_priv.group(3).upper()
             zip_cand = m_priv.group(4).strip()
             if state_cand in FROZEN_US_STATE_CODES:
-                norm_city = " ".join(city_part.upper().split())
+                norm_city = _normalize_city(city_part)
                 zip5 = zip_cand[:5]
                 norm_postal = zip_cand
                 raw_street_address = s1_raw
@@ -472,7 +487,7 @@ def fast_path_parse(
                     else:
                         norm_postal = h_zip
                     zip5 = h_zip
-            norm_city = " ".join(city_part.upper().split())
+            norm_city = _normalize_city(city_part)
             if enable_fuzzy:
                 h_city = heal_city_token(norm_city, state=state_cand, zip3=zip5[:3])
                 if h_city:

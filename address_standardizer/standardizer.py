@@ -32,7 +32,6 @@ from address_standardizer._patterns import (
     RE_SEC_UNIT,
     RE_WHITESPACE,
     RE_NON_ALPHANUMERIC,
-    RE_PRIVATE_RESIDENCE,
     RE_GLUED_HOUSE_NUM,
     RE_TERMINAL_COUNTRY,
     RE_LEGACY_CORRUPTIONS,
@@ -74,6 +73,12 @@ from address_standardizer.normalization import (  # noqa: E402
     normalize_us_state,  # noqa: F401
     normalize_us_postal_code,  # noqa: F401
     is_registered_agent_hub_address,  # noqa: F401
+)
+from address_standardizer._inputs import (  # noqa: E402
+    MAX_FIELD_LENGTH,
+    coerce_text,
+    is_privacy_placeholder,
+    normalize_po_box_spelling,
 )
 from address_standardizer.care_of import has_care_of, strip_care_of  # noqa: E402
 from address_standardizer.secondary_units import (  # noqa: E402
@@ -219,6 +224,9 @@ def _finalize_standardized_address(
     return std
 
 
+_GARBAGE_TOKENS = frozenset({"N/A", "NONE", "NULL", "UNKNOWN", "-", ".", "NO ADDRESS"})
+
+
 def _is_unit_phrase(text: str) -> bool:
     """True if `text` is made only of secondary-unit designators and short identifiers (e.g. 'STE 400 A')."""
     if not RE_SEC_UNIT.match(text):
@@ -252,6 +260,14 @@ def standardize_address(
     ``_pure_python_core``.
     """
     import os
+
+    # Callers (pandas, CSV readers) pass NaN, floats and bytes; normalize to text once, up front.
+    street1 = coerce_text(street1) if street1 is not None else None
+    street2 = coerce_text(street2) if street2 is not None else None
+    city = coerce_text(city) if city is not None else None
+    state = coerce_text(state) if state is not None else None
+    postal_code = coerce_text(postal_code) if postal_code is not None else None
+    country = coerce_text(country) if country is not None else None
     allow_locality = allow_locality or bool(
         kwargs.get("allow_locality_only")
         or kwargs.get("allow_city_level")
@@ -275,7 +291,7 @@ def standardize_address(
     cache_key = None
     if finalize and use_cache and cache.is_enabled():
         cache_key = make_cache_key(
-            street1,
+            street1 if street1 is not None else kwargs.get("street"),
             street2,
             city,
             state,
@@ -294,6 +310,27 @@ def standardize_address(
         if not finalize:
             return std
         return _finalize_standardized_address(std, raw_dict, cache_key, enable_geocoding=enable_geocoding)
+
+    _street_alias = kwargs.get("street")
+    if any(
+        len(v) > MAX_FIELD_LENGTH
+        for v in (
+            street1 or (_street_alias if isinstance(_street_alias, str) else ""),
+            street2 or "", city or "", state or "", postal_code or "", country or "",
+        )
+    ):
+        # Keep the caller's country (cheap to resolve, and the field itself is short) so downstream grouping works.
+        too_long_iso = "USA"
+        if country and len(country) <= MAX_FIELD_LENGTH:
+            too_long_iso = normalize_country_code(country, "", "", raw_street="", city_raw="") or "USA"
+        too_long = StandardizedAddress(
+            street1="", street2="", city="", state="", postal_code="", country=too_long_iso,
+            normalized_address_key=None, address_status="parse_failed", raw_street_address="",
+            is_us=too_long_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM"), building_key=None, phonetic_key=None,
+            is_registered_agent_hub=False, rooftop_address=None,
+        )
+        too_long.country_iso3 = too_long_iso
+        return _finish(too_long)
 
     # Tier 0: Pre-Flight Sanity, Multiline Bleed Recovery, & Unicode NFKC Normalization
     s1_cand = street1 if street1 is not None else kwargs.get("street")
@@ -342,8 +379,10 @@ def standardize_address(
                         s2_in = sline
                     elif sline_u not in s2_in.upper():
                         s2_in = f"{s2_in} {sline}".strip()
-                elif re.search(r"\bOFFICE\b", sline_u) and any(word in sline_u for word in (city_in.upper(), "OFFICE", "BRANCH", "MAIN")):
-                    pass
+                elif re.fullmatch(r"(?:(?:MAIN|BRANCH|HOME|HEAD|CORPORATE|REGIONAL)\s+)?OFFICE", sline_u) or (
+                    city_in and re.fullmatch(re.escape(city_in.upper()) + r"\s+(?:(?:MAIN|BRANCH)\s+)?OFFICE", sline_u)
+                ):
+                    pass  # a bare office label line, not a street line that merely contains the word
                 else:
                     cleaned_s1_parts.append(sline)
             if cleaned_s1_parts:
@@ -366,6 +405,10 @@ def standardize_address(
 
     s1_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', s1_in)).strip()
     s2_raw = re.sub(r"[\r\n\t]+", " ", unicodedata.normalize('NFKC', s2_in)).strip()
+    s1_raw = normalize_po_box_spelling(s1_raw)
+    s2_raw = normalize_po_box_spelling(s2_raw)
+    if s2_raw.upper() in _GARBAGE_TOKENS and s1_raw:
+        s2_raw = ""  # a placeholder in street2 next to a real street must not leak into the key
     s1_raw = clean_repetitive_cycles(s1_raw)
     s1_raw = RE_GLUED_HOUSE_NUM.sub(r"\1 \2", s1_raw)
     if s2_raw:
@@ -514,8 +557,7 @@ def standardize_address(
                         zip5 = healed_zip
 
         # Detect private residence indicators
-        raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
-        is_priv = bool(RE_PRIVATE_RESIDENCE.search(raw_combined_upper))
+        is_priv = is_privacy_placeholder(s1_raw, s2_raw)
         if is_priv:
             norm_s1 = "PRIVATE RESIDENCE"
             norm_s2 = ""
@@ -599,8 +641,7 @@ def standardize_address(
         norm_s2 = ""
         dep_loc = None
         bldg_name = None
-        raw_combined_upper = f"{s1_raw} {s2_raw} {raw_street_address}".upper()
-        is_priv = bool(RE_PRIVATE_RESIDENCE.search(raw_combined_upper))
+        is_priv = is_privacy_placeholder(s1_raw, s2_raw)
         if is_priv:
             norm_s1 = "PRIVATE RESIDENCE"
             norm_s2 = ""
