@@ -28,12 +28,13 @@ def ensure_engine_reset():
     reset_engine()
 
 
-def test_capabilities_and_wasm_flag():
+def test_capabilities_describe_what_is_really_accelerated():
     caps = get_capabilities()
     assert "version" in caps
     if is_native_available():
-        assert caps.get("wasm_capable") is True
         assert caps.get("engine") == "Rust_PyO3"
+        assert caps.get("native_functions") == ["compute_soundex"]
+        assert "wasm_capable" not in caps  # there is no wasm build, so it is not advertised
 
 
 def test_canonicalize_suffix_dispatch():

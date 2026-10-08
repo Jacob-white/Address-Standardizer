@@ -91,3 +91,6 @@ ignore = ["E501"]
 # Scripts and optional-dependency tests set sys.path / call importorskip before importing.
 "benchmarks/*.py" = ["E402"]
 "tests/test_arrow_duckdb.py" = ["E402"]
+
+[tool.maturin]
+features = ["extension-module"]

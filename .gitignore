@@ -62,3 +62,6 @@ obj/
 
 # Local agent state
 .claude/
+
+# Rust build output
+target/

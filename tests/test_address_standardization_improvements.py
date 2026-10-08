@@ -664,15 +664,14 @@ def test_native_rust_core_availability_and_dispatch():
     snd = _address_standardizer_rs.compute_soundex("MAIN")
     assert snd == "M500"
 
-    # Parity across native, pure python core, and dispatch for key generation with allow_locality=True
+    # Everything the extension does not implement falls back to the Python reference, so the dispatcher gives the
+    # same keys whether or not the extension is installed.
     from address_standardizer import _pure_python_core, _native_dispatch
-    k_rs = _address_standardizer_rs.generate_keys(city="Charlotte", state="NC", allow_locality=True)
     k_py = _pure_python_core.generate_keys(city="Charlotte", state="NC", allow_locality=True)
     k_disp = _native_dispatch.generate_keys_dispatch(city="Charlotte", state="NC", allow_locality=True)
 
-    assert k_rs == ("||CHARLOTTE|NC||USA", "||CHARLOTTE|NC||USA", None)
-    assert k_py == k_rs
-    assert k_disp == k_rs
+    assert k_py == ("||CHARLOTTE|NC||USA", "||CHARLOTTE|NC||USA", None)
+    assert k_disp == k_py
 
 
 def test_intersection_cross_street_standardization():

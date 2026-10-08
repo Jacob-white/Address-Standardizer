@@ -102,6 +102,18 @@ def get_active_engine() -> Any:
     return _pure_python_core
 
 
+def _native_function_names() -> List[str]:
+    """Names the loaded native module reports as accelerated (empty if it does not say)."""
+    if _NATIVE_MODULE is None or not hasattr(_NATIVE_MODULE, "get_capabilities"):
+        return []
+    try:
+        return list(dict(_NATIVE_MODULE.get_capabilities()).get("native_functions", []))
+    except BaseException as exc:  # noqa: BLE001 - PanicException is not an Exception subclass
+        if _is_fatal(exc):
+            raise
+        return []
+
+
 def get_engine_info() -> Dict[str, Any]:
     """Returns dictionary detailing engine metadata, active status, and SLA capabilities."""
     using_native = is_using_native()
@@ -111,9 +123,11 @@ def get_engine_info() -> Dict[str, Any]:
         "native_available": _NATIVE_AVAILABLE,
         "force_pure_python": _FORCE_PURE_PYTHON,
         "version": "3.3.0",
-        "throughput_sla_target": ">= 50,000 rec/s" if using_native else ">= 2,000 rec/s",
-        "simd_acceleration": using_native,
-        "zero_copy_slices": using_native,
+        # The native module only accelerates the functions listed here; parsing and key assembly are Python in both modes.
+        "native_functions": _native_function_names() if using_native else [],
+        "throughput_sla_target": ">= 2,000 rec/s",
+        "simd_acceleration": False,
+        "zero_copy_slices": False,
     }
 
 

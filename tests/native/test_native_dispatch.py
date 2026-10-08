@@ -134,9 +134,9 @@ class TestNativeDispatchWithMockExtension:
         assert info["engine"] == "Rust_PyO3"
         assert info["is_native"] is True
         assert info["native_available"] is True
-        assert info["throughput_sla_target"] == ">= 50,000 rec/s"
-        assert info["simd_acceleration"] is True
-        assert info["zero_copy_slices"] is True
+        assert info["throughput_sla_target"] == ">= 2,000 rec/s"  # no unmeasured speed-up claims
+        assert info["simd_acceleration"] is False
+        assert info["zero_copy_slices"] is False
 
         # Test dispatched calls route to native
         assert _native_dispatch.standardize_record_dispatch(street1="Test") == dummy_std
