@@ -29,7 +29,7 @@ pnpm add @address-standardizer/client
 ### Usage (TypeScript / Node.js)
 
 ```typescript
-import { AddressStandardizerClient } from "@address-standardizer/client";
+import { AddressStandardizerClient, isStreamError } from "@address-standardizer/client";
 
 const client = new AddressStandardizerClient({
   baseUrl: "http://localhost:8000",
@@ -55,8 +55,13 @@ const batch = await client.standardizeBatch({
 });
 
 // Stream large batches as NDJSON
+// (the stream also yields per-record error objects; narrow them with isStreamError)
 for await (const record of client.streamBatch(["100 Main St, Austin, TX"])) {
-  console.log(record.street1);
+  if (isStreamError(record)) {
+    console.error(`record ${record.index} failed: ${record.error}`);
+  } else {
+    console.log(record.street1);
+  }
 }
 ```
 
