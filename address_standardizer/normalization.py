@@ -52,6 +52,43 @@ _US_STATE_NAMES = sorted((k for k in US_STATES if len(k) > 2 and k.replace(" ", 
 _RE_STATE_NAME_ZIP = re.compile(
     r"(?:^|[,\s])(?:" + "|".join(re.escape(n) for n in _US_STATE_NAMES) + r")\s+\d{5}(?:-\d{4})?\s*$"
 )
+# Australian "<STATE> <4-digit postcode>" tail ("Sydney NSW 2000"); WA is also a US state but a US ZIP has 5 digits.
+_RE_AU_STATE_POSTCODE = re.compile(r"(?:^|[,\s])(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\s+\d{4}\s*$")
+
+
+_RE_TRAILING_CAN_PROVINCE = re.compile(r",\s*(?:ON|QC|BC|AB|MB|SK|NS|NB|NL|PE|NT|YT|NU)\s*$")
+UNKNOWN_COUNTRY = "ZZZ"  # ISO 3166 user-assigned code, used when a supplied country name cannot be resolved
+_COUNTRY_PLACEHOLDERS = frozenset(
+    {"N/A", "N.A.", "N.A", "NONE", "NULL", "NIL", "UNKNOWN", "UNK", "NOT AVAILABLE", "NOT APPLICABLE", "-", "--", "?", "TBD"}
+)
+# A bare "NA" is Namibia's ISO code and is deliberately not a placeholder.
+
+
+def _drop_from_first_numeric_token(text: str) -> str:
+    """"LEEDS 4 EXTRA" -> "LEEDS": everything from the first digit-initial word (after the first word) onwards is dropped.
+
+    Linear-time replacement for the regex ``\\s+\\d+.*$``, which backtracks quadratically on long whitespace runs.
+    """
+    words = text.split()
+    for i, word in enumerate(words):
+        if i > 0 and word[:1].isdigit():
+            return " ".join(words[:i])
+    return text.strip()
+
+
+_RE_CROWN_POSTCODE = re.compile(r"\b(JE|GY|IM)\d[A-Z0-9]?\s*\d[A-Z]{2}\b")
+_CROWN_PREFIX_ISO = {"JE": "JEY", "GY": "GGY", "IM": "IMN"}
+_CROWN_NAME_ISO = {"JERSEY": "JEY", "GUERNSEY": "GGY", "ISLE OF MAN": "IMN"}
+
+
+def _crown_dependency_code(text: str) -> Optional[str]:
+    """JE/GY/IM postcode or a trailing Jersey/Guernsey/Isle of Man country name -> JEY/GGY/IMN."""
+    up = text.upper()
+    m = _RE_CROWN_POSTCODE.search(up)
+    if m:
+        return _CROWN_PREFIX_ISO[m.group(1)]
+    last = up.split(",")[-1].strip()
+    return _CROWN_NAME_ISO.get(last)
 
 
 def normalize_country_code(
@@ -63,6 +100,9 @@ def normalize_country_code(
 ) -> str:
     """Resolve country to ISO-3166-1 alpha-3 code, defaulting to USA if state is a US state or CAN if Canadian province."""
     country_cand = ""
+    if country_raw and country_raw.strip().upper() in _COUNTRY_PLACEHOLDERS:
+        country_raw = None  # "N/A", "none", "unknown": a missing country, not a country called N/A (Namibia)
+    country_supplied = bool(country_raw and country_raw.strip())
     if country_raw:
         c_clean = country_raw.strip().upper()
         c_clean_alphanumeric = RE_NON_ALPHANUMERIC.sub("", c_clean)
@@ -112,7 +152,7 @@ def normalize_country_code(
         c_clean = RE_NON_ALPHANUMERIC.sub(" ", city_raw).strip().upper()
         c_clean = " ".join(c_clean.split())
         candidates = [c_clean]
-        c_no_num = re.sub(r"\s+\d+.*$", "", c_clean).strip()
+        c_no_num = _drop_from_first_numeric_token(c_clean)
         if c_no_num and c_no_num != c_clean:
             candidates.append(c_no_num)
         c_no_lead = re.sub(r"^\d+\s+", "", c_clean).strip()
@@ -139,16 +179,22 @@ def normalize_country_code(
         if RE_CAN_POSTCODE.match(p_clean):
             return "CAN"
         if RE_UK_POSTCODE.match(p_clean):
-            return "GBR"
+            return _crown_dependency_code(p_clean) or "GBR"
 
     # Scan raw single string for international indicators
     if raw_street:
         st_clean = raw_street.upper()
         if "CAYMAN" in st_clean:
             return "CYM"
+        crown = _crown_dependency_code(st_clean)
+        if crown:
+            return crown
         if RE_UK_POSTCODE.search(st_clean) or st_clean.endswith(", UK") or st_clean.endswith(" UK") or "UNITED KINGDOM" in st_clean:
             return "GBR"
         if RE_CAN_POSTCODE.search(st_clean) or st_clean.endswith(", CANADA") or st_clean.endswith(" CANADA"):
+            return "CAN"
+        # "..., Toronto, ON": a trailing comma-separated Canadian province code (none of these is a US state code).
+        if _RE_TRAILING_CAN_PROVINCE.search(st_clean):
             return "CAN"
         m_sz = RE_STATE_ZIP.search(st_clean)
         if m_sz and m_sz.group(1).upper() in FROZEN_US_STATE_CODES:
@@ -157,6 +203,8 @@ def normalize_country_code(
         # city (Poland, Denmark, Holland, Peru) or the state (Georgia) is also a country name.
         if _RE_STATE_NAME_ZIP.search(st_clean):
             return "USA"
+        if _RE_AU_STATE_POSTCODE.search(st_clean):
+            return "AUS"
 
         # Check if address ends with a US state code/name (or US state before country)
         # BEFORE scanning raw components against COUNTRY_MAP to prevent domestic namesake cities
@@ -256,6 +304,9 @@ def normalize_country_code(
                 if p_no_lead in COUNTRY_MAP and COUNTRY_MAP[p_no_lead] != "USA":
                     return COUNTRY_MAP[p_no_lead]
 
+    if country_supplied and not country_cand:
+        # A country was given but nothing recognises it and nothing else points to the US: do not silently call it USA.
+        return UNKNOWN_COUNTRY
     return "USA"
 
 

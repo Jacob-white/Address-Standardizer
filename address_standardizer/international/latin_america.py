@@ -22,6 +22,13 @@ from address_standardizer.international.base import (
 from address_standardizer.international.diacritics import (
     normalize_to_canonical_unicode,
 )
+from address_standardizer.international.romance import (
+    _SEC_END,
+    extract_units_from_part,
+    make_strict_sec_regex,
+    merge_units,
+    parse_street2_unit,
+)
 from address_standardizer.tables import COUNTRY_MAP, GLOBAL_METRO_TO_COUNTRY
 
 # Road type abbreviations for Latin America (Spanish & Portuguese)
@@ -91,10 +98,13 @@ RE_MANZANA_LOTE = re.compile(
 )
 
 # Secondary unit indicators (Int, Ext, Piso, Depto, Apto, Bloco, Torre, etc.)
-RE_LATAM_SEC = re.compile(
-    r"\b(INT|INTERIOR|EXT|EXTERIOR|DEPTO|DEPARTAMENTO|DPTO|PISO|ESC|APTO|APT|APARTAMENTO|SUITE|STE|UNIT|BLOCO|BL|SALA|CONJUNTO|CONJ|OFICINA|OF|TORRE|EDIF|EDIFICIO)\.?\s*([A-Za-z0-9\-]+)?",
-    re.IGNORECASE,
+# Keywords are whole words: "INT" never matches inside "Internacional", "ESC" never inside "Escuela".
+_LATAM_SEC_TYPES = (
+    r"INTERIOR|INT|EXTERIOR|EXT|DEPARTAMENTO|DEPTO|DPTO|PISO|ESC|APARTAMENTO|APTO|APT|SUITE|STE|UNIT|BLOCO|BL"
+    r"|SALA|CONJUNTO|CONJ|OFICINA|OF|TORRE|EDIFICIO|EDIF"
 )
+RE_LATAM_SEC = re.compile(rf"(?<!\w)({_LATAM_SEC_TYPES}){_SEC_END}([A-Za-z0-9\-]+)?", re.IGNORECASE)
+RE_LATAM_SEC_STRICT = make_strict_sec_regex(_LATAM_SEC_TYPES)
 
 # Floor/door like 2º B, 2o B, 2ª B, 2° B
 # The ordinal marker is º/ª/° (optionally spaced) or a lowercase "o" glued to the number ("2o B"); a letter "o"
@@ -187,6 +197,7 @@ class LatinAmericaGrammar(CountryGrammar):
 
         unit_type: Optional[str] = None
         unit_number: Optional[str] = None
+        sec_units: List[str] = []
         dep_locality: Optional[str] = None
         street_line = s1_raw
 
@@ -200,7 +211,6 @@ class LatinAmericaGrammar(CountryGrammar):
                 country_iso = self._resolve_country_iso(parts_comma[-1])
                 parts_comma = parts_comma[:-1]
 
-            sec_units: List[str] = []
             rem_parts: List[str] = []
             for part in parts_comma:
                 # Check for Colonia / Barrio
@@ -216,15 +226,9 @@ class LatinAmericaGrammar(CountryGrammar):
                     continue
 
                 # Check for secondary units: "Int. 401", "Piso 4", "Depto B", "Apt 12"
-                m_sec = RE_LATAM_SEC.search(part)
-                m_fd = RE_FLOOR_DOOR.search(part)
-                if m_sec:
-                    sec_t = m_sec.group(1).upper()
-                    sec_n = m_sec.group(2) or ""
-                    sec_units.append(f"{sec_t} {sec_n.upper()}".strip())
-                    continue
-                elif m_fd:
-                    sec_units.append(f"{m_fd.group(1)} {m_fd.group(2).upper()}")
+                part, found_units = extract_units_from_part(part, RE_LATAM_SEC, RE_LATAM_SEC_STRICT)
+                sec_units.extend(found_units)
+                if not part:
                     continue
 
                 # Check if entire part is a postal code
@@ -237,10 +241,6 @@ class LatinAmericaGrammar(CountryGrammar):
                     continue
 
                 rem_parts.append(part)
-
-            if sec_units:
-                unit_number = " ".join(sec_units)
-                unit_type = None
 
             if len(rem_parts) >= 2:
                 last_p = rem_parts[-1]
@@ -327,25 +327,10 @@ class LatinAmericaGrammar(CountryGrammar):
                     street_line = rem_parts[0]
 
         # Handle secondary units in s2_raw or embedded in street_line
-        if s2_raw and not unit_number:
-            m_fd = RE_FLOOR_DOOR.search(s2_raw)
-            m_secs = list(RE_LATAM_SEC.finditer(s2_raw))
-            if "," not in s2_raw and len(m_secs) > 1:
-                sec_items = []
-                for m in m_secs:
-                    sec_t = m.group(1).upper()
-                    sec_n = m.group(2) or ""
-                    sec_items.append(f"{sec_t} {sec_n.upper()}".strip())
-                unit_number = " ".join(sec_items)
-                unit_type = None
-            elif m_fd:
-                unit_number = f"{m_fd.group(1)} {m_fd.group(2).upper()}"
-            elif m_secs:
-                m_sec = m_secs[0]
-                unit_type = m_sec.group(1).upper()
-                unit_number = m_sec.group(2).upper() if m_sec.group(2) else None
-            else:
-                unit_number = s2_raw.strip().upper()
+        s2_type: Optional[str] = None
+        s2_number: Optional[str] = None
+        if s2_raw:
+            s2_type, s2_number = parse_street2_unit(s2_raw, RE_LATAM_SEC)
 
         # Check for Brazil " - " separator (e.g. "Avenida Paulista, 1578 - Bela Vista")
         if " - " in street_line:
@@ -354,19 +339,20 @@ class LatinAmericaGrammar(CountryGrammar):
             if not dep_locality:
                 dep_locality = p_dash[1].strip()
 
+        # A unit written at the end of the street line ("Avenida Estela 100 Int 4") or a floor/door ("2º B")
+        street_line, inline_units = extract_units_from_part(
+            street_line, RE_LATAM_SEC_STRICT, RE_LATAM_SEC_STRICT, allow_whole=False
+        )
+        sec_units.extend(inline_units)
         st1_base, st2_base = split_intl_secondary_unit(street_line, "")
-        if st2_base and not unit_number:
-            s2_p = st2_base.split(maxsplit=1)
-            unit_type = s2_p[0]
-            unit_number = s2_p[1] if len(s2_p) > 1 else None
-
-        # Check floor/door in st1_base
-        m_fd_inline = RE_FLOOR_DOOR.search(st1_base)
-        if m_fd_inline:
-            if not unit_number:
-                unit_number = f"{m_fd_inline.group(1)} {m_fd_inline.group(2).upper()}"
-            st1_base = st1_base[:m_fd_inline.start()] + st1_base[m_fd_inline.end():]
-            st1_base = st1_base.strip(" ,.-")
+        if st2_base and not (sec_units or s2_type or s2_number):
+            st2_parts = st2_base.split(maxsplit=1)
+            unit_type = st2_parts[0]
+            unit_number = st2_parts[1] if len(st2_parts) > 1 else None
+        else:
+            if st2_base:
+                sec_units.append(st2_base)
+            unit_type, unit_number = merge_units(sec_units, s2_type, s2_number)
 
         # Normalize thoroughfare
         _, st_num, thoroughfare = self.extract_premise_and_thoroughfare(st1_base)

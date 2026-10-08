@@ -513,6 +513,21 @@ def standardize_address(
         raw_street=raw_street_address,
         city_raw=city_raw,
     )
+    if not country_raw:
+        from address_standardizer.international.scripts import (
+            country_matches_script,
+            detect_script_country,
+            split_script_single_line,
+        )
+
+        _script_iso = detect_script_country(raw_street_address)
+        if _script_iso:
+            if not country_matches_script(country_iso, _script_iso):
+                country_iso = _script_iso
+            if not (city_raw or state_raw or postal_raw):
+                _script_split = split_script_single_line(s1_raw, country_iso)
+                if _script_split:
+                    s1_raw, city_raw, state_raw, postal_raw = _script_split
     is_us = country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
 
     # Strip terminal sovereign country before US or international parsing if structured components present

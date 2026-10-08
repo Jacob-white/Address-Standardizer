@@ -601,7 +601,7 @@ address-standardizer audit --list --status PENDING      # PENDING | APPROVED | M
 address-standardizer audit --export json                # json | sql | dict
 address-standardizer audit --clear
 ```
-`parse --audit` embeds the audit record in its output and `batch --audit-csv` writes them to a CSV. In a fresh process `audit --list` currently prints `[]` even after a separate `parse --audit` run, so do not rely on the CLI ledger persisting between invocations. There is no `audit --summary` flag.
+`parse --audit` embeds the audit record in its output and `batch --audit-csv` writes them to a CSV. The default ledger is in memory, so `audit --list` in a new process prints `[]`; pass `--audit-db PATH` (or set `ADDRESS_STANDARDIZER_AUDIT_DB`) to both `parse --audit` and `audit` to persist records in a SQLite file. There is no `audit --summary` flag.
 
 ---
 

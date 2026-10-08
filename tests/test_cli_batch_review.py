@@ -66,3 +66,11 @@ def test_server_rejects_non_object_ndjson_lines_and_counts_addresses():
     assert lines[0]["street1"] == "100 WALL ST"
     metrics = client.get("/metrics").json()
     assert metrics["total_addresses_processed"] >= 3
+
+
+def test_audit_records_persist_between_cli_invocations_with_audit_db(tmp_path):
+    db = str(tmp_path / "audit.db")
+    assert _cli("parse", "1 Main St, Austin TX 78701", "--audit", "--audit-db", db).returncode == 0
+    listed = json.loads(_cli("audit", "--list", "--audit-db", db).stdout)
+    assert len(listed) == 1 and listed[0]["action_type"]
+    assert json.loads(_cli("audit", "--list").stdout) == []  # the default ledger is per-process

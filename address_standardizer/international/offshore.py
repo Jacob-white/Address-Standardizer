@@ -14,6 +14,7 @@ from address_standardizer.international.base import (
     ParsedAddressComponents,
     split_intl_secondary_unit,
 )
+from address_standardizer.international.uk import split_po_box_unit
 from address_standardizer.international.diacritics import normalize_to_canonical_unicode
 from address_standardizer.tables import COUNTRY_MAP, DIRECTIONALS, STREET_SUFFIXES
 
@@ -163,6 +164,10 @@ class OffshoreGrammar(CountryGrammar):
         unit_type: Optional[str] = None
         unit_number: Optional[str] = None
         building_name: Optional[str] = None
+        if s1_raw and not s2_raw:
+            po_split = split_po_box_unit(s1_raw)
+            if po_split:
+                s1_raw, s2_raw = po_split
         street_line = s1_raw
 
         # Handle comma-delimited single string when city_raw is empty
@@ -199,7 +204,8 @@ class OffshoreGrammar(CountryGrammar):
                 rem_parts.append(part)
 
             if len(rem_parts) >= 3:
-                if rem_parts[-1].upper() in ("TORTOLA", "GRAND CAYMAN"):
+                prev_is_street = bool(re.match(r"^\d", rem_parts[-2]))  # "15 Harbour Drive, Grand Cayman"
+                if rem_parts[-1].upper() in ("TORTOLA", "GRAND CAYMAN") and not prev_is_street:
                     state_raw = rem_parts[-1]
                     city_raw = rem_parts[-2]
                     street_line = ", ".join(rem_parts[:-2])
@@ -234,6 +240,7 @@ class OffshoreGrammar(CountryGrammar):
         if "CHURCH" in street_line.upper():
             st1_base = self._normalize_street_tokens(street_line)
 
+        po_box_line: Optional[str] = None
         if st2_base:
             if not unit_number:
                 m_box_s2 = RE_OFFSHORE_PO_BOX.search(st2_base)
@@ -248,6 +255,14 @@ class OffshoreGrammar(CountryGrammar):
                     s2_p = st2_base.split(maxsplit=1)
                     unit_type = s2_p[0]
                     unit_number = s2_p[1] if len(s2_p) > 1 else None
+            elif not st1_base.strip() and not unit_type and RE_OFFSHORE_PO_BOX.fullmatch(st2_base.strip()):
+                # A bare PO box line plus a separate unit ("PO Box 309" + "Suite 100"): the box is the delivery line
+                # and the unit stays secondary (same shape as the UK/Canada/Australia).
+                po_box_line = f"PO BOX {RE_OFFSHORE_PO_BOX.fullmatch(st2_base.strip()).group(1).upper()}"
+                _, unit_norm = split_intl_secondary_unit("", unit_number)
+                u_parts = (unit_norm or unit_number).split(maxsplit=1)
+                unit_type = u_parts[0] if len(u_parts) > 1 else None
+                unit_number = u_parts[1] if len(u_parts) > 1 else u_parts[0]
             else:
                 if unit_type:
                     unit_number = f"{st2_base}, {unit_type} {unit_number}".strip()
@@ -270,6 +285,8 @@ class OffshoreGrammar(CountryGrammar):
             st1_base = st1_base.strip(" ,.-")
 
         premise, st_num, st_name = self.extract_premise_and_thoroughfare(st1_base)
+        if po_box_line:
+            premise, st_num, st_name = None, None, po_box_line
         if not building_name:
             building_name = premise
 

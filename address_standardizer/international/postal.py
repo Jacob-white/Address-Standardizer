@@ -222,7 +222,7 @@ _RE_UK_EXACT = re.compile(
     re.IGNORECASE,
 )
 _RE_NLD_EXACT = re.compile(
-    r"^(\d{4})\s*([A-Z]{2})$",
+    r"^([1-9]\d{3})\s*([A-Z]{2})$",  # PostNL: first digit 1-9 (no leading zero)
     re.IGNORECASE,
 )
 
@@ -315,7 +315,7 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "AIA": _rule("AIA", r"^AI-?2640$", 4, 7, allows_alnum=True, desc="AI-2640", example="AI-2640"),
     "BES": _rule("BES", r"^\d{4}$", 4, 4, desc="4 digits", example="1234"),
     "BLM": _rule("BLM", r"^97133$", 5, 5, desc="5 digits (97133)", example="97133"),
-    "BMU": _rule("BMU", r"^[A-Z]{2}\s?[A-Z0-9]{2}$", 4, 4, allows_alnum=True, format_fn=_format_bermuda, desc="2 letters + 2 alphanumerics", example="HM 11"),
+    "BMU": _rule("BMU", r"^(?:[A-Z]{2}\s?\d{2}|HM\s?[A-Z]X)$", 4, 4, allows_alnum=True, format_fn=_format_bermuda, desc="2 letters + 2 digits (area codes are not whitelisted: published lists disagree), or the Hamilton P.O. Box form HM <letter>X", example="HM 11"),
     "BRB": _rule("BRB", r"^BB\d{5}$", 7, 7, allows_alnum=True, desc="BB + 5 digits", example="BB11000"),
     "CUB": _rule("CUB", r"^(?:CP\s*)?\d{5}$", 5, 5, desc="5 digits", example="10100"),
     "CUW": _rule("CUW", r"^\d{4}$", 4, 4, desc="4 digits", example="1234"),
@@ -371,7 +371,7 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "ITA": _rule("ITA", r"^\d{5}$", 5, 5, prefixes=("I-", "IT-", "ITA-"), desc="5 digits", example="00185"),
     "ESP": _rule("ESP", r"^(?:0[1-9]|[1-4]\d|5[0-2])\d{3}$", 5, 5, prefixes=("E-", "ES-", "ESP-"), desc="5 digits (01000-52999)", example="28001"),
     "NLD": _rule(
-        "NLD", r"^\d{4}\s*[A-Z]{2}$", 6, 6, allows_alnum=True,
+        "NLD", r"^[1-9]\d{3}\s*[A-Z]{2}$", 6, 6, allows_alnum=True,
         format_fn=_format_netherlands, prefixes=("NL-", "NLD-"),
         desc="4 digits + 2 letters", example="1012 JS",
     ),
@@ -384,7 +384,7 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "FIN": _rule("FIN", r"^\d{5}$", 5, 5, prefixes=("FI-", "FIN-"), desc="5 digits", example="00100"),
     "POL": _rule("POL", r"^\d{2}-?\d{3}$", 5, 5, format_fn=_format_poland, prefixes=("PL-", "POL-"), desc="5 digits (2+3)", example="00-950"),
     "PRT": _rule("PRT", r"^\d{4}(?:-?\d{3})?$", 4, 7, format_fn=_format_portugal, prefixes=("P-", "PT-", "PRT-"), desc="4 or 7 digits (4+3)", example="1000-001"),
-    "IRL": _rule("IRL", r"^[A-Za-z]\d[0-9A-Za-z]\s?[0-9A-Za-z]{4}$", 7, 7, allows_alnum=True, format_fn=_format_ireland, desc="Eircode 7 chars", example="D02 X285"),
+    "IRL": _rule("IRL", r"^(?:[AC-FHKNPRTV-Y]\d{2}|D6W)\s?[0-9AC-FHKNPRTV-Y]{4}$", 7, 7, allows_alnum=True, format_fn=_format_ireland, desc="Eircode: routing key (letter from ACDEFHKNPRTVWXY + 2 digits, or D6W) + 4 characters from 0-9ACDEFHKNPRTVWXY", example="D02 X285"),
     "CZE": _rule("CZE", r"^\d{3}\s?\d{2}$", 5, 5, format_fn=_format_czech_slovak, prefixes=("CZ-", "CZE-"), desc="5 digits (3+2)", example="110 00"),
     "SVK": _rule("SVK", r"^\d{3}\s?\d{2}$", 5, 5, format_fn=_format_czech_slovak, prefixes=("SK-", "SVK-"), desc="5 digits (3+2)", example="811 01"),
     "HUN": _rule("HUN", r"^[1-9]\d{3}$", 4, 4, prefixes=("H-", "HU-", "HUN-"), desc="4 digits", example="1011"),

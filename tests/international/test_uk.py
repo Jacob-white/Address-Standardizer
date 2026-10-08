@@ -316,15 +316,15 @@ def test_uk_crown_dependencies_and_s2_building_names():
 
     # Crown dependencies single-line country ISO resolution
     res_jey = standardize_address("12 King Street, St Helier, JE2 3XX, Jersey")
-    assert res_jey.country == "GBR"
+    assert res_jey.country == "JEY"
     assert res_jey.street1 == "12 KING ST"
 
     res_ggy = standardize_address("8 Queen Street, St Peter Port, GY1 2YY, Guernsey")
-    assert res_ggy.country == "GBR"
+    assert res_ggy.country == "GGY"
     assert res_ggy.street1 == "8 QUEEN ST"
 
     res_imn = standardize_address("14 Bank Street, Douglas, IM1 1ZZ, Isle of Man")
-    assert res_imn.country == "GBR"
+    assert res_imn.country == "IMN"
     assert res_imn.street1 == "14 BANK ST"
 
     # s2_raw with unit and building name

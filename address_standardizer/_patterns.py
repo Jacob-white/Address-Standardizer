@@ -24,7 +24,6 @@ from address_standardizer.tables import (
 RE_CLEAN_TOKEN = re.compile(r"^[,\.#;:\-]+|[,\.#;:\-]+$")
 RE_WHITESPACE = re.compile(r"\s+")
 RE_NON_ALPHANUMERIC = re.compile(r"[^\w\s]")
-RE_NON_DIGITS = re.compile(r"[^\d]")
 RE_PUNCTUATION_SPLIT = re.compile(r"[,\.;:#]+")
 
 # Tier 1 Fast-Path Regexes
@@ -36,12 +35,8 @@ RE_CANONICAL_COMMA = re.compile(
 
 # State and ZIP matching
 RE_STATE_ZIP = re.compile(r"\b([A-Z]{2})(?:,\s*|\s+)(\d{5}(?:-\d{4})?)\b", re.IGNORECASE)
-RE_TERMINAL_ZIP = re.compile(r"\b(\d{5})(?:-(\d{4}))?\b$")
-
 # PO Box
 RE_PO_BOX = re.compile(r"\b(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+(\d[A-Z0-9\-]*|[A-Z](?![A-Z]))\b", re.IGNORECASE)
-RE_PO_BOX_START = re.compile(r"^(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+(\d[A-Z0-9\-]*|[A-Z](?![A-Z]))", re.IGNORECASE)
-
 # Secondary Units
 RE_SEC_UNIT = re.compile(
     r"\b(SUITE|STE|SUIT|UNIT|UNT|APT|APARTMENT|APPT|FLOOR|FL|FLR|ROOM|RM|BLDG|BUILDING|BLD|"
@@ -56,11 +51,7 @@ RE_PMB = re.compile(r"\b(?:PMB|PRIVATE\s+MAILBOX)\s*#?\s*([A-Z0-9\-]+)\b", re.IG
 
 # Queens borough hyphenation vs street range vs attached secondary unit
 RE_QUEENS_BOROUGH = re.compile(r"^(\d+-\d+)\s+([A-Za-z].*)$")
-RE_FRACTIONAL_HOUSE = re.compile(r"^(\d+)\s+(1/2|1/4|3/4|[A-Z])\b", re.IGNORECASE)
-
 # Suffix-attached secondary unit (e.g. "Main St-4B")
-RE_ATTACHED_SEC_UNIT = re.compile(r"^([A-Z0-9\s]+?)-(?:STE|APT|UNIT|FL|RM)?\s*([A-Z0-9]+)$", re.IGNORECASE)
-
 # Puerto Rico Urbanization
 RE_URBANIZATION = re.compile(
     r"\b(?:URB|URBANIZACION)\.?\s+([A-Z\s]+?)(?=\s+[A-Z]-?\d|\d|\b(?:CALLE|AVE|AVENIDA|CARR|BO|SECTOR|KM|BLQ|MZ|SOLAR|MANZANA)\b|,|$)",
@@ -92,8 +83,6 @@ RE_GLUED_UNIT = re.compile(r"\b(APT|STE|UNIT|FL)\.?(?=\d)", re.IGNORECASE)
 RE_GLUED_HOUSE_NUM = re.compile(r"^(\d+)([A-Za-z]{3,})\b")
 
 # Military Mail (APO, FPO, DPO)
-RE_MILITARY_CITY = re.compile(r"\b(APO|FPO|DPO)\b", re.IGNORECASE)
-RE_MILITARY_STATE = re.compile(r"\b(AE|AP|AA)\b", re.IGNORECASE)
 RE_MILITARY_UNIT_BOX = re.compile(
     r"^\s*((?:UNIT|PSC|CMR)\s+\d+)\s*(?:,)?\s*(BOX\s+\d+)\b",
     re.IGNORECASE,
@@ -114,7 +103,6 @@ RE_ATTACHED_SUFFIX_BARE_UNIT = re.compile(
     r"\b(ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|CIR|CIRCLE|PKWY|PARKWAY)-(\d+[A-Z0-9\-]*|[A-Z])\b",
     re.IGNORECASE,
 )
-RE_ATTACHED_SUFFIX_UNIT = RE_ATTACHED_SUFFIX_BARE_UNIT
 RE_PRIVATE_MAILBOX = re.compile(r"\bPRIVATE\s+MAILBOX\b", re.IGNORECASE)
 RE_HYPHENATED_UNIT = re.compile(r"\b(STE|SUITE|APT|UNIT|FL)-(\d+)", re.IGNORECASE)
 RE_PRIVATE_RESIDENCE = re.compile(
@@ -558,8 +546,6 @@ RE_ROUTE_PAIR = re.compile(
     r"^(?:ROUTES?|RTES?|HWYS?|STATE\s+ROUTES?|STATE\s+HWYS?)\s+([A-Z0-9\-]+)\s+(?:AND|&|\/)\s+([A-Z0-9\-]+)$",
     re.IGNORECASE,
 )
-RE_INTERSECTION_SPLIT = re.compile(r"\s+(?:AND|&|@|\/|AT)\s+", re.IGNORECASE)
-
 
 def _normalize_intersection_branch(branch: str) -> str:
     tokens = branch.split()

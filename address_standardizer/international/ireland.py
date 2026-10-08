@@ -342,6 +342,8 @@ class IrelandGrammar(CountryGrammar):
                 if p_up in IR_COUNTIES:
                     if not norm_county:
                         norm_county = IR_COUNTIES[p_up]
+                    if p_up in IR_POST_TOWNS and not p_up.startswith(("CO ", "CO.", "COUNTY ")):
+                        clean_parts.append(p)  # a bare "Cork"/"Galway" is also the city; do not lose it
                 else:
                     clean_parts.append(p)
             parts = clean_parts
@@ -430,14 +432,26 @@ class IrelandGrammar(CountryGrammar):
 
         # Normalize city
         norm_city = city_raw.strip().upper() if city_raw else ""
+        dublin_district: Optional[str] = None
         if norm_city in DUBLIN_DISTRICTS:
-            norm_city = DUBLIN_DISTRICTS[norm_city]
+            # "Dublin 1" is the city Dublin plus a postal district; the district is encoded in the Eircode routing key
+            # (D01), so it is folded into the city and only kept (as the dependent locality) when no Eircode carries it.
+            dublin_district = DUBLIN_DISTRICTS[norm_city]
+            norm_city = "DUBLIN"
+            if not norm_county:
+                norm_county = "CO DUBLIN"
         elif not norm_city and norm_county == "CO DUBLIN":
             norm_city = "DUBLIN"
         elif not norm_city and postal_raw:
             m_eir_rt = re.match(r"^([A-Za-z0-9]{3})", postal_raw)
             if m_eir_rt and m_eir_rt.group(1).upper() in IR_DUBLIN_ROUTING_KEYS:
                 norm_city = "DUBLIN"
+
+        if dublin_district:
+            m_rk = re.match(r"^([A-Za-z0-9]{3})", postal_raw or "")
+            expected_rk = "D6W" if dublin_district.endswith("6W") else f"D{int(re.sub(r'[^0-9]', '', dublin_district)[:2] or 0):02d}"
+            if not (m_rk and m_rk.group(1).upper() == expected_rk) and not dep_locality:
+                dep_locality = dublin_district
 
         # State normalization
         final_state = norm_county or (state_raw.strip().upper() if state_raw else "")

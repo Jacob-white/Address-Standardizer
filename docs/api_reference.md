@@ -79,6 +79,8 @@ standardize_address(
 Inputs are coerced to text first: `None` and NaN become empty, integral floats lose their `.0`, bytes are decoded.
 A field longer than 600 characters yields an `address_status == "parse_failed"` result.
 
+Country handling: placeholders such as `N/A`, `none` or `unknown` mean "no country given" (a bare `NA` is Namibia, its ISO code). A country name that nothing recognises is reported as `ZZZ` (ISO 3166 "user-assigned") instead of being silently turned into `USA`; US evidence such as a US state with a ZIP still wins over an unreadable country name.
+
 ```python
 >>> a = standardize_address("100 Wall St, Ste 400, New York, NY 10005")
 >>> a.normalized_address_key
@@ -385,7 +387,9 @@ autocomplete_address(query, max_results=5, state_filter=None, client_lat=None, c
 - **Audit ledger.** `get_audit_ledger() -> StewardshipAuditLedger` is a process-wide, **in-memory** ledger
   (`StewardshipAuditLedger(db_path=None, max_rows=None)`; a file-backed ledger keeps everything, the in-memory one is
   capped by `ADDRESS_STANDARDIZER_AUDIT_MAX_ROWS`, default 100000). Low-confidence results (those that route to manual
-  stewardship) create `PENDING` records automatically. Methods: `list_records(review_status=None, action_type=None,
+  stewardship) create `PENDING` records automatically. `routing_tier` describes parse/deliverability confidence, while a
+  record's `review_status` is the stewardship queue: a registered-agent hub address can be `AUTO_PASS` (it parsed and
+  verified cleanly) yet still be `PENDING` because the hub flag needs a human decision. The two are deliberately independent. Methods: `list_records(review_status=None, action_type=None,
   limit=None)`, `get_record(audit_id)`, `apply_manual_override(audit_id, steward_id, overrides, commentary="")`,
   `history(audit_id)`, `export(format="dict"|"json"|"sql")`, `clear()`. `ActionType`: `AUTO_PASS`, `AUTO_HEAL`,
   `MANUAL_OVERRIDE`, `REJECT_UNPARSEABLE`. `ReviewStatus`: `PENDING`, `APPROVED`, `MODIFIED`, `REJECTED`.
@@ -589,13 +593,13 @@ York, NY 10005"`), or, when stdin is piped, one address per line. Only `--format
 
 | Command | Synopsis |
 | :--- | :--- |
-| `parse` | `parse [address ...] [--street1 S] [--street2 S] [--city C] [--state S] [--zip Z] [--country/-c C] [--format {json,text,table,csv,upu}] [--enable-geocoding] [--spatial-db/--db PATH] [--geocode] [--cascade] [--confidence] [--audit] [--no-cache] [--correct-state-from-zip]` |
+| `parse` | `parse [address ...] [--street1 S] [--street2 S] [--city C] [--state S] [--zip Z] [--country/-c C] [--format {json,text,table,csv,upu}] [--enable-geocoding] [--spatial-db/--db PATH] [--geocode] [--cascade] [--confidence] [--audit] [--audit-db PATH] [--no-cache] [--correct-state-from-zip]` |
 | `batch` | `batch input_csv output_csv [--format {auto,csv,jsonl,ndjson,json}] [--mapping JSON_OR_FILE] [--street-col C] [--street2-col C] [--city-col C] [--state-col C] [--zip-col C] [--country-col C] [--country/-c C] [--chunk-size N] [--workers N] [--enable-geocoding] [--spatial-db/--db PATH] [--include-intl] [--geocode] [--confidence] [--audit-csv PATH] [--no-cache] [--correct-state-from-zip]` |
 | `benchmark` | `benchmark [--dataset {domestic,multi_national,all,FILE}] [--iterations N] [--format {text,json}]` |
 | `spatial build` | `spatial build [--output/--output-db/--db/--spatial-db PATH] [--openaddresses CSV] [--tiger CSV] [--osm GEOJSON]` (default output `data/spatial_index.db`) |
 | `spatial lookup` | `spatial lookup [address ...] [--address A] [--lat L --lon L [--radius METERS]] [--bbox min_lon,min_lat,max_lon,max_lat] [--min-lat/--min-lon/--max-lat/--max-lon V] [--limit N] [--spatial-db/--db PATH] [--format {json,text}]` |
 | `spatial info`, `spatial stats` | `spatial info [--spatial-db/--db PATH] [--format {text,json}]` (`stats` is an alias) |
-| `audit` | `audit [--list] [--status {PENDING,APPROVED,MODIFIED,REJECTED}] [--export {json,sql,dict}] [--clear]` |
+| `audit` | `audit [--list] [--status {PENDING,APPROVED,MODIFIED,REJECTED}] [--export {json,sql,dict}] [--clear] [--audit-db PATH]` |
 | `cache` | `cache [--stats] [--clear]` (prints stats unless `--clear`) |
 | `autocomplete` | `autocomplete QUERY [--limit 1-50] [--state S] [--format {json,text}]` (default limit 5, default format `text`) |
 | `validate-postal` | `validate-postal [code_or_text ...] [--country/-c C] [--format {json,text,table}]` (stdin supported; `-` reads stdin) |
@@ -616,8 +620,9 @@ Notes:
 - `benchmark` runs the harness in `benchmarks/run_benchmarks.py` and works only from a source checkout (not from an
   installed wheel). It needs the `benchmark` extra (`psutil`). `text` prints a throughput and accuracy report; the
   throughput SLA rows depend on the machine and can report FAIL on slow hardware.
-- `audit` operates on the process-wide in-memory ledger, which is empty at the start of every CLI process; use the
-  Python API to review a ledger populated within one process.
+- `audit` reads the default in-memory ledger, which is empty at the start of every CLI process. Pass
+  `--audit-db PATH` (or set `ADDRESS_STANDARDIZER_AUDIT_DB`) to `parse --audit` and `audit` to keep records in a SQLite
+  file that persists between invocations.
 - `cache --stats` prints the L1/L2 statistics as JSON.
 - `serve` requires the `server` extra (`uvicorn`).
 - Errors from bad paths or malformed rows print `Error: ...` to stderr and exit with status 2.
@@ -633,6 +638,7 @@ Notes:
 | `ADDRESS_STANDARDIZER_CORS_ORIGINS` | Comma-separated CORS origin allow-list; also enables credentialed CORS for those origins. | unset: `*`, no credentials |
 | `ADDRESS_STANDARDIZER_DISABLE_DOCS` | `1`, `true` or `yes` (case-insensitive) disables `/docs`, `/redoc` and `/openapi.json`. | docs on |
 | `ADDRESS_STANDARDIZER_FORCE_PURE` | `1`, `true`, `yes` or `on` disables the optional native module (read at import time). | unset |
+| `ADDRESS_STANDARDIZER_AUDIT_DB` | Path of a SQLite audit ledger used by the CLI `parse --audit` / `audit` commands when `--audit-db` is not given. | unset (in-memory) |
 | `ADDRESS_STANDARDIZER_AUDIT_MAX_ROWS` | Row cap of the default in-memory audit ledger. | `100000` |
 | `ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP` | `1`, `true`, `yes` or `on` turns on ZIP-based state correction when no explicit argument is given. The CLI flag sets it for the process. | off |
 | `ADDRESS_STANDARDIZER_ALLOW_LOCALITY` | The value `1` makes every `standardize_address` call allow locality-only results. | off |

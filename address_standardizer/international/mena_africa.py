@@ -159,7 +159,8 @@ class MenaAfricaGrammar(CountryGrammar):
             return None, plt_num, line.upper() if line.isascii() else line
 
         # Number-first: "7543 King Fahd Road", "100 Sandton Drive"
-        m_num = RE_NUM_FIRST.match(line)
+        # Collapse whitespace first: single spaces cannot trigger the regex's quadratic backtracking on long runs.
+        m_num = RE_NUM_FIRST.match(" ".join(line.split()))
         if m_num:
             st_num = m_num.group(1).strip()
             thoroughfare = m_num.group(2).strip()

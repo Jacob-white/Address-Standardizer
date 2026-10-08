@@ -368,6 +368,15 @@ def print_report(results: Dict[str, Any]) -> None:
     print(f"{'Metric / SLA Dimension':<35} | {'Observed Value':<18} | {'SLA Threshold':<17} | {'Status'}")
     print("-" * 90)
 
+    # Throughput/latency/memory thresholds are for developer-class hardware; slower machines set
+    # ADDRESS_STANDARDIZER_SLA_SCALE (e.g. 0.6) exactly as the test suite does.
+    try:
+        scale = float(os.environ.get("ADDRESS_STANDARDIZER_SLA_SCALE", "1.0"))
+    except ValueError:
+        scale = 1.0
+    if scale != 1.0:
+        print(f"(performance thresholds scaled by ADDRESS_STANDARDIZER_SLA_SCALE={scale})")
+
     # Check SLA items
     if acc_dom:
         dom_stat = "PASS" if acc_dom["overall_accuracy_pct"] >= 99.50 else "FAIL"
@@ -382,19 +391,19 @@ def print_report(results: Dict[str, Any]) -> None:
         print(f"{'Golden Parsing Accuracy':<35} | {acc['overall_accuracy_pct']:>6.2f}%            | {'>= 99.50%':<17} | {acc_stat} [{acc['total_passed']}/{acc['total_records']}]")
 
     struct_tp = perf["structured"]["throughput_rec_sec"]
-    struct_stat = "PASS" if struct_tp >= 50000.0 else "FAIL"
+    struct_stat = "PASS" if struct_tp >= 50000.0 * scale else "FAIL"
     print(f"{'Clean Structured Throughput':<35} | {struct_tp:>10,.0f} rec/s     | {'>= 50,000 rec/s':<17} | {struct_stat}")
 
     mixed_tp = perf["mixed_golden"]["throughput_rec_sec"]
-    mixed_stat = "PASS" if mixed_tp >= 2000.0 else "FAIL"
+    mixed_stat = "PASS" if mixed_tp >= 2000.0 * scale else "FAIL"
     print(f"{'Mixed Real-World Throughput':<35} | {mixed_tp:>10,.0f} rec/s     | {'>= 2,000 rec/s':<17} | {mixed_stat}")
 
     p99_lat = perf["mixed_golden"]["latency_ms"]["p99"]
-    p99_stat = "PASS" if p99_lat <= 5.0 else "FAIL"
+    p99_stat = "PASS" if p99_lat <= 5.0 / scale else "FAIL"
     print(f"{'p99 Latency (Mixed Batch)':<35} | {p99_lat:>10.4f} ms       | {'<= 5.0000 ms':<17} | {p99_stat}")
 
     peak_rss = perf["mixed_golden"]["peak_rss_mb"]
-    rss_stat = "PASS" if peak_rss <= 500.0 else "FAIL"
+    rss_stat = "PASS" if peak_rss <= 500.0 / scale else "FAIL"
     print(f"{'Peak Resident Memory (RSS)':<35} | {peak_rss:>10.1f} MB       | {'<= 500.0 MB':<17} | {rss_stat}")
     print("=" * 90)
 

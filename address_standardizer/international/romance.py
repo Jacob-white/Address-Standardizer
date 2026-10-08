@@ -1,4 +1,4 @@
-"""Romance and Latin American Address Grammar (FRA, ESP, ITA, PRT, MEX, COL, ARG, BRA)."""
+"""Romance European Address Grammar (FRA, ESP, ITA, PRT); Latin America lives in latin_america.py."""
 
 import re
 from typing import ClassVar, Dict, List, Optional, Tuple
@@ -72,15 +72,113 @@ RE_COLONIA = re.compile(
 )
 
 # Secondary unit indicators (Int, Piso, Esc, Apt, Depto)
-RE_ROMANCE_SEC = re.compile(
-    r"\b(INT|INTERIOR|DEPTO|DEPARTAMENTO|PISO|ESC|ESCALIER|BAT|BATIMENT|BÂTIMENT|ETAGE|ÉTAGE|PIANO|APT|APARTMENT|SUITE|STE|UNIT)\.?\s*([A-Za-z0-9\-]+)?",
-    re.IGNORECASE,
+# A unit keyword must be a whole word: "INT" never matches inside "Internacional", "PISO" never inside "Pisos".
+_SEC_END = r"(?![^\W\d_])\.?\s*"
+_ROMANCE_SEC_TYPES = (
+    r"INTERIOR|INT|DEPARTAMENTO|DEPTO|DPTO|PISO|ESCALIER|ESC|BATIMENT|BÂTIMENT|BÂT|BAT|ETAGE|ÉTAGE|PIANO"
+    r"|APARTMENT|APTO|APT|SUITE|STE|UNIT"
 )
+RE_ROMANCE_SEC = re.compile(rf"(?<!\w)({_ROMANCE_SEC_TYPES}){_SEC_END}([A-Za-z0-9\-]+)?", re.IGNORECASE)
 
+# A unit identifier that is unmistakably a unit number/letter ("4", "12B", "B", "B2", "IZQ"). Used when the keyword is
+# found inside a street line, where "Piso Alto" or "Escuela Nueva" must stay part of the street name.
+_STRICT_UNIT_ID = r"\d+[A-Za-z]{0,2}(?:-\d+)?|[A-Za-z]\d*|IZQ|DCHA|DER|PB|BIS"
 # Floor/door like 2º B, 2o B, 2ª B, 2° B
 # The ordinal marker is º/ª/° (optionally spaced) or a lowercase "o" glued to the number ("2o B"); a letter "o"
 # after a space is a word ("12 Oeste", "5 Oriente"). The door/letter is at most 3 characters ("B", "IZQ").
 RE_FLOOR_DOOR = re.compile(r"\b(\d+)(?:\s*[ºª°]\s*|o\s+)([A-Za-z0-9\-]{1,3})\b", re.IGNORECASE)
+# French "3ème étage", "1er étage", "2e étage"
+RE_FR_FLOOR = re.compile(r"(\d+)\s*(?:ER|ÈRE|ERE|RE|ÈME|EME|E|ND|D)?\s*(?:ÉTAGE|ETAGE|ETG)\.?", re.IGNORECASE)
+
+
+def make_strict_sec_regex(types: str) -> "re.Pattern[str]":
+    """Keyword plus an unmistakable identifier, as a whole-word match (see `_STRICT_UNIT_ID`)."""
+    return re.compile(rf"(?<!\w)({types}){_SEC_END}({_STRICT_UNIT_ID})(?!\w)", re.IGNORECASE)
+
+
+RE_ROMANCE_SEC_STRICT = make_strict_sec_regex(_ROMANCE_SEC_TYPES)
+
+
+def unit_text(text: str) -> str:
+    """Upper-cased unit text with punctuation stripped ("Esc. 2" -> "ESC 2")."""
+    return " ".join(re.sub(r"[.,;]", " ", text).upper().split())
+
+
+def extract_units_from_part(
+    part: str,
+    sec_re: "re.Pattern[str]",
+    strict_re: "re.Pattern[str]",
+    allow_whole: bool = True,
+) -> Tuple[str, List[str]]:
+    """Split one comma-delimited part into (remaining street/locality text, unit texts).
+
+    A part that *starts* with a unit keyword is entirely a unit. A unit keyword at the *end* of a part that already
+    has a house number ("Rua Augusta 1500 Apto 32") is split off and the street kept. A floor/door marker ("2º B")
+    is removed from the part wherever it sits. Anything else is returned untouched.
+    """
+    s = part.strip()
+    if not s:
+        return "", []
+    if allow_whole and sec_re.match(s):
+        return "", [unit_text(s)]
+    tail = s.rstrip(" .")
+    for m in strict_re.finditer(s):
+        prefix = s[: m.start()].strip(" ,.-")
+        if m.end() == len(tail) and prefix and re.search(r"\d", prefix):
+            return prefix, [unit_text(m.group(0))]
+    m_fd = RE_FLOOR_DOOR.search(s)
+    if m_fd:
+        rest = (s[: m_fd.start()] + " " + s[m_fd.end():]).strip(" ,.-")
+        return rest, [f"{m_fd.group(1)} {m_fd.group(2).upper()}"]
+    return s, []
+
+
+def merge_units(
+    found: List[str], s2_type: Optional[str], s2_number: Optional[str]
+) -> Tuple[Optional[str], Optional[str]]:
+    """Combine units found in the street line with the street2 unit; nothing is dropped."""
+    if not found:
+        return s2_type, s2_number
+    s2_full = " ".join(p for p in (s2_type, s2_number) if p)
+    return None, " ".join(found + ([s2_full] if s2_full else []))
+
+
+def parse_street2_unit(
+    s2: str, sec_re: "re.Pattern[str]"
+) -> Tuple[Optional[str], Optional[str]]:
+    """Normalise a street2 value into (unit_type, unit_number) without dropping any part of it.
+
+    A single "TYPE ID" stays split ("APTO", "32"); everything else (several comma-delimited parts such as
+    "Bât. B, Esc. 2, 3ème étage", trailing words, unknown text) is kept in full, upper-cased, as the unit number.
+    """
+    s = " ".join(s2.split())
+    if not s:
+        return None, None
+    if "," in s or ";" in s:
+        items: List[str] = []
+        for p in re.split(r"[,;]", s):
+            p = p.strip()
+            if not p:
+                continue
+            m_fr = RE_FR_FLOOR.fullmatch(p)
+            m_fd = RE_FLOOR_DOOR.fullmatch(p)
+            if m_fr:
+                items.append(f"ETAGE {m_fr.group(1)}")
+            elif m_fd:
+                items.append(f"{m_fd.group(1)} {m_fd.group(2).upper()}")
+            else:
+                items.append(unit_text(p))
+        return None, " ".join(items) or None
+    m_fr = RE_FR_FLOOR.fullmatch(s)
+    if m_fr:
+        return None, f"ETAGE {m_fr.group(1)}"
+    ms = list(sec_re.finditer(s))
+    if len(ms) == 1 and ms[0].start() == 0 and ms[0].end() == len(s.rstrip(" .")):
+        return ms[0].group(1).upper(), (ms[0].group(2).upper() if ms[0].group(2) else None)
+    m_fd = RE_FLOOR_DOOR.fullmatch(s)
+    if m_fd:
+        return None, f"{m_fd.group(1)} {m_fd.group(2).upper()}"
+    return None, unit_text(s)
 
 
 class RomanceGrammar(CountryGrammar):
@@ -98,16 +196,9 @@ class RomanceGrammar(CountryGrammar):
         "ITALIA",
         "PRT",
         "PORTUGAL",
-        "MEX",
-        "MEXICO",
-        "COL",
-        "COLOMBIA",
-        "ARG",
-        "ARGENTINA",
-        "BRA",
-        "BRAZIL",
-        "BRASIL",
     )
+    # MEX/COL/ARG/BRA are owned by LatinAmericaGrammar (colonias, CEP/CPA, Manzana/Lote); each country code is
+    # registered by exactly one grammar. tests/test_intl_latam_europe_review.py enforces this.
 
     def normalize_postal_code(self, raw_code: str) -> str:
         if not raw_code:
@@ -165,6 +256,7 @@ class RomanceGrammar(CountryGrammar):
 
         unit_type: Optional[str] = None
         unit_number: Optional[str] = None
+        sec_units: List[str] = []
         dep_locality: Optional[str] = None
         street_line = s1_raw
 
@@ -180,7 +272,6 @@ class RomanceGrammar(CountryGrammar):
                 parts_comma = parts_comma[:-1]
 
             # Scan from right for State / Postal / City
-            sec_units: List[str] = []
             rem_parts: List[str] = []
             for part in parts_comma:
                 # Check for Colonia
@@ -189,16 +280,10 @@ class RomanceGrammar(CountryGrammar):
                     dep_locality = m_col.group(1).strip()
                     continue
 
-                # Check for secondary units: "Int. 401", "Esc. B", "Apt 12"
-                m_sec = RE_ROMANCE_SEC.search(part)
-                m_fd = RE_FLOOR_DOOR.search(part)
-                if m_sec:
-                    sec_t = m_sec.group(1).upper()
-                    sec_n = m_sec.group(2) or ""
-                    sec_units.append(f"{sec_t} {sec_n.upper()}".strip())
-                    continue
-                elif m_fd:
-                    sec_units.append(f"{m_fd.group(1)} {m_fd.group(2).upper()}")
+                # Check for secondary units: "Int. 401", "Esc. B", "Apt 12", "Rua X 15 Apto 3"
+                part, found_units = extract_units_from_part(part, RE_ROMANCE_SEC, RE_ROMANCE_SEC_STRICT)
+                sec_units.extend(found_units)
+                if not part:
                     continue
 
                 # Check if entire part is a postal code
@@ -207,10 +292,6 @@ class RomanceGrammar(CountryGrammar):
                     continue
 
                 rem_parts.append(part)
-
-            if sec_units:
-                unit_number = " ".join(sec_units)
-                unit_type = None
 
             if len(rem_parts) >= 2:
                 last_p = rem_parts[-1]
@@ -268,25 +349,10 @@ class RomanceGrammar(CountryGrammar):
                     street_line = rem_parts[0]
 
         # Handle secondary units in s2_raw or embedded in street_line
-        if s2_raw and not unit_number:
-            m_fd = RE_FLOOR_DOOR.search(s2_raw)
-            m_secs = list(RE_ROMANCE_SEC.finditer(s2_raw))
-            if "," not in s2_raw and len(m_secs) > 1:
-                sec_items = []
-                for m in m_secs:
-                    sec_t = m.group(1).upper()
-                    sec_n = m.group(2) or ""
-                    sec_items.append(f"{sec_t} {sec_n.upper()}".strip())
-                unit_number = " ".join(sec_items)
-                unit_type = None
-            elif m_fd:
-                unit_number = f"{m_fd.group(1)} {m_fd.group(2).upper()}"
-            elif m_secs:
-                m_sec = m_secs[0]
-                unit_type = m_sec.group(1).upper()
-                unit_number = m_sec.group(2).upper() if m_sec.group(2) else None
-            else:
-                unit_number = s2_raw.strip().upper()
+        s2_type: Optional[str] = None
+        s2_number: Optional[str] = None
+        if s2_raw:
+            s2_type, s2_number = parse_street2_unit(s2_raw, RE_ROMANCE_SEC)
 
         # Check for Brazil " - " separator before split_intl_secondary_unit
         if " - " in street_line:
@@ -295,19 +361,20 @@ class RomanceGrammar(CountryGrammar):
             if not dep_locality:
                 dep_locality = p_dash[1].strip()
 
+        # A unit written at the end of the street line ("Avenida Estela 100 Int 4") or a floor/door ("Calle Mayor 45 2º B")
+        street_line, inline_units = extract_units_from_part(
+            street_line, RE_ROMANCE_SEC_STRICT, RE_ROMANCE_SEC_STRICT, allow_whole=False
+        )
+        sec_units.extend(inline_units)
         st1_base, st2_base = split_intl_secondary_unit(street_line, "")
-        if st2_base and not unit_number:
-            s2_p = st2_base.split(maxsplit=1)
-            unit_type = s2_p[0]
-            unit_number = s2_p[1] if len(s2_p) > 1 else None
-
-        # Check floor/door in st1_base: "Calle Mayor 45 2º B"
-        m_fd_inline = RE_FLOOR_DOOR.search(st1_base)
-        if m_fd_inline:
-            if not unit_number:
-                unit_number = f"{m_fd_inline.group(1)} {m_fd_inline.group(2).upper()}"
-            st1_base = st1_base[:m_fd_inline.start()] + st1_base[m_fd_inline.end():]
-            st1_base = st1_base.strip(" ,.-")
+        if st2_base and not (sec_units or s2_type or s2_number):
+            st2_parts = st2_base.split(maxsplit=1)
+            unit_type = st2_parts[0]
+            unit_number = st2_parts[1] if len(st2_parts) > 1 else None
+        else:
+            if st2_base:
+                sec_units.append(st2_base)
+            unit_type, unit_number = merge_units(sec_units, s2_type, s2_number)
 
         # Normalize thoroughfare
         _, st_num, thoroughfare = self.extract_premise_and_thoroughfare(st1_base)

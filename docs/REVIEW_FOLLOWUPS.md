@@ -35,56 +35,43 @@ Open items from the whole-codebase review. The review's other findings are fixed
 - [x] Document that the Rust module is Soundex-only.
 - [x] `docs/RELEASING.md`.
 
-## International parsing
+## International parsing (done; limitations noted)
 
-- [ ] CJK, Hangul and Cyrillic single-line addresses are classified as USA/BGR.
-- [ ] Brazil: single-line unit loses the street.
-- [ ] Romance/LatAm unit regex has no word boundary and matches street names containing INT/ESC/PISO/STE.
-- [ ] Hong Kong: "Central" is peeled off the street.
-- [ ] Canada: 4+ part "Street, City, Province, Postal"; "PO Box 123 Stn A" should become `PO BOX 123 STN A`.
-- [ ] IE/GB locality drops.
-- [ ] Offshore: "Tower 2" reorder; JE/GG/IM PO box + suite; JE/GY/IM single-line country.
-- [ ] Multi-part `street2` information loss (FR "Bât.", DE/AU c/o).
-- [ ] PO box + unit handling is inconsistent across countries.
-- [ ] Two country alias tables disagree (`CountryRegistry` vs `tables.COUNTRY_MAP`); unknown countries default to USA; "N/A" maps to Namibia.
-- [ ] Postal validators: NL leading zero, Eircode, BM.
-- [ ] AU single-line without a country falls back to USA.
-- [ ] German `Str.` abbreviations and house-number ranges.
-- [ ] `RE_NUM_FIRST` is quadratic (mitigated by the 600-char field cap).
-- [ ] Russian `кв.`; Greek tonos; zero-width characters.
-- [ ] `RomanceGrammar` / `LatinAmericaGrammar` registry collision (MEX/COL/ARG/BRA).
+- [x] CJK, Hangul and Cyrillic single-line detection and split (`international/scripts.py`).
+- [x] Brazil single-line unit; Romance/LatAm unit word boundaries; grammar registry collision (a test now fails if two grammars claim one country).
+- [x] Hong Kong "Central" kept in road names; Canada 4-part single line, `PO BOX 123 STN A`, bare `, ON` tail selects Canada.
+- [x] IE/GB locality handling; offshore "Tower 2"; JE/GG/IM country detection; PO box + unit uniform across GB/JE/GG/IM/CA/AU/IE/KY/BM/HK/DE/FR.
+- [x] Multi-part `street2` (FR "Bât."/"Esc."/"étage") keeps every part.
+- [x] Country alias tables unified (registry now includes every `COUNTRY_MAP` name); `N/A`/`none`/`unknown` are "no country"; an unrecognised country is `ZZZ`, not USA.
+- [x] Postal validators: NL (no leading zero), Eircode alphabet, Bermuda `AA NN` / `HM <letter>X`.
+- [x] AU single line without a country; German `Str.`/`Pl.` expansion and house-number ranges; `RE_NUM_FIRST` made linear.
+- [x] Russian `кв.`; Greek tonos in keys; zero-width characters.
+- [ ] **Decision needed:** keys are ASCII-only by contract (`test_cjk_grammar_full_width_and_unspaced`), so CJK/Hangul street names fold to digits only and distinct streets can share a `normalized_address_key`. Fixing it means changing that contract.
+- [ ] **Decision needed:** `c/o` / care-of text is removed engine-wide (`care_of.strip_care_of`) and the model has no field for it.
+- [ ] Bulgarian/Ukrainian grammars keep dots (`БУЛ.`, `ВУЛ.`, `КВ.`) where Russian drops them (shared grammar behaviour, left as is).
+- [ ] Hong Kong: "8 Finance Street Central" (no comma) now keeps CENTRAL in the street line.
+- [ ] A 5-digit postcode after an Australian state (`NSW 02000`) still falls through to US.
+- [ ] UK grammar deliberately keeps `HILL`/`HILLS` unabbreviated (Royal Mail has no abbreviation) although the shared table maps HILL to HL.
 
-## US core
+## US core (done; limitations noted)
 
-- [x] `enable_fuzzy=False` is not honored in `us_street_parser` (~line 466, `get_fuzzy_suffix` and the recursion).
-- [x] RR box comma / `R.R.` normalization.
-- [x] Ordinal word floors; `No.` / `Number` units.
-- [x] Single-token street + unit duplication (`Acme` + `Suite 500`, lone numbers).
-- [x] Dual-address / Urbanization branches lose data.
-- [ ] CRF path splits a `St.` prefix.
-- [x] `normalize_us_postal_code` with odd lengths.
-- [ ] "Paris" with a TX ZIP resolves to FRA.
-- [ ] `LocalityOnlyStatus` eq/hash contract (`models.py`).
-- [ ] Dead code: `RE_ATTACHED_SEC_UNIT`, unused aliases.
-- [ ] **Decision needed:** a hub address is AUTO_PASS but the audit marks it PENDING. Pick one policy.
+- [x] `enable_fuzzy=False`, RR/HC boxes, `No.`/`Number` units, word-number units/floors, premise-name duplication, two street lines, odd-length ZIPs.
+- [x] Dead patterns removed (`RE_ATTACHED_SEC_UNIT` and eight more).
+- [x] `LocalityOnlyStatus`: contract documented (equal to both spellings; hash follows `locality_only`).
+- [x] Confidence/audit policy: kept as designed and documented. `routing_tier` is parse/deliverability confidence; `review_status` is the stewardship queue, so a registered-agent hub can be AUTO_PASS yet PENDING.
+- [x] `phonetic_key` `#5` token is intentional (numbered streets get a `#<n>` token so `2nd` and `42nd` do not collide).
+- [x] "Paris" with a Texas ZIP now stays USA.
+- [ ] Trailing house numbers (`St. Louis Ave 100`) are not supported by the US parser; it produces a wrong street. Not fixed because moving a trailing number to the front would corrupt `County Road 12` / `Highway 66`.
+- [ ] A lone non-numeric street word (`XYZ`) is reported `standardized` (routing tier MANUAL_STEWARDSHIP flags it for review).
 
-## Server and CLI
+## Server and CLI (done)
 
-- [x] `arrow.py`: empty batch returns `None`; duplicate columns on re-apply; missing columns silently become null.
-- [x] CLI csv output: neutralize formula injection (`cli_formatting._format_csv_row`).
-- [x] `parse --enable-geocoding --spatial-db <bad>`: confirm it fails cleanly, not with a traceback.
-- [x] Streaming library functions: accept `correct_state_from_zip` as a parameter.
+- [x] Arrow/Polars, CSV formula neutralization, streaming `correct_state_from_zip`, `audit --audit-db` persistence, benchmark SLA scale.
 
-## Found while verifying (open)
+## Verification still outstanding
 
-- [ ] `St. Louis Ave 100` (trailing house number) is parsed as street `LOUIS AVE ST` + unit `STE 100`.
-- [ ] `Urbanization ...` single-line input drops the urbanization name when no street follows.
-- [ ] Japanese single-line input: `normalized_address_key` loses city/state and mangles the street.
-- [ ] `audit` CLI always uses a fresh in-memory ledger, so it is always empty across invocations (documented, not fixed).
-- [ ] `standardize_address("xyz", city="Nowhere")` returns status `standardized` with routing tier MANUAL_STEWARDSHIP.
-- [ ] `phonetic_key` for "350 5th Ave" is `350|#5|10118` (odd token).
-- [ ] The `benchmark` command's SLA gate fails the mixed-throughput row on slow machines (1,729 rec/s vs a 2,000 target).
-- [ ] Verify the GitHub Actions run after pushing `9ef4553` (CI failures were reproduced and fixed locally in Linux containers; not yet confirmed on GitHub).
+- [ ] Push and confirm the GitHub Actions run is green (CI failures were reproduced and fixed in Linux containers; Windows jobs not run locally).
+- [ ] Line coverage is 92% (not 100%); remaining gaps are mostly error branches in the grammars and CLI.
 
 ## Known behavior notes (for the release notes)
 
@@ -96,3 +83,10 @@ Open items from the whole-codebase review. The review's other findings are fixed
 - The Rust module is trimmed to Soundex only.
 - Python 3.11 or newer is required.
 - Golden datasets were regenerated from engine output where the old expectations encoded bugs.
+- `h3` is a required dependency; there is no approximate fallback. Invalid or out-of-range coordinates raise `ValueError` instead of being clamped.
+- A country name that cannot be resolved is reported as `ZZZ`, not `USA`; `N/A`, `none`, `unknown` mean "no country given".
+- Postal validation is stricter: Dutch codes cannot start with 0, Eircodes must use the Eircode alphabet, Bermuda codes must be `AA NN` (or `HM <letter>X`).
+- `normalize_us_postal_code` no longer pads, truncates or invents a ZIP from malformed input (returns the cleaned text with an empty ZIP5).
+- Jersey, Guernsey and the Isle of Man now report `JEY`, `GGY`, `IMN` (previously `GBR`), so their keys end in those codes.
+- German house-number ranges (`5-7`) stay in street1; `Str.`/`Pl.` expand to `STRASSE`/`PLATZ`.
+- CLI: `--audit-db` / `ADDRESS_STANDARDIZER_AUDIT_DB` persist the audit ledger; `parse` no longer forces a default `--country USA`.

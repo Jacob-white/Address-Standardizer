@@ -61,6 +61,11 @@ HK_NT_DISTRICTS = {
     "NEW TERRITORIES", "NT",
 }
 
+_HK_ROAD_TYPE_WORDS = frozenset({
+    "ROAD", "RD", "STREET", "ST", "AVENUE", "AVE", "LANE", "LN", "PATH", "DRIVE", "DR", "TERRACE", "BOULEVARD",
+    "BLVD", "WAY", "CIRCUIT", "CRESCENT", "STREETS",
+})
+
 ALL_HK_DISTRICTS = HK_ISLAND_DISTRICTS | HK_KOWLOON_DISTRICTS | HK_NT_DISTRICTS
 
 # Prominent Commercial Towers and Buildings
@@ -237,18 +242,27 @@ class HongKongGrammar(CountryGrammar):
         dep_loc = None
         region_city = "HONG KONG"
 
-        tokens_upper = combined.upper()
-        # Check districts in order of length descending
+        # Check districts in order of length descending. A district is only peeled off when it is clearly a separate
+        # locality: comma-separated, or not directly after a road type ("Queen's Road Central", "Des Voeux Road West"
+        # carry the district word in the street name itself).
         for dist in sorted(ALL_HK_DISTRICTS, key=len, reverse=True):
-            if re.search(rf"\b{re.escape(dist)}\b", tokens_upper):
-                dep_loc = dist
-                if dist in HK_KOWLOON_DISTRICTS and dist != "KOWLOON":
-                    region_city = "KOWLOON"
-                elif dist in HK_NT_DISTRICTS and dist not in ("NEW TERRITORIES", "NT"):
-                    region_city = "NEW TERRITORIES"
-                # Strip district from thoroughfare string if at end or comma-separated
-                combined = re.sub(rf"(?:,\s*|\s+)\b{re.escape(dist)}\b", "", combined, flags=re.IGNORECASE).strip(" ,.-")
-                break
+            chosen = None
+            for m_d in re.finditer(rf"(,\s*|\s+|^)\b{re.escape(dist)}\b", combined, flags=re.IGNORECASE):
+                lead = m_d.group(1)
+                prev_words = combined[: m_d.start()].split()
+                prev_word = re.sub(r"[^A-Z]", "", prev_words[-1].upper()) if prev_words else ""
+                if "," not in lead and prev_word in _HK_ROAD_TYPE_WORDS:
+                    continue
+                chosen = m_d
+            if chosen is None:
+                continue
+            dep_loc = dist
+            if dist in HK_KOWLOON_DISTRICTS and dist != "KOWLOON":
+                region_city = "KOWLOON"
+            elif dist in HK_NT_DISTRICTS and dist not in ("NEW TERRITORIES", "NT"):
+                region_city = "NEW TERRITORIES"
+            combined = (combined[: chosen.start()] + combined[chosen.end():]).strip(" ,.-")
+            break
 
         if not dep_loc and city_raw:
             c_up = city_raw.strip().upper()
@@ -272,6 +286,8 @@ class HongKongGrammar(CountryGrammar):
         unit_parts = sec_unit_str.split(None, 1) if sec_unit_str else []
         u_type = unit_parts[0] if len(unit_parts) > 1 else None
         u_num = unit_parts[1] if len(unit_parts) > 1 else (sec_unit_str or None)
+        if u_type and u_type.upper() == "SUITE":
+            u_type = "STE"
 
         final_city = dep_loc or region_city
 

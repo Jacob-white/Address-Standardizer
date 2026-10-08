@@ -26,6 +26,14 @@ RE_CAN_POSTCODE_EXACT = re.compile(
     re.IGNORECASE,
 )
 
+# "PO Box 123 Stn A" / "CP 123 Succ A" / "PO Box 123 RPO Main": the station belongs to the PO box line.
+RE_CAN_PO_STATION = re.compile(
+    r"^(P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX|C\.?P\.?|CASE\s+POSTALE)\s+(\d[A-Z0-9\-]*)[,\s]+"
+    r"(STN|STATION|RPO|SUCC|SUCCURSALE)\.?\s+([^,]+?)(?:\s*,\s*(.+))?$",
+    re.IGNORECASE,
+)
+RE_CAN_STATION_ONLY = re.compile(r"^(?:STN|STATION|RPO|SUCC|SUCCURSALE)\.?\s+\S.*$", re.IGNORECASE)
+
 FRENCH_STREET_TYPES: Dict[str, str] = {
     "RUE": "RUE",
     "BOULEVARD": "BD",
@@ -218,6 +226,15 @@ class CanadaGrammar(CountryGrammar):
                     street_line = ", ".join(parts_comma[:-2])
                 elif m_post:
                     postal_raw = parts_comma[-1]
+                    rest_parts = parts_comma[:-1]
+                    # "Street, City, Province, Postal": the part before the postal code is the province
+                    if len(rest_parts) >= 3 and " ".join(rest_parts[-1].upper().split()) in CANADIAN_PROVINCES:
+                        state_raw = rest_parts[-1]
+                        rest_parts = rest_parts[:-1]
+                    city_raw = rest_parts[-1]
+                    street_line = ", ".join(rest_parts[:-1])
+                elif len(parts_comma) >= 3 and " ".join(last_part.split()) in CANADIAN_PROVINCES:
+                    state_raw = parts_comma[-1]
                     city_raw = parts_comma[-2]
                     street_line = ", ".join(parts_comma[:-2])
                 else:
@@ -242,6 +259,16 @@ class CanadaGrammar(CountryGrammar):
         if s2_raw:
             s2_raw = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
 
+        # Canada Post puts the delivery station on the PO box line: "PO BOX 123 STN A" (also RPO / Succ forms).
+        po_station_line: Optional[str] = None
+        if s2_raw and RE_CAN_STATION_ONLY.match(s2_raw.strip()) and RE_PO_BOX.search(street_line):
+            street_line = f"{street_line.strip()} {s2_raw.strip()}"
+            s2_raw = ""
+        m_pos = RE_CAN_PO_STATION.match(street_line.strip())
+        if m_pos:
+            po_station_line = f"PO BOX {m_pos.group(2).upper()} STN {m_pos.group(4).strip().upper()}"
+            street_line = (m_pos.group(5) or "").strip()
+
         st1_base, st2_base = split_intl_secondary_unit(street_line, s2_raw)
         if st2_base:
             s2_parts = st2_base.split(maxsplit=1)
@@ -257,6 +284,8 @@ class CanadaGrammar(CountryGrammar):
             st1_base = st1_base.strip(" ,.-")
 
         _, st_num, st_name = self.extract_premise_and_thoroughfare(st1_base)
+        if po_station_line:
+            st_num, st_name = None, po_station_line
 
         # Normalize Province
         norm_state = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", state_raw).strip().upper())

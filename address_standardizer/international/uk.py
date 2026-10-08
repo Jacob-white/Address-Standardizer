@@ -192,6 +192,21 @@ UK_BUILDING_INDICATORS: Set[str] = {
 }
 
 
+RE_PO_BOX_WITH_UNIT = re.compile(
+    r"^(?:P\.?O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX)\s+([A-Z0-9\-]+)[,\s]+"
+    r"((?:SUITE|STE|FLAT|APT|APARTMENT|UNIT|FLOOR|FL|ROOM|RM)\s*#?\s*[A-Z0-9\-]+)$",
+    re.IGNORECASE,
+)
+
+
+def split_po_box_unit(line: str) -> Optional[Tuple[str, str]]:
+    """"PO Box 309 Suite 100" -> ("PO BOX 309", "Suite 100"); None when the line is not a PO box plus a unit."""
+    m = RE_PO_BOX_WITH_UNIT.match((line or "").strip())
+    if not m:
+        return None
+    return f"PO BOX {m.group(1).upper()}", m.group(2).strip()
+
+
 def is_uk_building_name(text: str) -> bool:
     """Returns True if text matches UK building / premise naming conventions."""
     if not text:
@@ -202,6 +217,9 @@ def is_uk_building_name(text: str) -> bool:
     tokens = set(re.findall(r"[A-Z]+", clean))
     return bool(tokens & UK_BUILDING_INDICATORS)
 
+
+# Royal Mail has no abbreviation for these; "Prospect Hill" must not become "PROSPECT HL".
+_UK_KEEP_FULL = frozenset({"HILL", "HILLS"})
 
 DISALLOWED_OUTWARD_POS1 = {"Q", "V", "X"}
 DISALLOWED_OUTWARD_POS2 = {"I", "J", "Z"}
@@ -312,7 +330,7 @@ class UKGrammar(CountryGrammar):
                 norm_sub = []
                 for sub_idx, sp in enumerate(subparts):
                     sp_clean = RE_NON_ALPHANUMERIC.sub("", sp).upper()
-                    if sub_idx == len(subparts) - 1 and sp_clean in STREET_SUFFIXES and may_abbreviate_street_type(sp_clean, idx, type_idx, allow_first=True):
+                    if sub_idx == len(subparts) - 1 and sp_clean in STREET_SUFFIXES and sp_clean not in _UK_KEEP_FULL and may_abbreviate_street_type(sp_clean, idx, type_idx, allow_first=True):
                         norm_sub.append(STREET_SUFFIXES[sp_clean])
                     elif sp_clean in DIRECTIONALS:
                         norm_sub.append(DIRECTIONALS[sp_clean])
@@ -321,7 +339,7 @@ class UKGrammar(CountryGrammar):
                 norm_words.append("-".join(norm_sub))
             else:
                 w_clean = RE_NON_ALPHANUMERIC.sub("", w).upper()
-                if w_clean in STREET_SUFFIXES and may_abbreviate_street_type(w_clean, idx, type_idx):
+                if w_clean in STREET_SUFFIXES and w_clean not in _UK_KEEP_FULL and may_abbreviate_street_type(w_clean, idx, type_idx):
                     norm_words.append(STREET_SUFFIXES[w_clean])
                 elif w_clean in DIRECTIONALS:
                     norm_words.append(DIRECTIONALS[w_clean])
@@ -341,6 +359,10 @@ class UKGrammar(CountryGrammar):
         unit_number: Optional[str] = None
         building_name: Optional[str] = None
         dep_locality: Optional[str] = None
+        if s1_raw and not s2_raw:
+            po_split = split_po_box_unit(s1_raw)
+            if po_split:
+                s1_raw, s2_raw = po_split
         street_line = s1_raw
 
         # Handle single-line comma-separated address when city_raw is empty
@@ -537,6 +559,16 @@ class UKGrammar(CountryGrammar):
                     unit_number = m_inline.group(2).upper()
                     street_line = street_line[:m_inline.start()] + street_line[m_inline.end():]
                     street_line = RE_WHITESPACE.sub(" ", street_line.strip(" ,.-"))
+
+        # "14 High Street, Headingley" with a separate city: the trailing part is a dependent locality (or premise).
+        if city_raw and street_line and "," in street_line:
+            seg = [p.strip() for p in street_line.split(",") if p.strip()]
+            if len(seg) == 2 and re.match(r"^\d+[A-Za-z]?\s+\S", seg[0]) and not re.search(r"\d", seg[1]):
+                if is_uk_building_name(seg[1]):
+                    pass  # premise-like tails keep their existing handling
+                elif not dep_locality and seg[1].upper() != RE_WHITESPACE.sub(" ", city_raw.strip().upper()):
+                    dep_locality = seg[1].upper()
+                    street_line = seg[0]
 
         premise, st_num, st_name = self.extract_premise_and_thoroughfare(street_line)
         if not building_name and premise:

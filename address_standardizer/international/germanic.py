@@ -63,6 +63,21 @@ COMPOUND_SUFFIXES = (
 )
 
 
+_GERMAN_COUNTRIES = frozenset({"DEU", "AUT", "CHE"})
+# "Hauptstr." / "Hauptstr" / "Str." -> STRASSE ; "Marktpl." / "Pl." -> PLATZ (dotted forms only for Platz, which is
+# otherwise ambiguous). Already spelled-out "Straße"/"Strasse" is left to the caller's upper-casing.
+_RE_DE_STR = re.compile(r"(?<=[A-Za-zÄÖÜäöüß])[Ss]tr\.?(?=[\s,]|$)|(?<![\w])[Ss]tr\.(?=[\s,]|$)")
+_RE_DE_PL = re.compile(r"(?<=[A-Za-zÄÖÜäöüß])[Pp]l\.(?=[\s,]|$)|(?<![\w])[Pp]l\.(?=[\s,]|$)")
+
+
+def expand_german_street_abbreviations(street_line: str) -> str:
+    """Expand German `Str.`/`str` to STRASSE and `Pl.` to PLATZ ("Hauptstr. 5" -> "Haupt" + "STRASSE" + " 5")."""
+    if not street_line:
+        return street_line
+    out = _RE_DE_STR.sub("STRASSE", street_line)
+    return _RE_DE_PL.sub("PLATZ", out)
+
+
 def is_valid_dutch_postcode(raw_code: str) -> bool:
     """Validate Netherlands postal code (4 digits + 2 letters, excluding SA/SD/SS)."""
     if not raw_code:
@@ -73,6 +88,9 @@ def is_valid_dutch_postcode(raw_code: str) -> bool:
         return False
     letters = m.group(2).upper()
     return letters not in DISALLOWED_NLD_COMBOS
+
+
+_RE_DE_POSTFACH_UNIT = re.compile(r"^(?:POSTFACH|POSTBOX|PF)\s+(\d+)(?:\s*[,;]\s*|\s+)([A-Za-zÄÖÜäöü][^\d].*|[A-Za-zÄÖÜäöü]+\s+\d.*)$", re.IGNORECASE)
 
 
 class GermanicGrammar(CountryGrammar):
@@ -167,6 +185,14 @@ class GermanicGrammar(CountryGrammar):
             elif len(parts_comma) == 1:
                 street_line = parts_comma[0]
 
+        if country_iso in _GERMAN_COUNTRIES:
+            street_line = expand_german_street_abbreviations(street_line)
+            # "Postfach 309, Zimmer 100" / "Postfach 309 Zimmer 100": the box is the street line, the rest is the unit.
+            m_pf = _RE_DE_POSTFACH_UNIT.match(street_line.strip())
+            if m_pf:
+                street_line = f"POSTFACH {m_pf.group(1)}"
+                s2_raw = f"{m_pf.group(2).strip()} {s2_raw}".strip() if s2_raw else m_pf.group(2).strip()
+
         # Check for Nordic floor/door (e.g. "45, 2. tv.")
         m_nordic_fd = RE_NORDIC_FLOOR_DOOR.search(street_line)
         if m_nordic_fd:
@@ -186,6 +212,9 @@ class GermanicGrammar(CountryGrammar):
         m_dash_unit = re.match(r"^(.*?)\s+(\d+)-([A-Za-z0-9]+)$", st1_base)
         # Check for Finnish/Nordic stairwell and apartment like "12 B 25"
         m_stair_apt = re.match(r"^(.*?)\s+(\d+)\s+([A-Za-z]\s*\d+)$", st1_base)
+        # "5-7" is a house-number range, not a unit (only Dutch "421-2"/"421-B" additions are units)
+        if m_dash_unit and m_dash_unit.group(3).isdigit() and country_iso != "NLD":
+            m_dash_unit = None
         if m_dash_unit and not unit_type and not unit_number:
             thoroughfare_stem = m_dash_unit.group(1).strip()
             st_num = m_dash_unit.group(2).strip()

@@ -1,7 +1,10 @@
 """Unicode diacritic normalization and deterministic ASCII key folding."""
 
+import re
 import unicodedata
 from typing import Dict, Optional
+
+_RE_GREEK = re.compile(r"[Ͱ-Ͽἀ-῿]")
 
 LIGATURE_MAP: Dict[str, str] = {
     "ß": "SS",
@@ -71,6 +74,11 @@ def fold_to_ascii_key(text: Optional[str]) -> str:
         return ""
 
     folded = text
+    if _RE_GREEK.search(folded):
+        # Greek: drop tonos/dialytika first so accented and unaccented spellings fold identically.
+        folded = "".join(
+            ch for ch in unicodedata.normalize("NFD", folded) if unicodedata.category(ch) != "Mn"
+        )
     for lig, replacement in LIGATURE_MAP.items():
         if lig in folded:
             folded = folded.replace(lig, replacement)

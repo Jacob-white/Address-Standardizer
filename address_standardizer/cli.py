@@ -14,7 +14,7 @@ import sqlite3
 import sys
 from typing import Any, Dict, List
 
-from address_standardizer.audit import get_audit_ledger
+from address_standardizer.audit import StewardshipAuditLedger, get_audit_ledger
 from address_standardizer.batch import stream_standardize_csv
 from address_standardizer.cache import (
     clear_cache,
@@ -261,6 +261,17 @@ def _port_number(value: str) -> int:
     return number
 
 
+def _audit_ledger(args: argparse.Namespace) -> StewardshipAuditLedger:
+    """The ledger for this invocation.
+
+    The default ledger lives in memory and disappears when the process exits, so records written by one CLI call can
+    never be listed by the next. ``--audit-db PATH`` (or ADDRESS_STANDARDIZER_AUDIT_DB) selects a SQLite file that
+    persists between invocations.
+    """
+    path = getattr(args, "audit_db", None) or os.environ.get("ADDRESS_STANDARDIZER_AUDIT_DB")
+    return StewardshipAuditLedger(db_path=path) if path else get_audit_ledger()
+
+
 def _apply_zip_state_flag(args: argparse.Namespace) -> None:
     """Honour --correct-state-from-zip for this process and any batch worker processes it starts."""
     if getattr(args, "correct_state_from_zip", False):
@@ -340,7 +351,7 @@ def _cmd_parse(args: argparse.Namespace) -> None:
             }
             from address_standardizer.confidence import compute_confidence_score
             conf = compute_confidence_score(res, raw_input=raw_dict)
-            res.audit_record = get_audit_ledger().record_standardized_address(
+            res.audit_record = _audit_ledger(args).record_standardized_address(
                 res, conf, raw_input=raw_dict
             )
         if res.audit_record:
@@ -730,7 +741,7 @@ def _cmd_spatial(args: argparse.Namespace) -> None:
 
 def _cmd_audit(args: argparse.Namespace) -> None:
     """Handler for the `audit` subcommand."""
-    ledger = get_audit_ledger()
+    ledger = _audit_ledger(args)
     if args.clear:
         ledger.clear()
         _emit_cli_output("Audit ledger cleared.")
@@ -889,6 +900,7 @@ def main():
     parse_parser.add_argument("--cascade", action="store_true", help="Run 4-stage graceful verification cascade")
     parse_parser.add_argument("--confidence", action="store_true", help="Include composite confidence score and routing tier")
     parse_parser.add_argument("--audit", action="store_true", help="Include stewardship audit record details")
+    parse_parser.add_argument("--audit-db", help="SQLite file for the audit ledger, so records persist between runs (default: in-memory; env ADDRESS_STANDARDIZER_AUDIT_DB)")
     parse_parser.add_argument("--no-cache", action="store_true", help="Bypass multi-tier reference cache")
     parse_parser.add_argument("--correct-state-from-zip", action="store_true", help="Replace a US state that contradicts the ZIP with the ZIP's state (reported as WARN_STATE_CORRECTED_FROM_ZIP). Default: keep the given state, flag ERR_ZIP_STATE_MISMATCH and mark the address UNDELIVERABLE.")
 
@@ -970,6 +982,7 @@ def main():
     audit_parser.add_argument("--status", choices=["PENDING", "APPROVED", "MODIFIED", "REJECTED"], help="Filter by review status")
     audit_parser.add_argument("--export", choices=["json", "sql", "dict"], default="json", help="Export format (default: json)")
     audit_parser.add_argument("--clear", action="store_true", help="Clear audit ledger")
+    audit_parser.add_argument("--audit-db", help="SQLite file holding the audit ledger (default: in-memory, which is always empty in a new process; env ADDRESS_STANDARDIZER_AUDIT_DB)")
 
     # Command: cache inspection & management
     cache_parser = subparsers.add_parser("cache", help="Inspect and manage multi-tier reference cache")

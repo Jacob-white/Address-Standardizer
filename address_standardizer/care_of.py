@@ -56,10 +56,11 @@ _RE_STREET_BOUNDARY = re.compile(
 )
 
 # ATTN/ATTENTION must not be followed by a street-type word, or "123 Attention St" would be read as a care-of marker.
-_CO_MARKER = rf"(?:C\s*/\s*O|IN\s+CARE\s+OF|(?:ATTN|ATTENTION)(?!\s+(?:{_STREET_ALT})\b))"
-RE_CO_PAREN = re.compile(rf"[\(\[]{_CO_MARKER}\b[^)\]]*[\)\]]", re.IGNORECASE)
-RE_CO_PAREN_START = re.compile(rf"[\(\[]{_CO_MARKER}\b", re.IGNORECASE)
-RE_CO_MARKER = re.compile(rf"(?:^|[\s,]){_CO_MARKER}\b[:\s\-]*", re.IGNORECASE)
+_CO_MARKER = rf"(?:C\s*/\s*O|C\s*/\s*-(?=\s|$)|IN\s+CARE\s+OF|(?:ATTN|ATTENTION)(?!\s+(?:{_STREET_ALT})\b))"
+_CO_END = r"(?:\b|(?<=-))"  # "C/-" (Australian care-of) ends in a non-word character
+RE_CO_PAREN = re.compile(rf"[\(\[]{_CO_MARKER}{_CO_END}[^)\]]*[\)\]]", re.IGNORECASE)
+RE_CO_PAREN_START = re.compile(rf"[\(\[]{_CO_MARKER}{_CO_END}", re.IGNORECASE)
+RE_CO_MARKER = re.compile(rf"(?:^|[\s,]){_CO_MARKER}{_CO_END}[:\s\-]*", re.IGNORECASE)
 
 # Matches a legal suffix followed by more text; ordered longest-first so the alternation is deterministic.
 _RE_LEGAL_SUFFIX_THEN_TEXT = re.compile(

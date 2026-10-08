@@ -65,3 +65,13 @@ def test_enable_fuzzy_false_never_corrects_street_words():
     assert _std("123 Mian Stret", enable_fuzzy=False).street1 == "123 MIAN STRET"
     assert _std("123 Mian Stret", enable_fuzzy=True).street1 == "123 MAIN ST"
     assert _std("123 North East Stret", enable_fuzzy=False).street1.endswith("STRET")
+
+
+def test_locality_only_status_contract():
+    from address_standardizer.models import LocalityOnlyStatus
+
+    status = LocalityOnlyStatus("locality_only")
+    assert status == "locality_only" and status == "city_level" and status == "CITY_LEVEL"
+    assert status != "parse_failed" and status != "standardized"
+    assert status in ("locality_only", "city_level")
+    assert hash(status) == hash("locality_only")

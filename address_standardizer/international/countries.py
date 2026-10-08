@@ -2576,6 +2576,15 @@ class CountryRegistry:
             for alias in c.aliases:
                 _add(alias, c)
 
+        # The flat alias table in tables.COUNTRY_MAP and this registry must agree: every name the table knows resolves
+        # here to the same country (registry entries win; the table only fills gaps such as "Burma" or "Ivory Coast").
+        from address_standardizer.tables import COUNTRY_MAP
+
+        for alias_name, alpha3 in COUNTRY_MAP.items():
+            info = cls._BY_ALPHA3.get(alpha3)
+            if info is not None:
+                _add(alias_name, info)
+
         cls._LOOKUP_INDEX = idx
 
     @classmethod

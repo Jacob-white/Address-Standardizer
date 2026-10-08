@@ -48,7 +48,13 @@ class AddressStatus:
 
 
 class LocalityOnlyStatus(str):
-    """String status representing locality-only / city-level standardization."""
+    """String status representing locality-only / city-level standardization.
+
+    Public contract: an instance compares equal to *both* ``"locality_only"`` and ``"city_level"`` (case-insensitive),
+    which is what callers rely on. Python cannot give one hash to two different strings, so ``hash()`` follows the
+    canonical ``"locality_only"`` spelling; do not use ``"city_level" in {status}`` for set/dict lookups. Test with
+    ``status in ("locality_only", "city_level")`` (tuple membership uses ``==``), or ``StandardizedAddress.is_locality_only``.
+    """
 
     def __eq__(self, other):
         if isinstance(other, str):

@@ -33,7 +33,9 @@ def coerce_text(value: Any) -> str:
         text.encode("utf-8")
     except UnicodeEncodeError:  # lone surrogates (e.g. from JSON "\ud800") cannot be stored or logged
         text = text.encode("utf-8", errors="replace").decode("utf-8")
-    return text
+    from address_standardizer.international.scripts import strip_zero_width
+
+    return strip_zero_width(text)
 
 
 def normalize_po_box_spelling(text: str) -> str:

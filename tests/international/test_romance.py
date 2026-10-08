@@ -90,7 +90,8 @@ def test_romance_grammar_secondary_unit_in_street2():
         country="ESP",
     )
     assert p_sec.format_street1() == "CALLE MAYOR 45"
-    assert p_sec.format_street2() == "PISO 3"
+    # every part of a multi-part street2 is kept (the old expectation silently dropped "Int. 4")
+    assert p_sec.format_street2() == "PISO 3 INT 4"
 
 
 def test_romance_grammar_edge_branches():

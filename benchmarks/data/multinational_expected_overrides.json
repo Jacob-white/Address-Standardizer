@@ -50,7 +50,10 @@
       "phonetic_key": "11|M560|OX1 1DP"
     },
     "INTL-01-106": {
-      "phonetic_key": "25|B632|JE2 3XX"
+      "phonetic_key": "25|B632|JE2 3XX",
+      "country": "JEY",
+      "normalized_address_key": "25 BRIDGE ST|APT 4 CLARENDON HOUSE|ST HELIER||JE2 3XX|JEY",
+      "building_key": "25 BRIDGE ST||ST HELIER||JE2 3XX|JEY"
     },
     "INTL-01-122": {
       "phonetic_key": "137|S335|M1 1AA"
@@ -65,10 +68,16 @@
       "phonetic_key": "97|S335|CB2 1TN"
     },
     "INTL-01-144": {
-      "phonetic_key": "111|M560|JE1 1AA"
+      "phonetic_key": "111|M560|JE1 1AA",
+      "country": "JEY",
+      "normalized_address_key": "111 MANOR RD||ST HELIER||JE1 1AA|JEY",
+      "building_key": "111 MANOR RD||ST HELIER||JE1 1AA|JEY"
     },
     "INTL-01-146": {
-      "phonetic_key": "125|B632|GY1 1AA"
+      "phonetic_key": "125|B632|GY1 1AA",
+      "country": "GGY",
+      "normalized_address_key": "125 BRIDGE ST|APT 2|ST PETER PORT||GY1 1AA|GGY",
+      "building_key": "125 BRIDGE ST||ST PETER PORT||GY1 1AA|GGY"
     },
     "INTL-01-162": {
       "phonetic_key": "57|S335|B33 8TH"
@@ -80,10 +89,16 @@
       "phonetic_key": "85|B632|EH2 2ER"
     },
     "INTL-01-182": {
-      "phonetic_key": "17|S335|GY1 2YY"
+      "phonetic_key": "17|S335|GY1 2YY",
+      "country": "GGY",
+      "normalized_address_key": "17 STATION RD|APT 2|ST PETER PORT||GY1 2YY|GGY",
+      "building_key": "17 STATION RD||ST PETER PORT||GY1 2YY|GGY"
     },
     "INTL-01-184": {
-      "phonetic_key": "31|M560|IM1 1ZZ"
+      "phonetic_key": "31|M560|IM1 1ZZ",
+      "country": "IMN",
+      "normalized_address_key": "31 MANOR RD|APT 4 CLARENDON HOUSE|DOUGLAS||IM1 1ZZ|IMN",
+      "building_key": "31 MANOR RD||DOUGLAS||IM1 1ZZ|IMN"
     },
     "INTL-01-186": {
       "phonetic_key": "45|B632|SW1A 1AA"
@@ -1346,6 +1361,86 @@
       "normalized_address_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
       "building_key": "80 RUE FRANCOIS 1ER||PARIS||75008|FRA",
       "phonetic_key": "80|R000|75008"
+    },
+    "INTL-01-032": {
+      "country": "JEY",
+      "normalized_address_key": "47 MARKET PL|APT 2|ST HELIER||JE2 3XX|JEY",
+      "building_key": "47 MARKET PL||ST HELIER||JE2 3XX|JEY"
+    },
+    "INTL-01-034": {
+      "country": "GGY",
+      "normalized_address_key": "61 COMMERCIAL RD|APT 4 CLARENDON HOUSE|ST PETER PORT||GY1 2YY|GGY",
+      "building_key": "61 COMMERCIAL RD||ST PETER PORT||GY1 2YY|GGY"
+    },
+    "INTL-01-036": {
+      "country": "IMN",
+      "normalized_address_key": "75 KING ST||DOUGLAS||IM1 1ZZ|IMN",
+      "building_key": "75 KING ST||DOUGLAS||IM1 1ZZ|IMN"
+    },
+    "INTL-01-070": {
+      "country": "JEY",
+      "normalized_address_key": "133 LONDON RD|APT 4 CLARENDON HOUSE|ST HELIER||JE1 1AA|JEY",
+      "building_key": "133 LONDON RD||ST HELIER||JE1 1AA|JEY"
+    },
+    "INTL-01-072": {
+      "country": "GGY",
+      "normalized_address_key": "147 MARKET PL||ST PETER PORT||GY1 1AA|GGY",
+      "building_key": "147 MARKET PL||ST PETER PORT||GY1 1AA|GGY"
+    },
+    "INTL-01-074": {
+      "country": "IMN",
+      "normalized_address_key": "161 COMMERCIAL RD|APT 2|DOUGLAS||IM2 4RW|IMN",
+      "building_key": "161 COMMERCIAL RD||DOUGLAS||IM2 4RW|IMN"
+    },
+    "INTL-01-108": {
+      "country": "GGY",
+      "normalized_address_key": "39 PARK RD||ST PETER PORT||GY1 2YY|GGY",
+      "building_key": "39 PARK RD||ST PETER PORT||GY1 2YY|GGY"
+    },
+    "INTL-01-110": {
+      "country": "IMN",
+      "normalized_address_key": "53 LONDON RD|APT 2|DOUGLAS||IM1 1ZZ|IMN",
+      "building_key": "53 LONDON RD||DOUGLAS||IM1 1ZZ|IMN"
+    },
+    "INTL-01-148": {
+      "country": "IMN",
+      "normalized_address_key": "139 PARK RD|APT 4 CLARENDON HOUSE|DOUGLAS||IM2 4RW|IMN",
+      "building_key": "139 PARK RD||DOUGLAS||IM2 4RW|IMN"
+    },
+    "INTL-01-180": {
+      "country": "JEY",
+      "normalized_address_key": "183 CASTLE ST||ST HELIER||JE2 3XX|JEY",
+      "building_key": "183 CASTLE ST||ST HELIER||JE2 3XX|JEY"
+    },
+    "INTL-03-002": {
+      "street1": "FRIEDRICHSTRASSE 43-45",
+      "street2": "",
+      "normalized_address_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU",
+      "building_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU"
+    },
+    "INTL-03-042": {
+      "street1": "FRIEDRICHSTRASSE 43-45",
+      "street2": "",
+      "normalized_address_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU",
+      "building_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU"
+    },
+    "INTL-03-082": {
+      "street1": "FRIEDRICHSTRASSE 43-45",
+      "street2": "",
+      "normalized_address_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU",
+      "building_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU"
+    },
+    "INTL-03-122": {
+      "street1": "FRIEDRICHSTRASSE 43-45",
+      "street2": "",
+      "normalized_address_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU",
+      "building_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU"
+    },
+    "INTL-03-162": {
+      "street1": "FRIEDRICHSTRASSE 43-45",
+      "street2": "",
+      "normalized_address_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU",
+      "building_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU"
     }
   }
 }
