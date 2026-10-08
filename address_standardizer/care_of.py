@@ -20,6 +20,8 @@ STREET_TYPE_WORDS = (
 _AMBIGUOUS_TYPE_WORDS = frozenset({"AL", "PK", "PW", "HY", "HW", "BL", "BLV", "WY", "RUN", "GADE"})
 _STREET_TAIL_WORDS = (frozenset(STREET_TYPE_WORDS) - _AMBIGUOUS_TYPE_WORDS) | {"BOX", "BROADWAY", "BOWERY"}
 # Narrow set used when a c/o clause has a single leftover part and no digits.
+# Single-word streets that stand alone.
+_BARE_STREET_WORDS = frozenset({"BROADWAY", "BOWERY"})
 _SINGLE_PART_STREET_WORDS = frozenset({
     "ST", "STREET", "RD", "ROAD", "AVE", "AVENUE", "BLVD", "BOULEVARD", "DR", "DRIVE", "LN", "LANE", "WAY",
     "CT", "COURT", "PL", "PLACE", "BOX", "HWY", "HIGHWAY", "PKWY", "PARKWAY", "CIR", "CIRCLE",
@@ -53,7 +55,8 @@ _RE_STREET_BOUNDARY = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 
-_CO_MARKER = r"(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)"
+# ATTN/ATTENTION must not be followed by a street-type word, or "123 Attention St" would be read as a care-of marker.
+_CO_MARKER = rf"(?:C\s*/\s*O|IN\s+CARE\s+OF|(?:ATTN|ATTENTION)(?!\s+(?:{_STREET_ALT})\b))"
 RE_CO_PAREN = re.compile(rf"[\(\[]{_CO_MARKER}\b[^)\]]*[\)\]]", re.IGNORECASE)
 RE_CO_PAREN_START = re.compile(rf"[\(\[]{_CO_MARKER}\b", re.IGNORECASE)
 RE_CO_MARKER = re.compile(rf"(?:^|[\s,]){_CO_MARKER}\b[:\s\-]*", re.IGNORECASE)
@@ -72,10 +75,19 @@ def has_care_of(text: str) -> bool:
 
 
 def _looks_like_street(candidate: str) -> bool:
-    """A tail after a legal suffix is a street only if it has a house number or a street-type word."""
+    """A tail after a legal suffix is a street only if it has a house number or *ends* in a street-type word.
+
+    Requiring the street type to be the last word keeps company-name tails such as "Park Capital Partners",
+    "Ocean Park Holdings" or "Way Financial" from becoming a delivery line.
+    """
     if re.search(r"\d", candidate):
         return True
-    return bool({w.upper() for w in re.findall(r"\w+", candidate)} & _STREET_TAIL_WORDS)
+    words = [w.upper() for w in re.findall(r"\w+", candidate)]
+    if not words:
+        return False
+    if len(words) == 1:
+        return words[0] in _BARE_STREET_WORDS
+    return words[-1] in _STREET_TAIL_WORDS
 
 
 def _street_after_legal_suffix(after_co: str) -> str:

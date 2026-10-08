@@ -66,6 +66,7 @@ include = ["address_standardizer*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+norecursedirs = [".claude", "node_modules", ".git", "build", "dist"]
 python_files = ["test_*.py"]
 markers = [
     "perf: absolute-throughput/memory SLA tests; run without coverage tracing (pytest -m perf)",
@@ -80,6 +81,7 @@ skip_empty = true
 
 [tool.ruff]
 line-length = 120
+extend-exclude = [".claude"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W"]

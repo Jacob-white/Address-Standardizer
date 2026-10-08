@@ -59,3 +59,6 @@ node_modules/
 # .NET build output
 bin/
 obj/
+
+# Local agent state
+.claude/

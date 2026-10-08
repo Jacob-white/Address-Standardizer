@@ -219,6 +219,14 @@ def _finalize_standardized_address(
     return std
 
 
+def _is_unit_phrase(text: str) -> bool:
+    """True if `text` is made only of secondary-unit designators and short identifiers (e.g. 'STE 400 A')."""
+    if not RE_SEC_UNIT.match(text):
+        return False
+    rest = RE_SEC_UNIT.sub(" ", text)
+    return all(len(tok) <= 2 for tok in re.findall(r"\w+", rest))
+
+
 def standardize_address(
     street1: Optional[str] = None,
     street2: Optional[str] = None,
@@ -610,16 +618,15 @@ def standardize_address(
         if norm_s1 and norm_city and norm_s1.upper() == norm_city.upper():
             norm_s1 = ""
 
-        if is_invalid_thoroughfare(norm_s1):
+        if norm_s1 and norm_s2.startswith("PO BOX ") and _is_unit_phrase(norm_s1):
+            # A unit phrase plus a PO box ("PO Box 450, Suite 400"): the box is the delivery line and the
+            # unit stays secondary, matching the US pipeline.
+            norm_s1, norm_s2 = norm_s2, _standardize_secondary_unit(norm_s1)
+        elif is_invalid_thoroughfare(norm_s1):
+            # Lone numbers/letters and other non-street street1 values are merged into the secondary line.
             if norm_s1:
-                if norm_s2.startswith("PO BOX ") and RE_SEC_UNIT.fullmatch(norm_s1):
-                    # A unit phrase plus a PO box ("PO Box 450, Suite 400"): the box is the delivery line and
-                    # the unit stays secondary, matching the US pipeline. Other invalid street1 values
-                    # (lone numbers/letters) keep the generic merge below.
-                    norm_s1, norm_s2 = norm_s2, _standardize_secondary_unit(norm_s1)
-                else:
-                    norm_s2 = f"{norm_s1} {norm_s2}".strip() if norm_s2 else norm_s1
-                    norm_s1 = ""
+                norm_s2 = f"{norm_s1} {norm_s2}".strip() if norm_s2 else norm_s1
+                norm_s1 = ""
 
         # If thoroughfare (street1) is empty but secondary delivery line / PO Box exists, promote it
         if not norm_s1 and norm_s2:
