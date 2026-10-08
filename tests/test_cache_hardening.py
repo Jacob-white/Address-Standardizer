@@ -48,3 +48,18 @@ def test_l2_eviction_prefers_least_recently_used():
     cache.set("d", "d")
     assert cache.get("a") == "a"
     assert cache.get("b") is None
+
+
+def test_l2_eviction_is_correct_even_with_a_frozen_clock(monkeypatch):
+    """A coarse clock (Windows ticks ~16 ms) must not make a write and a touch tie and evict the wrong entry."""
+    import address_standardizer.cache as cache_mod
+
+    monkeypatch.setattr(cache_mod.time, "time", lambda: 1000.0)
+    cache = SQLiteCache(max_entries=3)
+    for key in "abc":
+        cache.set(key, key)
+    assert cache.get("a") == "a"  # touch a: now the most recently used
+    cache.set("d", "d")
+    assert cache.get("a") == "a"
+    assert cache.get("b") is None
+    assert cache._stamp() > 1000.0  # stamps keep increasing while the clock does not

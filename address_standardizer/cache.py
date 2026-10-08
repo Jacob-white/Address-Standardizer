@@ -131,10 +131,17 @@ class SQLiteCache:
         self._hits = 0
         self._misses = 0
         self._evictions = 0
+        self._last_stamp = 0.0
         self._pid = os.getpid()
         self._conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._init_db()
+
+    def _stamp(self) -> float:
+        """A strictly increasing recency stamp. ``time.time()`` ticks in ~16 ms steps on Windows, so a write and an
+        immediate read-touch could share a timestamp and LRU eviction would pick the wrong entry; callers hold the lock."""
+        self._last_stamp = max(time.time(), self._last_stamp + 1e-6)
+        return self._last_stamp
 
     def _get_conn(self) -> sqlite3.Connection:
         import os
@@ -183,7 +190,7 @@ class SQLiteCache:
             if row:
                 self._hits += 1
                 with conn:  # recency for LRU-style eviction
-                    conn.execute("UPDATE l2_address_cache SET created_at = ? WHERE cache_key = ?", (time.time(), key))
+                    conn.execute("UPDATE l2_address_cache SET created_at = ? WHERE cache_key = ?", (self._stamp(), key))
                 try:
                     data = json.loads(row["payload"])
                     if isinstance(data, dict) and data.get("__class__") == "StandardizedAddress":
@@ -321,7 +328,7 @@ class SQLiteCache:
             with conn:
                 conn.execute(
                     "INSERT OR REPLACE INTO l2_address_cache (cache_key, payload, created_at) VALUES (?, ?, ?)",
-                    (key, payload_str, time.time()),
+                    (key, payload_str, self._stamp()),
                 )
                 if self.max_entries and self.max_entries > 0:
                     cur = conn.execute("SELECT COUNT(*) AS cnt FROM l2_address_cache")
