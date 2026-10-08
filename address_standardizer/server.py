@@ -9,15 +9,16 @@ Production-grade FastAPI daemon exposing OpenAPI 3.1 endpoints for:
   - Real-time Prometheus and JSON metrics (/metrics)
 """
 
-import asyncio
 import json
 import logging
 import os
+import threading
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 
@@ -46,21 +47,31 @@ class MetricsCollector:
     """Thread-safe in-memory metrics collector for server telemetry."""
 
     def __init__(self) -> None:
-        self._lock = asyncio.Lock() if hasattr(asyncio, "Lock") else None
+        self._lock = threading.Lock()
         self.total_requests = 0
         self.endpoint_counts: Dict[str, int] = {}
         self.status_counts: Dict[int, int] = {}
         self.total_addresses_processed = 0
         self.total_latency_seconds = 0.0
 
+    # Endpoint labels are route templates (or "unmatched"), never raw client paths, so cardinality is bounded.
+    MAX_ENDPOINT_LABELS = 64
+
     def record_request(self, endpoint: str, status_code: int, duration: float, address_count: int = 1) -> None:
-        self.total_requests += 1
-        self.endpoint_counts[endpoint] = self.endpoint_counts.get(endpoint, 0) + 1
-        self.status_counts[status_code] = self.status_counts.get(status_code, 0) + 1
-        self.total_addresses_processed += address_count
-        self.total_latency_seconds += duration
+        with self._lock:
+            self.total_requests += 1
+            if endpoint not in self.endpoint_counts and len(self.endpoint_counts) >= self.MAX_ENDPOINT_LABELS:
+                endpoint = "other"
+            self.endpoint_counts[endpoint] = self.endpoint_counts.get(endpoint, 0) + 1
+            self.status_counts[status_code] = self.status_counts.get(status_code, 0) + 1
+            self.total_addresses_processed += address_count
+            self.total_latency_seconds += duration
 
     def snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            return self._snapshot_locked()
+
+    def _snapshot_locked(self) -> Dict[str, Any]:
         avg_lat_ms = (
             (self.total_latency_seconds / self.total_requests * 1000.0)
             if self.total_requests > 0
@@ -92,10 +103,23 @@ class MetricsCollector:
             f"address_standardizer_avg_latency_ms {snap['average_latency_ms']}",
         ]
         for ep, cnt in snap["requests_by_endpoint"].items():
-            lines.append(f'address_standardizer_endpoint_requests_total{{endpoint="{ep}"}} {cnt}')
+            lines.append(f'address_standardizer_endpoint_requests_total{{endpoint="{_escape_label(ep)}"}} {cnt}')
         for st, cnt in snap["requests_by_status"].items():
             lines.append(f'address_standardizer_status_requests_total{{code="{st}"}} {cnt}')
         return "\n".join(lines) + "\n"
+
+
+def _item_error(index: int, exc: Exception) -> Dict[str, Any]:
+    """Generic per-record error line for NDJSON output (no internals, no echo of the input)."""
+    if isinstance(exc, (ValueError, TypeError)):  # includes JSON decode and pydantic validation errors
+        return {"error": "invalid record", "index": index}
+    logger.exception("Batch item %d failed", index)
+    return {"error": "engine failure", "index": index}
+
+
+def _escape_label(value: str) -> str:
+    """Escape a Prometheus label value (backslash, double quote, newline)."""
+    return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 
 metrics = MetricsCollector()
@@ -229,9 +253,15 @@ class AutocompleteRequest(BaseModel):
     query: str = Field(..., min_length=1, description="Partial address input string")
     max_results: int = Field(default=10, ge=1, le=50, description="Max suggestions to return")
     state_filter: Optional[str] = Field(default=None, description="US State postal filter (e.g. CA, NY)")
-    latitude: Optional[float] = Field(default=None, description="Client latitude for proximity ranking")
-    longitude: Optional[float] = Field(default=None, description="Client longitude for proximity ranking")
-    radius_miles: Optional[float] = Field(default=None, description="Proximity radius bounding in miles")
+    latitude: Optional[float] = Field(
+        default=None, ge=-90, le=90, allow_inf_nan=False, description="Client latitude for proximity ranking"
+    )
+    longitude: Optional[float] = Field(
+        default=None, ge=-180, le=180, allow_inf_nan=False, description="Client longitude for proximity ranking"
+    )
+    radius_miles: Optional[float] = Field(
+        default=None, gt=0, le=25000, allow_inf_nan=False, description="Proximity radius bounding in miles"
+    )
 
 
 class AutocompleteSuggestionItem(BaseModel):
@@ -317,8 +347,15 @@ def _process_item_to_dict(
 # Application Factory
 # ============================================================================
 
+def _route_label(request: Request) -> str:
+    """Matched route template (e.g. "/v1/batch"), or "unmatched" for 404s: never the raw client path."""
+    route = request.scope.get("route")
+    return getattr(route, "path", None) or "unmatched"
+
+
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application daemon."""
+    docs_enabled = os.environ.get("ADDRESS_STANDARDIZER_DISABLE_DOCS", "").strip().lower() not in ("1", "true", "yes")
     app = FastAPI(
         title="Address Standardizer Microservice API",
         version=__version__,
@@ -326,15 +363,18 @@ def create_app() -> FastAPI:
             "High-performance universal address standardization, pure offline rooftop geocoding, "
             "CASS Cycle N deliverability verification, and real-time typeahead autocomplete daemon."
         ),
-        openapi_url="/openapi.json",
-        docs_url="/docs",
-        redoc_url="/redoc",
+        openapi_url="/openapi.json" if docs_enabled else None,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
     )
 
+    # Origins come from configuration. The default is open (no cookies/auth are used), but credentialed
+    # cross-origin requests are only allowed for an explicit allow-list.
+    configured = [o.strip() for o in os.environ.get("ADDRESS_STANDARDIZER_CORS_ORIGINS", "").split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=configured or ["*"],
+        allow_credentials=bool(configured),
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -342,10 +382,13 @@ def create_app() -> FastAPI:
     @app.middleware("http")
     async def metrics_middleware(request: Request, call_next):
         start = time.perf_counter()
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            metrics.record_request(_route_label(request), 500, time.perf_counter() - start)
+            raise
         duration = time.perf_counter() - start
-        path = request.url.path
-        metrics.record_request(path, response.status_code, duration)
+        metrics.record_request(_route_label(request), response.status_code, duration)
         response.headers["X-Response-Time-Ms"] = f"{duration * 1000.0:.3f}"
         return response
 
@@ -385,16 +428,20 @@ def create_app() -> FastAPI:
         summary="Standardize single address",
         tags=["Standardization"],
     )
-    async def standardize_single(request: StandardizeRequest):
-        """Standardize a single address string or structured address fields with sub-2ms latency."""
+    def standardize_single(request: StandardizeRequest):
+        """Standardize a single address string or structured address fields with sub-2ms latency.
+
+        Declared as a plain function so FastAPI runs the CPU-bound work in its threadpool instead of
+        blocking the event loop (and every other request, including /health).
+        """
         try:
             result = _standardize_from_req(request)
             return JSONResponse(result)
-        except Exception as exc:
+        except Exception:
             logger.exception("Standardization failed")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Standardization engine failure: {str(exc)}",
+                detail="Standardization engine failure",
             )
 
     @app.post(
@@ -422,18 +469,19 @@ def create_app() -> FastAPI:
             # Handle incoming NDJSON stream
             body_bytes = await _read_body_limited(request)
             body_text = body_bytes.decode("utf-8", errors="replace")
-            ndjson_lines = [ln.strip() for ln in body_text.splitlines() if ln.strip()]
+            # JSON allows U+2028/U+0085 etc. inside strings; only "\n" separates NDJSON records.
+            ndjson_lines = [ln.strip() for ln in body_text.split("\n") if ln.strip()]
             if len(ndjson_lines) > _max_batch_size():
                 raise _batch_too_large(len(ndjson_lines), _max_batch_size())
 
-            async def ndjson_generator() -> AsyncIterator[str]:
-                for line in ndjson_lines:
+            def ndjson_generator() -> Iterator[str]:
+                for index, line in enumerate(ndjson_lines):
                     try:
                         item = json.loads(line)
                         res = _process_item_to_dict(item)
                         yield json.dumps(res) + "\n"
-                    except Exception as e:
-                        yield json.dumps({"error": str(e), "raw": line}) + "\n"
+                    except Exception as exc:
+                        yield json.dumps(_item_error(index, exc)) + "\n"
 
             return StreamingResponse(ndjson_generator(), media_type="application/x-ndjson")
 
@@ -478,32 +526,45 @@ def create_app() -> FastAPI:
                 )
 
         if is_ndjson_resp:
-            async def stream_array_as_ndjson() -> AsyncIterator[str]:
-                for item in addresses_list:
-                    res = _process_item_to_dict(
-                        item,
-                        default_geocoding=default_geo,
-                        default_fuzzy=default_fuzzy,
-                        default_allow_locality=default_allow_loc,
-                    )
-                    yield json.dumps(res) + "\n"
+            def stream_array_as_ndjson() -> Iterator[str]:
+                for index, item in enumerate(addresses_list):
+                    try:
+                        res = _process_item_to_dict(
+                            item,
+                            default_geocoding=default_geo,
+                            default_fuzzy=default_fuzzy,
+                            default_allow_locality=default_allow_loc,
+                        )
+                        yield json.dumps(res) + "\n"
+                    except Exception as exc:
+                        yield json.dumps(_item_error(index, exc)) + "\n"
 
             return StreamingResponse(stream_array_as_ndjson(), media_type="application/x-ndjson")
 
         # Standard JSON array response
-        results = []
-        for index, item in enumerate(addresses_list):
-            try:
-                results.append(
-                    _process_item_to_dict(
-                        item,
-                        default_geocoding=default_geo,
-                        default_fuzzy=default_fuzzy,
-                        default_allow_locality=default_allow_loc,
+        def _process_all() -> List[Dict[str, Any]]:
+            out: List[Dict[str, Any]] = []
+            for index, item in enumerate(addresses_list):
+                try:
+                    out.append(
+                        _process_item_to_dict(
+                            item,
+                            default_geocoding=default_geo,
+                            default_fuzzy=default_fuzzy,
+                            default_allow_locality=default_allow_loc,
+                        )
                     )
-                )
-            except ValidationError as exc:
-                raise HTTPException(status_code=400, detail=f"addresses[{index}] has invalid fields: {exc.errors()[0]['loc']}")
+                except ValidationError as exc:
+                    raise HTTPException(
+                        status_code=400, detail=f"addresses[{index}] has invalid fields: {exc.errors()[0]['loc']}"
+                    )
+                except Exception:
+                    logger.exception("Batch item %d failed", index)
+                    raise HTTPException(status_code=500, detail="Standardization engine failure")
+            return out
+
+        # CPU-bound: keep it off the event loop so /health and other requests stay responsive.
+        results = await run_in_threadpool(_process_all)
         return JSONResponse(results)
 
     @app.post(
@@ -550,9 +611,9 @@ def create_app() -> FastAPI:
         q: str = Query(..., min_length=1, description="Partial address query"),
         limit: int = Query(10, ge=1, le=50, description="Max results"),
         state: Optional[str] = Query(None, description="Optional state filter"),
-        lat: Optional[float] = Query(None, description="Optional user latitude"),
-        lon: Optional[float] = Query(None, description="Optional user longitude"),
-        radius_miles: Optional[float] = Query(None, description="Optional radius in miles"),
+        lat: Optional[float] = Query(None, ge=-90, le=90, allow_inf_nan=False, description="Optional user latitude"),
+        lon: Optional[float] = Query(None, ge=-180, le=180, allow_inf_nan=False, description="Optional user longitude"),
+        radius_miles: Optional[float] = Query(None, gt=0, le=25000, allow_inf_nan=False, description="Optional radius in miles"),
     ):
         """GET endpoint for interactive typeahead address search."""
         req = AutocompleteRequest(

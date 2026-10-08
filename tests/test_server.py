@@ -239,3 +239,93 @@ def test_batch_rejects_oversized_bodies(client, monkeypatch):
     ndjson = "\n".join('{"address": "100 Main St, Austin, TX 78701"}' for _ in range(200))
     res = client.post("/v1/batch", content=ndjson, headers={"Content-Type": "application/x-ndjson"})
     assert res.status_code == 413
+
+
+class TestServerHardening:
+    """Regressions from the whole-codebase review of the HTTP surface."""
+
+    def test_metrics_labels_use_route_templates_not_raw_paths(self, client):
+        from address_standardizer.server import metrics
+
+        for i in range(30):
+            client.get(f"/no/such/path/{i}")
+        client.get('/x%22%7D%20999%0Aevil_metric%7Bz=%22q')
+        text = client.get("/metrics?format=prometheus").text
+        assert "evil_metric" not in text
+        assert all(ep == "unmatched" or ep.startswith("/") and "no/such" not in ep for ep in metrics.endpoint_counts)
+        assert len(metrics.endpoint_counts) <= metrics.MAX_ENDPOINT_LABELS
+
+    def test_prometheus_label_values_are_escaped(self):
+        from address_standardizer.server import _escape_label
+
+        raw = "a" + chr(34) + "b" + chr(92) + "c" + chr(10) + "d"
+        assert _escape_label(raw) == "a" + chr(92) + chr(34) + "b" + chr(92) * 2 + "c" + chr(92) + "nd"
+
+    def test_unhandled_errors_are_counted_as_500(self, client, monkeypatch):
+        from address_standardizer import server
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("secret internal detail")
+
+        monkeypatch.setattr(server, "_standardize_from_req", boom)
+        before = server.metrics.status_counts.get(500, 0)
+        res = client.post("/v1/standardize", json={"address": "1 Main St"})
+        assert res.status_code == 500
+        assert "secret internal detail" not in res.text
+        assert server.metrics.status_counts.get(500, 0) == before + 1
+
+    def test_cors_does_not_combine_wildcard_with_credentials(self, client):
+        res = client.get("/health", headers={"Origin": "https://evil.example"})
+        assert res.headers.get("access-control-allow-credentials") != "true"
+
+    def test_autocomplete_rejects_non_finite_or_out_of_range_coordinates(self, client):
+        for query in ("lat=nan&lon=1", "lat=999&lon=1", "lat=1&lon=inf", "lat=1&lon=1&radius_miles=-5"):
+            assert client.get(f"/v1/autocomplete?q=100&{query}").status_code == 422, query
+
+    def test_streaming_batch_reports_bad_items_inline_without_truncating(self, client):
+        res = client.post(
+            "/v1/batch?format=ndjson",
+            json={"addresses": ["100 Main St, Austin, TX 78701", {"address": "1 Main St", "enable_geocoding": None}, "350 5th Ave, New York, NY 10118"]},
+        )
+        assert res.status_code == 200
+        lines = [json.loads(ln) for ln in res.text.strip().split("\n")]
+        assert len(lines) == 3
+        assert lines[1] == {"error": "invalid record", "index": 1}
+
+    def test_ndjson_input_splits_only_on_newlines(self, client):
+        record = json.dumps({"address": "100 Main St Austin, TX 78701"})
+        res = client.post("/v1/batch", content=record, headers={"Content-Type": "application/x-ndjson"})
+        lines = res.text.strip().split("\n")
+        assert len(lines) == 1
+        assert "error" not in json.loads(lines[0])
+
+    def test_over_long_and_surrogate_inputs_do_not_500(self, client):
+        assert client.post("/v1/standardize", json={"address": "1 " + "a" * 50000}).status_code == 200
+        res = client.post(
+            "/v1/standardize", content=b'{"address": "1 Main St \ud800"}', headers={"Content-Type": "application/json"}
+        )
+        assert res.status_code == 200
+
+    def test_batch_endpoint_does_not_block_the_event_loop(self):
+        import asyncio
+        import time
+
+        import httpx
+
+        from address_standardizer.server import app
+
+        async def scenario():
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+                big = {"addresses": ["100 Main St, Austin, TX 78701"] * 400}
+                slow = asyncio.create_task(ac.post("/v1/batch", json=big))
+                await asyncio.sleep(0.01)
+                t0 = time.perf_counter()
+                health = await ac.get("/health")
+                health_latency = time.perf_counter() - t0
+                await slow
+                return health.status_code, health_latency
+
+        status_code, latency = asyncio.run(scenario())
+        assert status_code == 200
+        assert latency < 1.0

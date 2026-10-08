@@ -9,6 +9,7 @@ Provides memory-bounded chunked streaming CSV processing for massive datasets
 import csv
 import json
 import multiprocessing
+import os
 from typing import Any, Dict, Generator, Iterable, Iterator, List, Optional, Tuple, Union
 
 from address_standardizer._native_dispatch import standardize_batch_dispatch
@@ -18,6 +19,52 @@ from address_standardizer.standardizer import standardize_address
 from address_standardizer.cache import get_default_cache
 
 _ORIGINAL_STANDARDIZE_ADDRESS = standardize_address
+
+# Spreadsheet applications evaluate cells that start with these characters as formulas.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe_cell(value: Any) -> Any:
+    """Neutralize CSV/formula injection in a text cell by prefixing a single quote."""
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
+
+def _csv_safe_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Sanitize the text produced by the standardizer (std_*, keys, rooftop) before it is written to CSV.
+
+    The caller's own passthrough columns are left exactly as supplied.
+    """
+    out: List[Dict[str, Any]] = []
+    for row in rows:
+        safe = dict(row)
+        for key in safe:
+            if isinstance(key, str) and (
+                key.startswith("std_") or key in ("rooftop_address", "normalized_address_key", "building_key", "phonetic_key")
+            ):
+                safe[key] = _csv_safe_cell(safe[key])
+        out.append(safe)
+    return out
+
+
+def _check_distinct_paths(**paths: Optional[str]) -> None:
+    """Refuse to run when an output path is the same file as the input (or another output)."""
+    seen: Dict[str, str] = {}
+    for label, path in paths.items():
+        if not path:
+            continue
+        real = os.path.normcase(os.path.realpath(path))
+        if real in seen:
+            raise ValueError(f"{label} and {seen[real]} are the same file ({path}); refusing to overwrite the input")
+        seen[real] = label
+
+
+def _clean_csv_rows(reader: Iterator[Dict[Any, Any]]) -> Iterator[Dict[str, Any]]:
+    """Drop surplus cells of ragged CSV rows (DictReader stores them under a None key)."""
+    for row in reader:
+        row.pop(None, None)
+        yield row
 
 
 def resolve_column_mappings(
@@ -88,6 +135,8 @@ def buffered_chunk_generator(
     Yields rows from reader in fixed-size chunks using pre-allocated buffer arrays.
     Ensures O(chunk_size) memory footprint regardless of file size.
     """
+    if chunk_size < 1:
+        raise ValueError("chunk_size must be at least 1")
     buffer: List[Optional[Dict[str, Any]]] = [None] * chunk_size
     count = 0
     for row in reader:
@@ -393,13 +442,17 @@ def stream_standardize_csv(
             mapping, street_col, street2_col, city_col, state_col, zip_col, country_col
         )
 
+    _check_distinct_paths(input=input_path, output=output_path, audit_csv=audit_csv_path)
+
     # Enforce strict system resource limit (max 2 workers)
     effective_workers = max(1, min(max_workers, 2))
     total_processed = 0
+    tmp_output = f"{output_path}.tmp-{os.getpid()}"
 
     with open(input_path, mode="r", encoding="utf-8", errors="replace") as fin:
-        reader = csv.DictReader(fin)
-        fieldnames = list(reader.fieldnames or []) + [
+        dict_reader = csv.DictReader(fin)
+        reader = _clean_csv_rows(dict_reader)
+        fieldnames = list(dict_reader.fieldnames or []) + [
             "std_street1", "std_street2", "std_city", "std_state", "std_postal_code",
             "std_country", "rooftop_address", "std_rooftop_address", "normalized_address_key", "building_key", "phonetic_key",
             "is_registered_agent_hub", "is_private_residence", "address_status"
@@ -484,7 +537,9 @@ def stream_standardize_csv(
             return processed_chunk
 
         try:
-            with open(output_path, mode="w", encoding="utf-8", newline="") as fout:
+            # Written to a temp file and moved into place only on success, so a failure never leaves a
+            # truncated or half-written output (and can never clobber the input).
+            with open(tmp_output, mode="w", encoding="utf-8", newline="") as fout:
                 writer = csv.DictWriter(fout, fieldnames=fieldnames)
                 writer.writeheader()
 
@@ -524,7 +579,7 @@ def stream_standardize_csv(
                             processed = _apply_geocoding_to_chunk(processed)
                         if enable_geocoding:
                             processed = _apply_spatial_to_chunk(processed)
-                        writer.writerows(processed)
+                        writer.writerows(_csv_safe_rows(processed))
                         total_processed += len(processed)
                 else:
                     chunk_args_gen = (
@@ -538,9 +593,12 @@ def stream_standardize_csv(
                                 processed_chunk = _apply_geocoding_to_chunk(processed_chunk)
                             if enable_geocoding:
                                 processed_chunk = _apply_spatial_to_chunk(processed_chunk)
-                            writer.writerows(processed_chunk)
+                            writer.writerows(_csv_safe_rows(processed_chunk))
                             total_processed += len(processed_chunk)
+            os.replace(tmp_output, output_path)
         finally:
+            if os.path.exists(tmp_output):
+                os.remove(tmp_output)
             if audit_file:
                 audit_file.close()
             if active_spatial and spatial_db:
@@ -582,8 +640,10 @@ def stream_standardize_jsonl(
             mapping, street_col, street2_col, city_col, state_col, zip_col, country_col
         )
 
+    _check_distinct_paths(input=input_path, output=output_path, audit_csv=audit_csv_path)
     effective_workers = max(1, min(max_workers, 2))
     total_processed = 0
+    tmp_output = f"{output_path}.tmp-{os.getpid()}"
 
     audit_file = None
     audit_writer = None
@@ -674,14 +734,21 @@ def stream_standardize_jsonl(
         return processed_chunk
 
     def _jsonl_line_generator(f):
-        for line in f:
+        for line_no, line in enumerate(f, 1):
             line_str = line.strip()
-            if line_str:
-                yield json.loads(line_str)
+            if not line_str:
+                continue
+            try:
+                obj = json.loads(line_str)
+            except ValueError as exc:
+                raise ValueError(f"{input_path}: line {line_no} is not valid JSON ({exc.__class__.__name__})") from exc
+            if not isinstance(obj, dict):
+                raise ValueError(f"{input_path}: line {line_no} must be a JSON object, got {type(obj).__name__}")
+            yield obj
 
     try:
         with open(input_path, mode="r", encoding="utf-8", errors="replace") as fin, \
-             open(output_path, mode="w", encoding="utf-8") as fout:
+             open(tmp_output, mode="w", encoding="utf-8") as fout:
             reader = _jsonl_line_generator(fin)
 
             if effective_workers <= 1:
@@ -712,7 +779,10 @@ def stream_standardize_jsonl(
                         for row in processed_chunk:
                             fout.write(json.dumps(row) + "\n")
                         total_processed += len(processed_chunk)
+        os.replace(tmp_output, output_path)
     finally:
+        if os.path.exists(tmp_output):
+            os.remove(tmp_output)
         if audit_file:
             audit_file.close()
         if active_spatial and spatial_db:
@@ -743,12 +813,19 @@ def stream_standardize_json(
     country: Optional[str] = None,
 ) -> int:
     """
-    Streams and processes JSON array address datasets with chunked execution.
+    Processes a JSON array of address records in chunks.
+
+    Unlike the CSV/JSONL streamers this loads the whole document (and the processed rows) into memory, because a
+    JSON array cannot be parsed incrementally with the standard library; use JSONL for very large inputs.
     Returns total number of rows processed.
     """
+    _check_distinct_paths(input=input_path, output=output_path, audit_csv=audit_csv_path)
     with open(input_path, mode="r", encoding="utf-8", errors="replace") as fin:
         data = json.load(fin)
         raw_items = data if isinstance(data, list) else [data]
+    for index, item in enumerate(raw_items):
+        if not isinstance(item, dict):
+            raise ValueError(f"{input_path}: item {index} must be a JSON object, got {type(item).__name__}")
 
     if mapping:
         street_col, street2_col, city_col, state_col, zip_col, country_col = resolve_column_mappings(
@@ -763,8 +840,14 @@ def stream_standardize_json(
         )
         all_processed.extend(processed)
 
-    with open(output_path, mode="w", encoding="utf-8") as fout:
-        json.dump(all_processed, fout, indent=2)
+    tmp_output = f"{output_path}.tmp-{os.getpid()}"
+    try:
+        with open(tmp_output, mode="w", encoding="utf-8") as fout:
+            json.dump(all_processed, fout, indent=2)
+        os.replace(tmp_output, output_path)
+    finally:
+        if os.path.exists(tmp_output):
+            os.remove(tmp_output)
 
     return len(all_processed)
 

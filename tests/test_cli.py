@@ -776,22 +776,13 @@ class TestCLI:
         assert "Coordinates:" in captured.out
         assert "Stage" in captured.out
 
-    def test_cli_benchmark_import_failure_raises(self):
-        import builtins
-        real_import = builtins.__import__
-
-        def fake_import(name, *args, **kwargs):
-            if name == "benchmarks.run_benchmarks":
-                raise ImportError("Mocked import error")
-            return real_import(name, *args, **kwargs)
-
-        with patch("builtins.__import__", side_effect=fake_import):
-            with patch("importlib.util.spec_from_file_location", return_value=None):
-                test_args = ["address-standardizer", "benchmark"]
-                with patch.object(sys, "argv", test_args):
-                    with pytest.raises(ImportError) as exc:
-                        main()
-                    assert "Cannot load benchmarks from" in str(exc.value)
+    def test_cli_benchmark_unloadable_harness_exits_with_message(self, capsys):
+        with patch("importlib.util.spec_from_file_location", return_value=None):
+            with patch.object(sys, "argv", ["address-standardizer", "benchmark"]):
+                with pytest.raises(SystemExit) as exc:
+                    main()
+        assert exc.value.code == 2
+        assert "cannot load benchmarks" in capsys.readouterr().err.lower()
 
     def test_cli_spatial_lookup_bbox_non_numeric_error(self):
         test_args = ["address-standardizer", "spatial", "lookup", "--bbox", "invalid,coords,not,numbers"]
@@ -864,3 +855,62 @@ def test_real_subcommands_still_dispatch():
     assert "l1" in out.stdout.lower() or "size" in out.stdout.lower()
     out = _run_cli("batch", "--help")
     assert out.returncode == 0
+
+
+class TestCliHardening:
+    """Regressions from the whole-codebase review of the CLI."""
+
+    @staticmethod
+    def _run(*argv, stdin=None):
+        import subprocess
+
+        return subprocess.run(
+            [sys.executable, "-m", "address_standardizer.cli", *argv],
+            input=stdin, capture_output=True, text=True, timeout=60,
+        )
+
+    def test_piped_stdin_is_standardized(self):
+        out = self._run("--format", "csv", stdin="100 Wall St, New York, NY 10005\n")
+        assert out.returncode == 0, out.stderr
+        assert "100 WALL ST" in out.stdout
+
+    def test_unknown_shorthand_flag_is_an_error(self):
+        out = self._run("--fromat", "csv", "1 Main St")
+        assert out.returncode == 2
+        assert "--fromat" in out.stderr
+
+    def test_serve_binds_to_loopback_by_default(self):
+        out = self._run("serve", "--help")
+        assert "default: 127.0.0.1" in out.stdout
+
+    def test_bad_numeric_arguments_are_rejected_by_argparse(self):
+        assert self._run("batch", "in.csv", "out.csv", "--chunk-size", "0").returncode == 2
+        assert self._run("batch", "in.csv", "out.csv", "--workers", "0").returncode == 2
+        assert self._run("autocomplete", "1", "--limit", "-5").returncode == 2
+        assert self._run("serve", "--port", "99999").returncode == 2
+
+    def test_missing_input_file_is_a_clean_error(self, tmp_path):
+        out = self._run("batch", str(tmp_path / "missing.csv"), str(tmp_path / "out.csv"))
+        assert out.returncode == 2
+        assert "Traceback" not in out.stderr
+
+    def test_mapping_must_be_a_json_object(self, tmp_path):
+        src = tmp_path / "in.csv"
+        src.write_text("street1,city,state,postal_code\n1 Main St,Austin,TX,78701\n", encoding="utf-8")
+        out = self._run("batch", str(src), str(tmp_path / "out.csv"), "--mapping", "[1]")
+        assert out.returncode == 2
+        assert "JSON object" in out.stderr
+
+    def test_benchmark_never_imports_a_benchmarks_package_from_the_cwd(self, tmp_path):
+        import subprocess
+
+        evil = tmp_path / "benchmarks"
+        evil.mkdir()
+        (evil / "__init__.py").write_text("")
+        (evil / "run_benchmarks.py").write_text("print('PWNED-FROM-CWD')\n")
+        out = subprocess.run(
+            [sys.executable, "-m", "address_standardizer.cli", "benchmark", "--iterations", "1", "--format", "json"],
+            cwd=str(tmp_path), capture_output=True, text=True, timeout=300,
+            env={**__import__("os").environ, "PYTHONPATH": str(__import__("pathlib").Path(__file__).resolve().parent.parent)},
+        )
+        assert "PWNED-FROM-CWD" not in out.stdout

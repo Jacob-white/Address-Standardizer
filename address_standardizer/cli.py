@@ -7,8 +7,10 @@ audit ledger triage, and reference cache management.
 """
 
 import argparse
+import csv
 import json
 import os
+import sqlite3
 import sys
 from typing import Any, Dict, List
 
@@ -41,24 +43,26 @@ from address_standardizer.standardizer import standardize_address
 
 
 def _has_stdin_data() -> bool:
-    """Check if sys.stdin has data available to read without blocking."""
+    """True when stdin is a pipe or file that a blocking read should consume.
+
+    A zero-timeout ``select`` cannot tell "no data" from "producer not ready yet" (``slow_cmd | cli``) and does
+    not work on Windows pipes at all, so the stream type decides: pipes and regular files are read (blocking until
+    the producer writes or closes), while terminals and ``NUL``/``/dev/null`` are not.
+    """
+    import stat
+
     if sys.stdin is None or sys.stdin.isatty():
         return False
     if getattr(sys.stdin, "__class__", None).__name__ == "DontReadFromInput":
         return False
-    if hasattr(sys.stdin, "getvalue"):
+    if hasattr(sys.stdin, "getvalue"):  # in-memory streams (tests, embedding)
         return bool(sys.stdin.getvalue().strip())
     try:
-        fileno = sys.stdin.fileno()
+        mode = os.fstat(sys.stdin.fileno()).st_mode
     except Exception:
-        fileno = None
-    if fileno is not None:
-        import select
-        try:
-            r, _, _ = select.select([sys.stdin], [], [], 0.0)
-            return bool(r)
-        except Exception:
-            return False
+        mode = None
+    if mode is not None:
+        return stat.S_ISFIFO(mode) or stat.S_ISREG(mode) or stat.S_ISSOCK(mode)
     if hasattr(sys.stdin, "seekable") and sys.stdin.seekable():
         try:
             pos = sys.stdin.tell()
@@ -236,6 +240,27 @@ def _process_piped_stream(
             _emit_cli_output(json.dumps(data))
 
 
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"must be a positive integer, got {value}")
+    return number
+
+
+def _limit_1_50(value: str) -> int:
+    number = int(value)
+    if not 1 <= number <= 50:
+        raise argparse.ArgumentTypeError(f"must be between 1 and 50, got {value}")
+    return number
+
+
+def _port_number(value: str) -> int:
+    number = int(value)
+    if not 1 <= number <= 65535:
+        raise argparse.ArgumentTypeError(f"must be a TCP port between 1 and 65535, got {value}")
+    return number
+
+
 def _cmd_parse(args: argparse.Namespace) -> None:
     """Handler for the `parse` subcommand."""
     if args.no_cache:
@@ -403,6 +428,9 @@ def _cmd_batch(args: argparse.Namespace) -> None:
                 mapping_dict = json.load(mf)
         else:
             mapping_dict = json.loads(m_str)
+        if not isinstance(mapping_dict, dict):
+            sys.stderr.write("Error: --mapping must be a JSON object, e.g. '{\"address\": \"street1\"}'\n")
+            sys.exit(2)
 
     fmt = getattr(args, "format", "auto").lower()
     if fmt == "auto":
@@ -492,19 +520,22 @@ def _cmd_batch(args: argparse.Namespace) -> None:
 
 def _cmd_benchmark(args: argparse.Namespace) -> None:
     """Handler for the `benchmark` subcommand."""
-    try:
-        from benchmarks.run_benchmarks import print_report, run_all_benchmarks
-    except ImportError:
-        import importlib.util
-        bench_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "benchmarks", "run_benchmarks.py"))
-        spec = importlib.util.spec_from_file_location("benchmarks.run_benchmarks", bench_path)
-        if spec and spec.loader:
-            mod = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(mod)
-            run_all_benchmarks = getattr(mod, "run_all_benchmarks")
-            print_report = getattr(mod, "print_report")
-        else:
-            raise ImportError(f"Cannot load benchmarks from {bench_path}")
+    import importlib.util
+
+    # Load the harness from this checkout only: importing a "benchmarks" package off sys.path would execute whatever
+    # directory the user happens to be in. The harness is not part of the installed wheel.
+    bench_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "benchmarks", "run_benchmarks.py"))
+    if not os.path.isfile(bench_path):
+        sys.stderr.write("Error: the benchmark harness is only available in a source checkout of the repository.\n")
+        sys.exit(2)
+    spec = importlib.util.spec_from_file_location("address_standardizer_benchmarks_run", bench_path)
+    if spec is None or spec.loader is None:
+        sys.stderr.write(f"Error: cannot load benchmarks from {bench_path}\n")
+        sys.exit(2)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    run_all_benchmarks = getattr(mod, "run_all_benchmarks")
+    print_report = getattr(mod, "print_report")
 
     results = run_all_benchmarks(dataset_path=args.dataset, iterations=args.iterations)
     if args.format == "json":
@@ -779,12 +810,20 @@ def main():
         shorthand_parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json")
         shorthand_parser.add_argument("--country", "-c", default="USA")
         shorthand_parser.add_argument("address", nargs="*")
+        unknown_flags: List[str] = []
         try:
-            s_args, _ = shorthand_parser.parse_known_args(sys.argv[1:])
+            s_args, extras = shorthand_parser.parse_known_args(sys.argv[1:])
+            unknown_flags = [a for a in extras if a.startswith("-") and len(a) > 1]
         except argparse.ArgumentError:
             s_args = None  # options this parser does not understand: let the subcommand parser handle them
         # Shorthand mode only when the first positional word is not a subcommand, so an address such as
         # "12 audit rd" or an option value such as "--country cache" is never mistaken for a subcommand.
+        if s_args is not None and unknown_flags and not (s_args.address and s_args.address[0] in _known_subcommands):
+            sys.stderr.write(
+                f"Error: unrecognized option(s): {' '.join(unknown_flags)} "
+                f"(shorthand mode accepts --format and --country; use a subcommand such as `parse` for more).\n"
+            )
+            sys.exit(2)
         if s_args is not None and not (s_args.address and s_args.address[0] in _known_subcommands):
             if s_args.address:
                 raw_addr = " ".join(s_args.address)
@@ -851,8 +890,8 @@ def main():
     batch_parser.add_argument("--zip-col", default="postal_code", help="Column name for zip (default: postal_code)")
     batch_parser.add_argument("--country-col", default="country", help="Column name for country (default: country)")
     batch_parser.add_argument("--country", "-c", dest="country", default=None, help="Default country name or ISO code for batch")
-    batch_parser.add_argument("--chunk-size", type=int, default=5000, help="Streaming chunk size (default: 5000)")
-    batch_parser.add_argument("--workers", type=int, default=2, help="Multiprocessing workers, max 2 (default: 2)")
+    batch_parser.add_argument("--chunk-size", type=_positive_int, default=5000, help="Streaming chunk size (default: 5000)")
+    batch_parser.add_argument("--workers", type=_positive_int, default=2, help="Multiprocessing workers, max 2 (default: 2)")
     batch_parser.add_argument("--enable-geocoding", action="store_true", help="Batch geocode with offline spatial engine")
     batch_parser.add_argument("--spatial-db", "--db", dest="spatial_db", help="Path to offline SQLite spatial database file")
     batch_parser.add_argument("--include-intl", action="store_true", help="Include international columns (dependent_locality, building_name)")
@@ -895,7 +934,7 @@ def main():
     spatial_lookup.add_argument("--max-lat", type=float, help="Maximum latitude for bounding box query")
     spatial_lookup.add_argument("--max-lon", type=float, help="Maximum longitude for bounding box query")
     spatial_lookup.add_argument("--bbox", help="Bounding box as min_lon,min_lat,max_lon,max_lat")
-    spatial_lookup.add_argument("--limit", type=int, default=10, help="Maximum results to return (default: 10)")
+    spatial_lookup.add_argument("--limit", type=_positive_int, default=10, help="Maximum results to return (default: 10)")
     spatial_lookup.add_argument("--spatial-db", "--db", dest="spatial_db", help="Path to offline SQLite spatial database file")
     spatial_lookup.add_argument("--format", choices=["json", "text"], default="json", help="Output format (default: json)")
 
@@ -924,7 +963,7 @@ def main():
     # Command: autocomplete typeahead
     auto_parser = subparsers.add_parser("autocomplete", help="Real-time address typeahead and secondary unit prompt")
     auto_parser.add_argument("query", help="Prefix or address query to autocomplete")
-    auto_parser.add_argument("--limit", type=int, default=5, help="Maximum suggestions (default: 5)")
+    auto_parser.add_argument("--limit", type=_limit_1_50, default=5, help="Maximum suggestions (default: 5)")
     auto_parser.add_argument("--state", help="Filter suggestions by state code")
     auto_parser.add_argument("--format", choices=["json", "text"], default="text", help="Output format (default: text)")
 
@@ -956,9 +995,9 @@ def main():
         "serve",
         help="Start standalone FastAPI microservice daemon with OpenAPI documentation",
     )
-    serve_parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
-    serve_parser.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
-    serve_parser.add_argument("--workers", type=int, default=1, help="Number of worker processes (default: 1)")
+    serve_parser.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1; use 0.0.0.0 to listen on all interfaces)")
+    serve_parser.add_argument("--port", type=_port_number, default=8000, help="Bind port (default: 8000)")
+    serve_parser.add_argument("--workers", type=_positive_int, default=1, help="Number of worker processes (default: 1)")
     serve_parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
 
     raw_args = sys.argv[1:]
@@ -988,7 +1027,12 @@ def main():
 
     handler = _COMMAND_HANDLERS.get(args.command)
     if handler is not None:
-        handler(args)
+        try:
+            handler(args)
+        except (OSError, ValueError, sqlite3.Error, csv.Error) as exc:
+            # Bad paths, malformed input rows and unusable databases are user errors, not crashes.
+            sys.stderr.write(f"Error: {exc}\n")
+            sys.exit(2)
 
 
 if __name__ == "__main__":

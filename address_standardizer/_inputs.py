@@ -22,12 +22,16 @@ def coerce_text(value: Any) -> str:
     if isinstance(value, float):
         if math.isnan(value) or math.isinf(value):
             return ""
-        if value.is_integer():
-            return str(int(value))
-        return str(value)
-    if isinstance(value, bytes):
-        return value.decode("utf-8", errors="replace")
-    return str(value)
+        text = str(int(value)) if value.is_integer() else str(value)
+    elif isinstance(value, bytes):
+        text = value.decode("utf-8", errors="replace")
+    else:
+        text = str(value)
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:  # lone surrogates (e.g. from JSON "\ud800") cannot be stored or logged
+        text = text.encode("utf-8", errors="replace").decode("utf-8")
+    return text
 
 
 def normalize_po_box_spelling(text: str) -> str:
