@@ -1628,6 +1628,12 @@ def standardize_address(
 
     # Care-Of / Attention Prefix Cleaner
     # Strips "c/o <Company Name>" segment and legal entity suffixes, preserving physical address parts before or after
+    _CO_STREET_WORDS = {
+        "ST", "STREET", "RD", "ROAD", "AVE", "AVENUE", "BLVD", "BOULEVARD", "DR", "DRIVE", "LN", "LANE", "WAY",
+        "CT", "COURT", "PL", "PLACE", "BOX", "HWY", "HIGHWAY", "PKWY", "PARKWAY", "CIR", "CIRCLE", "SQ", "SQUARE",
+        "BROADWAY", "BOWERY", "PLAZA", "TERRACE", "TRAIL", "ROW", "MEWS",
+    }
+
     def _strip_care_of(text: str) -> str:
         if not text:
             return ""
@@ -1686,6 +1692,10 @@ def standardize_address(
                         cand_st = m_suf.group(1).strip(" ,.-")
                         cand_words = [w.upper() for w in re.findall(r"\w+", cand_st)]
                         if cand_words and all(w in LEGAL_SUFFIXES_CLEAN for w in cand_words):
+                            continue
+                        # The tail after a legal suffix is only a street if it looks like one; otherwise it is
+                        # just the rest of the c/o name (e.g. "C/O CORE PROPERTY P/S", "... GROUP AB").
+                        if not re.search(r"\d", cand_st) and not (set(cand_words) & _CO_STREET_WORDS):
                             continue
                         extracted_street = cand_st
                         break

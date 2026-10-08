@@ -1,0 +1,5 @@
+{
+  "_comment": "Minimum accepted overall_accuracy_pct per golden dataset. Raise (never lower) when accuracy improves. INTL-02-036/076/116 (street1='Suite 400' + street2='PO Box 450') are known, accepted misses.",
+  "golden_dataset.json": 100.0,
+  "data/golden_dataset_multinational.json": 99.7
+}
