@@ -7,6 +7,8 @@ Provides memory-bounded chunked streaming CSV processing for massive datasets
 """
 
 import csv
+import functools
+import inspect
 import json
 import multiprocessing
 import os
@@ -389,6 +391,57 @@ def _worker_process_chunk(
 
 
 
+
+def _with_zip_state_option(func):
+    """Add a keyword-only ``correct_state_from_zip`` option to a batch entry point.
+
+    Worker processes decide through the ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP switch, so the option is applied by
+    setting that variable for the duration of the call (workers are started inside the call and inherit it) and
+    restoring it afterwards. ``None`` leaves the ambient setting alone.
+    """
+    from address_standardizer._inputs import CORRECT_STATE_ENV
+
+    @functools.wraps(func)
+    def wrapper(*args, correct_state_from_zip: Optional[bool] = None, **kwargs):
+        if correct_state_from_zip is None:
+            return func(*args, **kwargs)
+        previous = os.environ.get(CORRECT_STATE_ENV)
+        os.environ[CORRECT_STATE_ENV] = "1" if correct_state_from_zip else "0"
+        try:
+            result = func(*args, **kwargs)
+            if inspect.isgenerator(result):
+                # Generators run lazily: keep the setting active while they are consumed.
+                return _hold_env(result, CORRECT_STATE_ENV, os.environ[CORRECT_STATE_ENV], previous)
+            return result
+        finally:
+            _restore_env(CORRECT_STATE_ENV, previous)
+
+    sig = inspect.signature(func)
+    params = list(sig.parameters.values())
+    new_param = inspect.Parameter(
+        "correct_state_from_zip", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=Optional[bool]
+    )
+    var_kw = [i for i, prm in enumerate(params) if prm.kind is inspect.Parameter.VAR_KEYWORD]
+    params.insert(var_kw[0] if var_kw else len(params), new_param)
+    wrapper.__signature__ = sig.replace(parameters=params)  # type: ignore[attr-defined]
+    return wrapper
+
+
+def _restore_env(name: str, previous: Optional[str]) -> None:
+    if previous is None:
+        os.environ.pop(name, None)
+    else:
+        os.environ[name] = previous
+
+
+def _hold_env(gen, name: str, value: str, previous: Optional[str]):
+    os.environ[name] = value
+    try:
+        yield from gen
+    finally:
+        _restore_env(name, previous)
+
+
 def process_chunk(
     chunk: List[Dict[str, Any]],
     street_col: str = "street1",
@@ -408,6 +461,7 @@ def process_chunk(
     return processed_rows
 
 
+@_with_zip_state_option
 def stream_standardize_csv(
     input_path: str,
     output_path: str,
@@ -607,6 +661,7 @@ def stream_standardize_csv(
     return total_processed
 
 
+@_with_zip_state_option
 def stream_standardize_jsonl(
     input_path: str,
     output_path: str,
@@ -791,6 +846,7 @@ def stream_standardize_jsonl(
     return total_processed
 
 
+@_with_zip_state_option
 def stream_standardize_json(
     input_path: str,
     output_path: str,
@@ -852,6 +908,7 @@ def stream_standardize_json(
     return len(all_processed)
 
 
+@_with_zip_state_option
 def batch_standardize(
     addresses: Iterable[Union[str, Dict[str, Any]]],
     enable_fuzzy: bool = True,

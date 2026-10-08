@@ -7,6 +7,7 @@ High-performance analytical dataset processing for large address tables:
   - Embedded DuckDB SQL scalar and struct UDFs for in-database standardization
 """
 
+import warnings
 from typing import Any, Dict, List, Optional
 
 try:
@@ -65,6 +66,19 @@ def standardize_arrow(
 
     num_rows = table.num_rows
     col_names = table.column_names
+
+    if street1_col not in col_names:
+        raise ValueError(f"street1_col {street1_col!r} is not a column of the input (columns: {col_names})")
+    missing = [
+        name
+        for name in (street2_col, city_col, state_col, postal_code_col, country_col)
+        if name and name not in col_names
+    ]
+    if missing:
+        warnings.warn(
+            f"standardize_arrow: column(s) {missing} not found in the input; those fields are treated as empty",
+            stacklevel=2,
+        )
 
     # Extract column lists or defaults
     def _get_col_list(name: Optional[str]) -> List[Optional[str]]:
@@ -184,7 +198,7 @@ def standardize_arrow(
             pa.array(out_cmra, pa.bool_()),
         ]
         struct_col = pa.StructArray.from_arrays(struct_arrays, fields=struct_fields)
-        out_table = table.append_column("standardized_address", struct_col)
+        out_table = _put_column(table, "standardized_address", struct_col)
     else:
         columns_to_append = [
             (f"{output_prefix}street1", pa.array(out_street1, pa.string())),
@@ -211,12 +225,26 @@ def standardize_arrow(
         ]
         out_table = table
         for name, col_arr in columns_to_append:
-            out_table = out_table.append_column(name, col_arr)
+            out_table = _put_column(out_table, name, col_arr)
 
     if is_batch:
-        batches = out_table.to_batches()
-        return batches[0] if batches else None
+        # A RecordBatch in, a RecordBatch out - including the zero-row case (which has no batches to return).
+        combined = out_table.combine_chunks()
+        batches = combined.to_batches()
+        if batches:
+            return batches[0]
+        return pa.RecordBatch.from_arrays(
+            [pa.array([], type=field.type) for field in combined.schema], schema=combined.schema
+        )
     return out_table
+
+
+def _put_column(table: Any, name: str, column: Any) -> Any:
+    """Append ``column``, replacing an existing column of the same name (so re-applying never duplicates)."""
+    idx = table.schema.get_field_index(name)
+    if idx >= 0:
+        return table.set_column(idx, name, column)
+    return table.append_column(name, column)
 
 
 # ============================================================================

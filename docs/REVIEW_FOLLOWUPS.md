@@ -70,10 +70,10 @@ Open items from the whole-codebase review. The review's other findings are fixed
 
 ## Server and CLI
 
-- [ ] `arrow.py`: empty batch returns `None`; duplicate columns on re-apply; missing columns silently become null.
-- [ ] CLI csv output: neutralize formula injection (`cli_formatting._format_csv_row`).
-- [ ] `parse --enable-geocoding --spatial-db <bad>`: confirm it fails cleanly, not with a traceback.
-- [ ] Streaming library functions: accept `correct_state_from_zip` as a parameter.
+- [x] `arrow.py`: empty batch returns `None`; duplicate columns on re-apply; missing columns silently become null.
+- [x] CLI csv output: neutralize formula injection (`cli_formatting._format_csv_row`).
+- [x] `parse --enable-geocoding --spatial-db <bad>`: confirm it fails cleanly, not with a traceback.
+- [x] Streaming library functions: accept `correct_state_from_zip` as a parameter.
 
 ## Known behavior notes (for the release notes)
 

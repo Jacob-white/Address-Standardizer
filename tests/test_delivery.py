@@ -387,3 +387,35 @@ class TestZipStateMismatchPolicy:
             capture_output=True, text=True, timeout=60,
         )
         assert '"state": "CA"' in out.stdout, out.stderr
+
+
+class TestBatchZipStateOption:
+    """The streaming/batch library functions take correct_state_from_zip like standardize_address does."""
+
+    ROW = {"street1": "350 5th Ave", "city": "New York", "state": "CA", "postal_code": "10118"}
+
+    def test_batch_standardize_option(self, monkeypatch):
+        import os
+
+        from address_standardizer.batch import batch_standardize
+
+        monkeypatch.delenv("ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP", raising=False)
+        kept = list(batch_standardize([dict(self.ROW)]))[0]
+        fixed = list(batch_standardize([dict(self.ROW)], correct_state_from_zip=True))[0]
+        assert getattr(kept, "state", None) == "CA" or kept["state"] == "CA"
+        assert (getattr(fixed, "state", None) or fixed["state"]) == "NY"
+        assert "ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP" not in os.environ  # restored
+
+    def test_stream_csv_option(self, tmp_path, monkeypatch):
+        import csv
+
+        from address_standardizer.batch import stream_standardize_csv
+
+        monkeypatch.delenv("ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP", raising=False)
+        src = tmp_path / "in.csv"
+        src.write_text("street1,city,state,postal_code\n350 5th Ave,New York,CA,10118\n", encoding="utf-8")
+        for flag, expected in ((None, "CA"), (True, "NY")):
+            out = tmp_path / f"out_{flag}.csv"
+            stream_standardize_csv(str(src), str(out), max_workers=1, correct_state_from_zip=flag)
+            rows = list(csv.DictReader(out.open(encoding="utf-8")))
+            assert rows[0]["std_state"] == expected

@@ -80,16 +80,19 @@ def _format_csv_row(data: Dict[str, Any]) -> str:
     writer = csv.writer(out)
     conf_val = data.get("confidence_score")
     conf = f"{conf_val:.4f}" if isinstance(conf_val, float) else (str(conf_val) if conf_val is not None else "")
+    from address_standardizer.batch import _csv_safe_cell
+
+    # Text cells are neutralized against spreadsheet formula injection (=, +, -, @ prefixes); the numeric score is not.
     writer.writerow([
-        data.get("street1") or "",
-        data.get("street2") or "",
-        data.get("city") or "",
-        data.get("state") or "",
-        data.get("postal_code") or "",
-        data.get("country") or "",
-        data.get("address_status") or "",
+        _csv_safe_cell(data.get("street1") or ""),
+        _csv_safe_cell(data.get("street2") or ""),
+        _csv_safe_cell(data.get("city") or ""),
+        _csv_safe_cell(data.get("state") or ""),
+        _csv_safe_cell(data.get("postal_code") or ""),
+        _csv_safe_cell(data.get("country") or ""),
+        _csv_safe_cell(data.get("address_status") or ""),
         conf,
-        data.get("normalized_address_key") or "",
+        _csv_safe_cell(data.get("normalized_address_key") or ""),
     ])
     return out.getvalue().rstrip("\r\n")
 
