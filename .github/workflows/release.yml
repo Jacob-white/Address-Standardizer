@@ -1,0 +1,73 @@
+name: Release
+
+# Push a tag like v3.3.1 to publish the Python package, the npm package and the NuGet package.
+# The Go SDK is released by pushing a `sdks/go/vX.Y.Z` tag (see sdks/README.md); no job is needed.
+#
+# One-time setup before the first release:
+#   - PyPI: add this repo as a trusted publisher for `address-standardizer` (no token needed).
+#   - npm: create the `@address-standardizer` scope and add an NPM_TOKEN secret.
+#   - NuGet: reserve the `AddressStandardizer.Client` id and add a NUGET_API_KEY secret.
+#   - Create a GitHub environment named `release` with required reviewers; every publish job waits on it.
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/check_versions.py "${GITHUB_REF_NAME}"
+
+  ci:
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+
+  pypi:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build && python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  npm:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: release
+    defaults:
+      run:
+        working-directory: sdks/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm test
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  nuget:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet pack sdks/dotnet/AddressStandardizer.Client.csproj -c Release -o nupkgs
+      - run: dotnet nuget push "nupkgs/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json

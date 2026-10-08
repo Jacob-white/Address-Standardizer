@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:
 
 jobs:
   python:
@@ -40,38 +41,46 @@ jobs:
       - run: maturin build --release --out dist && pip install dist/*.whl && pip install -e .
       - run: pytest tests/native tests/test_rust_acceleration.py tests/test_address_standardization_improvements.py
 
-  typescript:
+  sdks:
+    # Builds and tests every client SDK, then runs each against a live server (contract + integration).
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdks/typescript
+    env:
+      ADDRESS_STANDARDIZER_URL: http://127.0.0.1:8000
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
-      - run: npm test
-
-  go:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sdks/go
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.21"
-      - run: gofmt -l . | tee /dev/stderr | (! read)
-      - run: go vet ./...
-      - run: go test ./...
-
-  dotnet:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
-      - run: dotnet build sdks/dotnet -c Release
+      - run: pip install -e ".[server,dev]"
+      - name: SDK models match the server's OpenAPI schema
+        run: pytest tests/test_sdk_contract.py
+      - name: Start server
+        run: |
+          nohup python -m uvicorn address_standardizer.server:app --port 8000 > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf $ADDRESS_STANDARDIZER_URL/health && exit 0; sleep 1; done
+          cat server.log; exit 1
+      - name: TypeScript
+        working-directory: sdks/typescript
+        run: |
+          npm ci
+          npm test
+      - name: Go
+        working-directory: sdks/go
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go test ./...
+      - name: .NET
+        run: dotnet test sdks/dotnet/tests/AddressStandardizer.Client.Tests -c Release
+      - name: Server log
+        if: failure()
+        run: cat server.log

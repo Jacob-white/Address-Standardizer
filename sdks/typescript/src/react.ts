@@ -37,6 +37,7 @@ export class AutocompleteController {
   private client: AddressStandardizerClient;
   private options: UseAddressAutocompleteOptions;
   private timer: any = null;
+  private requestId = 0;
   private listeners: Set<() => void> = new Set();
 
   public query: string = "";
@@ -63,6 +64,7 @@ export class AutocompleteController {
     this.query = q;
     this.selectedSuggestion = null;
     this.error = null;
+    const requestId = ++this.requestId;
 
     if (this.timer) {
       clearTimeout(this.timer);
@@ -91,9 +93,11 @@ export class AutocompleteController {
           longitude: this.options.longitude,
           radius_miles: this.options.radiusMiles,
         });
+        if (requestId !== this.requestId) return; // superseded by a newer query or clear()
         this.suggestions = results;
         this.isLoading = false;
       } catch (err: any) {
+        if (requestId !== this.requestId) return;
         this.error = err instanceof Error ? err : new Error(String(err));
         this.suggestions = [];
         this.isLoading = false;
@@ -111,6 +115,7 @@ export class AutocompleteController {
   }
 
   public clear(): void {
+    this.requestId++;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -151,10 +156,12 @@ export function useAddressAutocomplete(options: UseAddressAutocompleteOptions = 
 
   const clientRef = React.useRef(options.client || new AddressStandardizerClient());
   const timerRef = React.useRef<any>(null);
+  const requestIdRef = React.useRef(0);
 
   const setQuery = React.useCallback((newQuery: string) => {
     setQueryState(newQuery);
     setSelectedSuggestion(null);
+    const requestId = ++requestIdRef.current;
 
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -180,12 +187,14 @@ export function useAddressAutocomplete(options: UseAddressAutocompleteOptions = 
           longitude: options.longitude,
           radius_miles: options.radiusMiles,
         });
+        if (requestId !== requestIdRef.current) return; // superseded by a newer query or clear()
         setSuggestions(results);
         setError(null);
+        setIsLoading(false);
       } catch (err: any) {
+        if (requestId !== requestIdRef.current) return;
         setError(err instanceof Error ? err : new Error(String(err)));
         setSuggestions([]);
-      } finally {
         setIsLoading(false);
       }
     }, debounceMs);
@@ -199,6 +208,7 @@ export function useAddressAutocomplete(options: UseAddressAutocompleteOptions = 
   }, []);
 
   const clear = React.useCallback(() => {
+    requestIdRef.current++;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;

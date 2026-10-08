@@ -231,3 +231,46 @@ test("AutocompleteController - headless state machine", async () => {
   assert.equal(controller.suggestions.length, 0);
   assert.equal(controller.selectedSuggestion, null);
 });
+
+test("AutocompleteController - ignores stale responses from superseded queries", async () => {
+  const makeResponse = (text) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      count: 1,
+      suggestions: [
+        {
+          text,
+          street_line: text,
+          city: "X",
+          state: "NY",
+          postal_code: "10005",
+          secondary_prompt_required: false,
+          suggested_secondary_units: [],
+        },
+      ],
+    }),
+  });
+
+  // The first request resolves slowly, after the second query has already completed.
+  const mockFetch = async (url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.query === "100 Wall") {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      return makeResponse("STALE");
+    }
+    return makeResponse("FRESH");
+  };
+
+  const client = new AddressStandardizerClient({ fetch: mockFetch });
+  const controller = new AutocompleteController({ client, debounceMs: 1, minChars: 3 });
+
+  controller.setQuery("100 Wall");
+  await new Promise((resolve) => setTimeout(resolve, 10)); // first request now in flight
+  controller.setQuery("100 Wall St");
+  await new Promise((resolve) => setTimeout(resolve, 120));
+
+  assert.equal(controller.suggestions.length, 1);
+  assert.equal(controller.suggestions[0].text, "FRESH");
+  assert.equal(controller.isLoading, false);
+});

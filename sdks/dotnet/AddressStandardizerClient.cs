@@ -46,8 +46,8 @@ namespace AddressStandardizer.Client
         public async Task<StandardizedAddress> StandardizeAsync(StandardizeRequest request, CancellationToken cancellationToken = default)
         {
             var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync("v1/standardize", content, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            using var response = await _httpClient.PostAsync("v1/standardize", content, cancellationToken).ConfigureAwait(false);
+            await EnsureSuccessAsync(response).ConfigureAwait(false);
 
             var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             var result = await JsonSerializer.DeserializeAsync<StandardizedAddress>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
@@ -62,8 +62,8 @@ namespace AddressStandardizer.Client
         public async Task<List<StandardizedAddress>> StandardizeBatchAsync(BatchStandardizeRequest request, CancellationToken cancellationToken = default)
         {
             var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync("v1/batch", content, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            using var response = await _httpClient.PostAsync("v1/batch", content, cancellationToken).ConfigureAwait(false);
+            await EnsureSuccessAsync(response).ConfigureAwait(false);
 
             var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             var result = await JsonSerializer.DeserializeAsync<List<StandardizedAddress>>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
@@ -79,8 +79,8 @@ namespace AddressStandardizer.Client
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/x-ndjson"));
             request.Content = new StringContent(JsonSerializer.Serialize(payload, JsonOptions), Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            await EnsureSuccessAsync(response).ConfigureAwait(false);
 
             using var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             using var reader = new StreamReader(responseStream, Encoding.UTF8);
@@ -104,8 +104,8 @@ namespace AddressStandardizer.Client
         public async Task<List<AutocompleteSuggestion>> AutocompleteAsync(AutocompleteRequest request, CancellationToken cancellationToken = default)
         {
             var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync("v1/autocomplete", content, cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            using var response = await _httpClient.PostAsync("v1/autocomplete", content, cancellationToken).ConfigureAwait(false);
+            await EnsureSuccessAsync(response).ConfigureAwait(false);
 
             var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             var result = await JsonSerializer.DeserializeAsync<AutocompleteResponse>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
@@ -114,12 +114,31 @@ namespace AddressStandardizer.Client
 
         public async Task<HealthResponse> GetHealthAsync(CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            using var response = await _httpClient.GetAsync("health", cancellationToken).ConfigureAwait(false);
+            await EnsureSuccessAsync(response).ConfigureAwait(false);
 
             var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             var result = await JsonSerializer.DeserializeAsync<HealthResponse>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
             return result ?? throw new InvalidOperationException("Failed to deserialize health response.");
+        }
+
+        private static async Task EnsureSuccessAsync(HttpResponseMessage response)
+        {
+            if (response.IsSuccessStatusCode)
+                return;
+
+            string body;
+            try
+            {
+                body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                body = response.ReasonPhrase ?? string.Empty;
+            }
+
+            throw new HttpRequestException(
+                $"Address Standardizer HTTP {(int)response.StatusCode}: {body}");
         }
 
         public void Dispose()

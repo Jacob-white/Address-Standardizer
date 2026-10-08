@@ -12,6 +12,8 @@ Address Standardizer provides official, type-safe client SDKs for integrating th
 | **.NET / C#** | [`AddressStandardizer.Client`](dotnet/) | `sdks/dotnet` | .NET 8.0, .NET Standard 2.0 / C# 12 |
 | **Go** | [`github.com/Jacob-white/Address-Standardizer/sdks/go`](go/) | `sdks/go` | Go 1.21+ |
 
+> **Note:** the npm, NuGet and Go install commands below work once a release has been published (see [Releasing](#-releasing)). Until then, build from source in this repository.
+
 ---
 
 ## 1. TypeScript / React SDK (`@address-standardizer/client`)
@@ -209,6 +211,8 @@ func main() {
 
 ## 🧪 Testing the SDKs
 
+Set `ADDRESS_STANDARDIZER_URL` (for example `http://127.0.0.1:8000`, with `python -m uvicorn address_standardizer.server:app` running) to also run the live-server integration tests in each SDK; without it they are skipped.
+
 ```bash
 # TypeScript / Node.js
 cd sdks/typescript
@@ -217,12 +221,19 @@ npm test   # builds first via the pretest script
 
 # .NET (requires dotnet SDK)
 cd sdks/dotnet
-dotnet build   # AddressStandardizerClientTests.cs is a verification helper, not an xUnit suite
+dotnet test tests/AddressStandardizer.Client.Tests
 
 # Go (requires Go toolchain)
 cd sdks/go
 go test -v ./...
 ```
+
+---
+
+## 🚀 Releasing
+
+- **Python, npm, NuGet:** bump the version in `pyproject.toml`, `address_standardizer/__init__.py`, `sdks/typescript/package.json` and `sdks/dotnet/AddressStandardizer.Client.csproj` (`python scripts/check_versions.py` verifies they match), then push a `vX.Y.Z` tag. `.github/workflows/release.yml` runs CI and publishes after approval of the `release` environment.
+- **Go:** Go modules at v2+ must carry a `/vN` path suffix, so the Go SDK is versioned independently from `v1`. Release it by pushing a `sdks/go/v1.Y.Z` tag.
 
 ---
 
