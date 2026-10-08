@@ -458,6 +458,12 @@ def clean_repetitive_cycles(s: str) -> str:
     # 2. Token-level cycle detection on whitespace-separated words
     tokens = curr.split()
     if len(tokens) >= 2:
+        # Fast exit: a cycle needs at least one repeated (normalized) token, so all-distinct tokens
+        # can never collapse and the loops below would only re-join them unchanged.
+        normalized = [t.upper().strip(" ,.-") for t in tokens]
+        if len(set(normalized)) == len(normalized):
+            return " ".join(tokens)
+
         def _is_prefix_seq(rem_seq: list, chunk_seq: list) -> bool:
             if not rem_seq:
                 return True

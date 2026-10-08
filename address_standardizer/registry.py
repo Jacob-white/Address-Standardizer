@@ -11,6 +11,7 @@ and KYC/AML entity co-location isolation invariants.
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Dict, List, Optional, Tuple, Any
 
 from address_standardizer.tables import US_STATES
@@ -807,6 +808,7 @@ CURATED_CORPORATE_REGISTRY: List[CorporateRegistryEntry] = [
 ]
 
 
+@lru_cache(maxsize=8192)
 def _fold_ascii(s: str) -> str:
     if not s:
         return ""

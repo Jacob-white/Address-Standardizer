@@ -442,7 +442,7 @@ class TestAddressStandardizerUS:
         assert res.building_key is None
 
         # In rule-based mode
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             res_rb = standardize_address(street1="Chicago", city="Chicago", state="IL", postal_code="60601")
             assert res_rb.street1 == ""
             assert res_rb.city == "CHICAGO"
@@ -614,7 +614,7 @@ class TestRuleBasedFallbackAndEdgeCases:
 
     def test_pure_rule_based_us_address_parsing(self):
         """Verify that when usaddress is unavailable (None), rule-based parsing succeeds completely."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             res = standardize_address("100 Wall Street, Suite 400, New York, NY 10005")
             assert res.address_status == "standardized"
             assert res.street1 == "100 WALL ST"
@@ -627,7 +627,7 @@ class TestRuleBasedFallbackAndEdgeCases:
 
     def test_rule_based_po_box_parsing(self):
         """Verify PO Box parsing in pure rule-based fallback mode."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             res = standardize_address("PO Box 456, New York, NY 10001")
             assert res.address_status == "standardized"
             assert res.street1 == "PO BOX 456"
@@ -638,7 +638,7 @@ class TestRuleBasedFallbackAndEdgeCases:
 
     def test_rule_based_combined_street_and_po_box(self):
         """Verify street and PO Box parsing in pure rule-based mode."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             res = standardize_address("100 Main St, PO Box 456, New York, NY 10001")
             assert res.address_status == "standardized"
             assert res.street1 == "100 MAIN ST"
@@ -649,7 +649,7 @@ class TestRuleBasedFallbackAndEdgeCases:
 
     def test_rule_based_numbered_streets_and_ordinals(self):
         """Verify numbered street and ordinal normalization in pure rule-based mode."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             # Word ordinal
             res1 = standardize_address(street1="350 Fifth Avenue", city="New York", state="NY", postal_code="10118")
             assert res1.street1 == "350 5TH AVE"
@@ -823,7 +823,7 @@ class TestRuleBasedFallbackAndEdgeCases:
 
     def test_rule_based_no_comma_before_state_zip(self):
         """Verify rule-based mode handles address without comma before state and zip."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             res = standardize_address("100 Wall St NY 10005")
             assert res.street1 == "100 WALL ST"
             assert res.state == "NY"
@@ -1055,7 +1055,7 @@ class TestRuleBasedFallbackAndEdgeCases:
 
     def test_rule_based_street_secondary_unit_and_po_box(self):
         """Verify secondary unit preservation with PO Box in pure rule-based fallback mode."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             res = standardize_address("100 Main St Suite 200 PO Box 456, New York, NY 10001")
             assert res.street1 == "100 MAIN ST"
             assert res.street2 == "STE 200 PO BOX 456"
@@ -1067,14 +1067,14 @@ class TestRuleBasedFallbackAndEdgeCases:
 
     def test_rule_based_hash_unit_without_whitespace(self):
         """Verify that # without whitespace is recognized in pure rule-based fallback mode."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             res = standardize_address("100 Main St#101, New York, NY 10001")
             assert res.street1 == "100 MAIN ST"
             assert res.street2 == "STE 101"
 
     def test_rule_based_no_comma_street_city_split(self):
         """Verify intelligent street and city splitting without comma in rule-based fallback mode."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             res_ny = standardize_address("100 Wall Street New York NY 10005")
             assert res_ny.street1 == "100 WALL ST"
             assert res_ny.city == "NEW YORK"
@@ -1125,7 +1125,7 @@ class TestRuleBasedFallbackAndEdgeCases:
 
     def test_rule_based_no_comma_complex_patterns(self):
         """Verify rule-based comma-free parsing for PO Box, post-directional, and secondary units."""
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             # PO Box without comma
             res_pob = standardize_address("PO Box 123 New York NY 10001")
             assert res_pob.street1 == "PO BOX 123"
@@ -1193,7 +1193,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert city == "New York"
 
         # Reverse anchor with usaddress = None
-        with patch("address_standardizer.standardizer.usaddress", None):
+        with patch("address_standardizer.us_street_parser.usaddress", None):
             # Comma in before_sz
             st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("100 Main St, Austin TX 78701")
             assert st1 == "100 MAIN ST"
