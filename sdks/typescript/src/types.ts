@@ -15,6 +15,8 @@ export interface StandardizeRequest {
   enable_geocoding?: boolean;
   enable_fuzzy?: boolean;
   allow_locality?: boolean;
+  /** Replace a US state that contradicts the ZIP with the ZIP's state (default false). */
+  correct_state_from_zip?: boolean;
   include_metadata?: boolean;
 }
 
@@ -58,6 +60,7 @@ export interface BatchStandardizeRequest {
   enable_geocoding?: boolean;
   enable_fuzzy?: boolean;
   allow_locality?: boolean;
+  correct_state_from_zip?: boolean;
 }
 
 export interface AutocompleteRequest {

@@ -19,6 +19,8 @@ from address_standardizer._patterns import (
     is_invalid_thoroughfare,
 )
 from address_standardizer.international.base import (
+    may_abbreviate_street_type,
+    street_type_index,
     CountryGrammar,
     ParsedAddressComponents,
     split_intl_secondary_unit,
@@ -254,7 +256,8 @@ class IrelandGrammar(CountryGrammar):
             return ""
         words = text.strip().split()
         norm_words: List[str] = []
-        for w in words:
+        type_idx = street_type_index(words)
+        for idx, w in enumerate(words):
             w_clean = RE_NON_ALPHANUMERIC.sub("", w).upper()
             # Retain QUAY, LOWER, UPPER explicitly
             if w_clean in ("QUAY", "QUAYS"):
@@ -263,7 +266,7 @@ class IrelandGrammar(CountryGrammar):
                 norm_words.append("LOWER")
             elif w_clean in ("UPPER", "UPR"):
                 norm_words.append("UPPER")
-            elif w_clean in STREET_SUFFIXES:
+            elif w_clean in STREET_SUFFIXES and may_abbreviate_street_type(w_clean, idx, type_idx):
                 norm_words.append(STREET_SUFFIXES[w_clean])
             elif w_clean in DIRECTIONALS:
                 norm_words.append(DIRECTIONALS[w_clean])

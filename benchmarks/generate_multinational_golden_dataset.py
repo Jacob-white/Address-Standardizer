@@ -140,11 +140,11 @@ def generate_intl_01_uk(rng: random.Random) -> List[Dict[str, Any]]:
 
     st_suffix_norm = {
         "High Street": "HIGH ST", "Park Road": "PARK RD", "Victoria Street": "VICTORIA ST",
-        "Station Road": "STA RD", "Church Street": "CHURCH ST", "King Street": "KING ST",
-        "Queen Street": "QUEEN ST", "London Road": "LONDON RD", "Green Lane": "GRN LN",
-        "Manor Road": "MNR RD", "Bank Street": "BANK ST", "Mill Lane": "ML LN",
+        "Station Road": "STATION RD", "Church Street": "CHURCH ST", "King Street": "KING ST",
+        "Queen Street": "QUEEN ST", "London Road": "LONDON RD", "Green Lane": "GREEN LN",
+        "Manor Road": "MANOR RD", "Bank Street": "BANK ST", "Mill Lane": "MILL LN",
         "North Street": "N ST", "Market Place": "MARKET PL", "George Street": "GEORGE ST",
-        "Bridge Street": "BRG ST", "Broad Street": "BROAD ST", "Castle Street": "CASTLE ST",
+        "Bridge Street": "BRIDGE ST", "Broad Street": "BROAD ST", "Castle Street": "CASTLE ST",
         "New Road": "NEW RD", "Commercial Road": "COMMERCIAL RD",
     }
 

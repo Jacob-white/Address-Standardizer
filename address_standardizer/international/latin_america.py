@@ -97,7 +97,9 @@ RE_LATAM_SEC = re.compile(
 )
 
 # Floor/door like 2º B, 2o B, 2ª B, 2° B
-RE_FLOOR_DOOR = re.compile(r"\b(\d+)\s*[ºoª°]\s*([A-Za-z0-9\-]+)\b", re.IGNORECASE)
+# The ordinal marker is º/ª/° (optionally spaced) or a lowercase "o" glued to the number ("2o B"); a letter "o"
+# after a space is a word ("12 Oeste", "5 Oriente"). The door/letter is at most 3 characters ("B", "IZQ").
+RE_FLOOR_DOOR = re.compile(r"\b(\d+)(?:\s*[ºª°]\s*|o\s+)([A-Za-z0-9\-]{1,3})\b", re.IGNORECASE)
 
 
 class LatinAmericaGrammar(CountryGrammar):

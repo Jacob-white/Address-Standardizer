@@ -41,6 +41,7 @@ WARN_CRA_HUB_DETECTED = "WARN_CRA_HUB_DETECTED"
 WARN_PMB_DISGUISED = "WARN_PMB_DISGUISED"
 WARN_RESIDENTIAL_COMM = "WARN_RESIDENTIAL_COMM"
 WARN_TYPO_HEALED = "WARN_TYPO_HEALED"
+WARN_STATE_CORRECTED_FROM_ZIP = "WARN_STATE_CORRECTED_FROM_ZIP"
 WARN_CMRA_DETECTED = "WARN_CMRA_DETECTED"
 WARN_MISSING_SECONDARY_UNIT = "WARN_MISSING_SECONDARY_UNIT"
 WARN_VACANT_DELIVERY_POINT = "WARN_VACANT_DELIVERY_POINT"
@@ -123,6 +124,8 @@ class ConfidenceScorer:
         raw_combined = f"{raw_s1} {raw_s2}".strip().upper()
 
         reason_codes: List[str] = []
+        if raw.get("state_corrected_from"):
+            reason_codes.append(WARN_STATE_CORRECTED_FROM_ZIP)
 
         # 0. Check for locality-only / city-level addresses
         is_locality = getattr(std_address, "is_locality_only", False) or getattr(std_address, "address_status", "") in ("locality_only", "city_level")

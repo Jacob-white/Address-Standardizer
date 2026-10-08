@@ -13,6 +13,8 @@ from address_standardizer._patterns import (
     clean_redundant_street_tail,
 )
 from address_standardizer.international.base import (
+    may_abbreviate_street_type,
+    street_type_index,
     CountryGrammar,
     ParsedAddressComponents,
     split_intl_secondary_unit,
@@ -127,7 +129,7 @@ class CanadaGrammar(CountryGrammar):
 
         # Check Rural Route / Delivery modes
         m_rr = re.match(
-            r"^(RR|RURAL\s+ROUTE|SS|MR|STN\s+MAIN|COMP|CP|CASE\s+POSTALE)\s*#?\s*([A-Za-z0-9\-]+)?(.*)$",
+            r"^(RR|RURAL\s+ROUTE|SS|MR|STN\s+MAIN|COMP|CP|CASE\s+POSTALE)\b\s*#?\s*([A-Za-z0-9\-]+)?(.*)$",
             line,
             re.IGNORECASE,
         )
@@ -135,7 +137,8 @@ class CanadaGrammar(CountryGrammar):
             mode_raw = m_rr.group(1).upper()
             mode_norm = RURAL_DELIVERY_MODES.get(mode_raw, mode_raw)
             mode_num = m_rr.group(2) or ""
-            return None, None, f"{mode_norm} {mode_num}".strip()
+            trailing = (m_rr.group(3) or "").strip(" ,")  # "Site 3 Box 4" etc. must survive
+            return None, None, f"{mode_norm} {mode_num} {trailing}".strip()
 
         # Standard civic address
         m_num = re.match(r"^(\d+[A-Za-z0-9\-\/]*)\s+(.*)$", line)
@@ -172,9 +175,10 @@ class CanadaGrammar(CountryGrammar):
 
         # English suffix type: "King Street West"
         norm_words: List[str] = []
-        for w in words:
+        type_idx = street_type_index(words)
+        for idx, w in enumerate(words):
             w_clean = RE_NON_ALPHANUMERIC.sub("", w).upper()
-            if w_clean in STREET_SUFFIXES:
+            if w_clean in STREET_SUFFIXES and may_abbreviate_street_type(w_clean, idx, type_idx):
                 norm_words.append(STREET_SUFFIXES[w_clean])
             elif w_clean in DIRECTIONALS:
                 norm_words.append(DIRECTIONALS[w_clean])

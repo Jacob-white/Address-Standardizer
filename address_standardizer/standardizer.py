@@ -77,6 +77,8 @@ from address_standardizer.normalization import (  # noqa: E402
 from address_standardizer._inputs import (  # noqa: E402
     MAX_FIELD_LENGTH,
     coerce_text,
+    correct_state_from_zip as correct_state_from_zip_helper,
+    correct_state_from_zip_enabled,
     is_privacy_placeholder,
     normalize_po_box_spelling,
 )
@@ -248,6 +250,7 @@ def standardize_address(
     use_cache: bool = True,
     allow_locality: bool = False,
     finalize: bool = True,
+    correct_state_from_zip: Optional[bool] = None,
     **kwargs: Any,
 ) -> StandardizedAddress:
     """
@@ -258,6 +261,11 @@ def standardize_address(
     With ``finalize=False`` the confidence score, delivery intelligence, corporate risk and spatial
     resolution steps (and the result cache) are skipped, which is the fast batch-normalization mode used by
     ``_pure_python_core``.
+
+    A ZIP that belongs to a different state never changes how the address is standardized: the supplied state is
+    kept, ``ERR_ZIP_STATE_MISMATCH`` is reported and deliverability is UNDELIVERABLE (DPV footnote A1). Set
+    ``correct_state_from_zip=True`` (or ``ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP=1``) to replace the state with
+    the ZIP's state instead; the change is reported as ``WARN_STATE_CORRECTED_FROM_ZIP``. Off by default.
     """
     import os
 
@@ -268,6 +276,10 @@ def standardize_address(
     state = coerce_text(state) if state is not None else None
     postal_code = coerce_text(postal_code) if postal_code is not None else None
     country = coerce_text(country) if country is not None else None
+    original_state_arg = state
+    state_corrected_from: Optional[str] = None
+    if correct_state_from_zip_enabled(correct_state_from_zip):
+        state, state_corrected_from = correct_state_from_zip_helper(state, postal_code, country)
     allow_locality = allow_locality or bool(
         kwargs.get("allow_locality_only")
         or kwargs.get("allow_city_level")
@@ -285,6 +297,7 @@ def standardize_address(
         "enable_fuzzy": enable_fuzzy,
         "enable_geocoding": enable_geocoding,
         "allow_locality": allow_locality,
+        "state_corrected_from": state_corrected_from,
     }
 
     cache = get_default_cache()
@@ -294,13 +307,14 @@ def standardize_address(
             street1 if street1 is not None else kwargs.get("street"),
             street2,
             city,
-            state,
+            original_state_arg,
             postal_code,
             country,
             enable_fuzzy=enable_fuzzy,
             enable_geocoding=enable_geocoding,
             allow_locality=allow_locality,
             is_vacant=is_vacant if is_vacant is not None else kwargs.get("vacant"),
+            correct_state_from_zip=state_corrected_from is not None or correct_state_from_zip_enabled(correct_state_from_zip),
         )
         cached = cache.get(cache_key)
         if cached is not None:
@@ -659,6 +673,31 @@ def standardize_address(
                 country=country_iso,
                 raw_street_address=raw_street_address,
             )
+            # "Street, City, Postal, Country" written on one line: when the grammar did not isolate a valid postal
+            # code, split the locality off generically and parse the street and locality separately.
+            if not city_raw and not postal_raw and not state_raw and "," in s1_raw:
+                from address_standardizer.international.base import split_single_line_locality
+                from address_standardizer.international.postal import validate_postal_code
+
+                has_valid_postal = bool(parsed.postal_code) and bool(validate_postal_code(parsed.postal_code, country_iso))
+                split = None if has_valid_postal else split_single_line_locality(s1_raw, country_iso)
+                if split is not None:
+                    reparsed = grammar.standardize(
+                        street1=split[0],
+                        street2=s2_raw,
+                        city=split[1],
+                        state="",
+                        postal_code=split[2],
+                        country=country_iso,
+                        raw_street_address=raw_street_address,
+                    )
+                    # Adopt the locality split when it yields a postal code, unless it pushed a unit into street1
+                    # that the original parse had kept apart.
+                    unit_leaked = bool(RE_SEC_UNIT.search(reparsed.format_street1())) and not RE_SEC_UNIT.search(
+                        parsed.format_street1()
+                    )
+                    if reparsed.postal_code and not unit_leaked:
+                        parsed = reparsed
             norm_s1 = parsed.format_street1()
             norm_s2 = parsed.format_street2()
             norm_city = parsed.city or ""

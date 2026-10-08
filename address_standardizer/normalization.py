@@ -49,6 +49,12 @@ def _clean_token(t: str) -> str:
     return RE_CLEAN_TOKEN.sub("", t.strip())
 
 
+_US_STATE_NAMES = sorted((k for k in US_STATES if len(k) > 2 and k.replace(" ", "").isalpha()), key=len, reverse=True)
+_RE_STATE_NAME_ZIP = re.compile(
+    r"(?:^|[,\s])(?:" + "|".join(re.escape(n) for n in _US_STATE_NAMES) + r")\s+\d{5}(?:-\d{4})?\s*$"
+)
+
+
 def normalize_country_code(
     country_raw: Optional[str],
     state_raw: Optional[str] = None,
@@ -148,6 +154,10 @@ def normalize_country_code(
         m_sz = RE_STATE_ZIP.search(st_clean)
         if m_sz and m_sz.group(1).upper() in FROZEN_US_STATE_CODES:
             return "USA"
+        # "..., Poland, Ohio 44514": a full US state name followed by a 5-digit ZIP is a US address even when the
+        # city (Poland, Denmark, Holland, Peru) or the state (Georgia) is also a country name.
+        if _RE_STATE_NAME_ZIP.search(st_clean):
+            return "USA"
 
         # Check if address ends with a US state code/name (or US state before country)
         # BEFORE scanning raw components against COUNTRY_MAP to prevent domestic namesake cities
@@ -169,6 +179,17 @@ def normalize_country_code(
                     sub_last = RE_NON_ALPHANUMERIC.sub("", subwords[-1]).strip().upper()
                     if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
                         return "USA"
+
+        # A trailing comma part that is a country's name in any supported language/accent ("Italia", "Belgique",
+        # "Sverige", "México") resolves through the same registry the structured `country` field uses.
+        if len(raw_parts) >= 2:
+            trailing = raw_parts[-1].strip()
+            if 3 <= len(trailing) <= 40 and not any(ch.isdigit() for ch in trailing):
+                from address_standardizer.international.countries import CountryRegistry
+
+                info = CountryRegistry.get(trailing)
+                if info is not None and info.alpha3 != "USA":
+                    return info.alpha3
 
         # Check country map in raw street components (ignoring US state abbreviations and numbers)
         for part in raw_street.split(","):

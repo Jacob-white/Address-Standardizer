@@ -1,10 +1,12 @@
 """Input coercion and guard helpers shared by the standardization pipeline."""
 
 import math
+import os
 import re
-from typing import Any
+from typing import Any, Optional, Tuple
 
 from address_standardizer._patterns import RE_PRIVATE_RESIDENCE
+from address_standardizer.tables import US_STATES, ZIP3_TO_STATE
 
 # No real address line is anywhere near this long; longer inputs would only feed quadratic regexes and parsers.
 MAX_FIELD_LENGTH = 600
@@ -58,3 +60,41 @@ def is_privacy_placeholder(*fields: str) -> bool:
         if first_part and RE_PRIVATE_RESIDENCE.fullmatch(first_part):
             return True
     return False
+
+
+CORRECT_STATE_ENV = "ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP"
+_US_COUNTRY_NAMES = frozenset({"", "US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA"})
+_RE_ZIP5 = re.compile(r"^\s*(\d{5})(?:[-\s]?\d{4})?\s*$")
+
+
+def correct_state_from_zip_enabled(explicit: Optional[bool]) -> bool:
+    """Per-call setting wins; otherwise the ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP environment switch."""
+    if explicit is not None:
+        return bool(explicit)
+    return os.environ.get(CORRECT_STATE_ENV, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def correct_state_from_zip(
+    state: Optional[str], postal_code: Optional[str], country: Optional[str]
+) -> Tuple[Optional[str], Optional[str]]:
+    """Replace a US state that contradicts the ZIP code with the state the ZIP belongs to.
+
+    Returns ``(state, original_state)``; ``original_state`` is None when nothing was changed. Only a US address
+    with a valid 5-digit ZIP and a *recognizable* US state that differs from the ZIP's state is touched, so
+    missing/unknown states and non-US addresses pass through unchanged.
+    """
+    if not state or not postal_code:
+        return state, None
+    if (country or "").strip().upper() not in _US_COUNTRY_NAMES:
+        return state, None
+    m = _RE_ZIP5.match(postal_code)
+    if not m:
+        return state, None
+    expected = ZIP3_TO_STATE.get(m.group(1)[:3])
+    if not expected:
+        return state, None
+    raw = state.strip().upper().replace(".", "")
+    current = US_STATES.get(raw, raw)
+    if current not in set(US_STATES.values()) or current == expected:
+        return state, None
+    return expected, state

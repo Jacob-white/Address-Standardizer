@@ -13,6 +13,8 @@ import re
 from typing import ClassVar, List, Optional, Tuple
 
 from address_standardizer.international.base import (
+    may_abbreviate_street_type,
+    street_type_index,
     CountryGrammar,
     ParsedAddressComponents,
     split_intl_secondary_unit,
@@ -168,9 +170,10 @@ class SingaporeGrammar(CountryGrammar):
         if st_name:
             words = st_name.split()
             norm_words = []
-            for w in words:
+            type_idx = street_type_index(words)
+            for idx, w in enumerate(words):
                 w_up = w.upper()
-                if w_up in STREET_SUFFIXES:
+                if w_up in STREET_SUFFIXES and may_abbreviate_street_type(w_up, idx, type_idx):
                     norm_words.append(STREET_SUFFIXES[w_up])
                 elif w_up in DIRECTIONALS:
                     norm_words.append(DIRECTIONALS[w_up])

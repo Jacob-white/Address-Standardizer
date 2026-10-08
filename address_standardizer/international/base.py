@@ -34,6 +34,92 @@ from address_standardizer.tables import (
 )
 
 
+def split_single_line_locality(text: str, country_iso: str) -> Optional[Tuple[str, str, str]]:
+    """Split "Street, City, Postal[, Country]" / "Street, Postal City[, Country]" into (street, city, postal).
+
+    Used as a fallback when a country grammar returned neither a city nor a postal code for a single-line address.
+    Returns None when no postal code or locality can be identified.
+    """
+    from address_standardizer.international.countries import CountryRegistry
+    from address_standardizer.international.postal import extract_postal_code
+
+    parts = [p.strip() for p in (text or "").split(",") if p.strip()]
+    if len(parts) >= 2:
+        info = CountryRegistry.get(parts[-1]) if not any(ch.isdigit() for ch in parts[-1]) else None
+        if info is not None and info.alpha3 == country_iso:
+            parts = parts[:-1]  # the trailing country name
+    if len(parts) < 2:
+        return None
+
+    last = parts[-1]
+    postal = extract_postal_code(last, country_iso) or ""
+    if postal:
+        locality = re.sub(re.escape(postal), " ", last, count=1, flags=re.IGNORECASE)
+        locality = RE_WHITESPACE.sub(" ", locality).strip(" ,.-")
+        rest = parts[:-1]
+        if not locality and len(rest) >= 2:
+            locality = rest[-1]
+            rest = rest[:-1]
+        if not rest:
+            return None
+        return ", ".join(rest), locality, postal
+
+    # No postal code in the last part: it is the city; look for the code in the part before it.
+    before = parts[-2]
+    postal = extract_postal_code(before, country_iso) or ""
+    if postal and re.fullmatch(re.escape(postal), before.strip(), flags=re.IGNORECASE):
+        rest = parts[:-2]
+        if rest:
+            return ", ".join(rest), last, postal
+    return None
+
+
+# Articles/particles that are part of a name and never street types ("Al Olaya", "El Camino").
+NAME_PARTICLES = frozenset({"AL", "EL", "LA", "LE", "LES", "LOS", "LAS", "DE", "DEL", "DER", "DIE", "DAS", "THE"})
+
+
+# Unambiguous street types may be abbreviated anywhere after the first word ("1 Stratton Place Residential Ltd");
+# every other suffix word (Mill, Orchard, Green, Park, Station, ...) only in the street-type position.
+UNAMBIGUOUS_STREET_TYPES = frozenset({
+    "STREET", "ST", "ROAD", "RD", "AVENUE", "AVE", "LANE", "LN", "DRIVE", "DR", "PLACE", "PL", "COURT", "CT",
+    "BOULEVARD", "BLVD", "TERRACE", "TER", "CIRCLE", "CIR", "SQUARE", "SQ", "PARKWAY", "PKWY", "HIGHWAY", "HWY",
+    "CRESCENT", "CRES", "WAY", "GARDENS", "GDNS",
+})
+_TRAILING_MODIFIERS = frozenset({"LOWER", "UPPER", "LR", "UPR", "CENTRAL", "EXTENSION", "EXT"})
+
+
+def street_type_index(words: List[str]) -> Set[int]:
+    """Indices that can carry the street type: per comma-delimited segment, the last word that is not a trailing
+    directional or modifier ("10 North Road West" -> ROAD, "10 Baggot Street Lower" -> STREET).
+
+    Street-type abbreviations apply at these positions (or for UNAMBIGUOUS_STREET_TYPES); abbreviating
+    place-name words inside a street name ("Orchard Road" -> "ORCH RD", "Mill Lane" -> "ML LN") corrupts real names.
+    """
+    indices: Set[int] = set()
+    seg_start = 0
+    for idx, w in enumerate(words):
+        if w.endswith(",") or idx == len(words) - 1:
+            ti = idx
+            while ti > seg_start and (
+                RE_NON_ALPHANUMERIC.sub("", words[ti]).upper() in DIRECTIONALS
+                or RE_NON_ALPHANUMERIC.sub("", words[ti]).upper() in _TRAILING_MODIFIERS
+            ):
+                ti -= 1
+            indices.add(ti)
+            seg_start = idx + 1
+    return indices
+
+
+def may_abbreviate_street_type(clean_word: str, idx: int, type_indices: Set[int], *, allow_first: bool = False) -> bool:
+    """True when `clean_word` (upper-case, punctuation stripped) at `idx` should be abbreviated as a street type."""
+    if clean_word in NAME_PARTICLES or (idx == 0 and not allow_first):
+        return False
+    return clean_word in UNAMBIGUOUS_STREET_TYPES or idx in type_indices
+
+
+_LEADING_STREET_TYPES = frozenset({"AV", "AVE", "AVENUE", "AVDA", "AVENIDA", "AVN", "BLVD", "BOULEVARD", "BLV"})
+
+
 def split_intl_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
     """Helper to detect and split secondary unit in international street string, and normalize suffixes."""
     st1 = (street1 or "").upper()
@@ -89,17 +175,27 @@ def split_intl_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
 
     words = st1.split()
     norm_words = []
-    for w in words:
+    type_indices = street_type_index(words)
+    last_index = len(words) - 1
+    for idx, w in enumerate(words):
         w_clean = RE_NON_ALPHANUMERIC.sub("", w).upper()
         if w_clean == "FORT":
             norm_words.append("FORT")
         elif w_clean == "AL" and (w.endswith(".") or w.lower() == "al."):
             norm_words.append("AL.")
+        elif w_clean in ("AL", "EL", "LA", "LE", "LES", "LOS", "LAS", "DE", "DEL", "DER", "DIE", "DAS", "THE"):
+            # Articles/particles (Arabic "Al", Spanish "El", ...) are part of the name, never street types.
+            norm_words.append(w)
         elif w_clean == "SOUTH" and "CHURCH" in st1.upper():
             norm_words.append("SOUTH")
-        elif w_clean in STREET_SUFFIXES:
+        elif w_clean in _LEADING_STREET_TYPES and len(words) > 1 and (idx == 0 or (idx == 1 and words[0][:1].isdigit())):
+            # Spanish/Portuguese-style addresses put the type first ("Av. Vallarta 1300").
+            norm_words.append(STREET_SUFFIXES.get(w_clean, w))
+        elif w_clean in STREET_SUFFIXES and may_abbreviate_street_type(w_clean, idx, type_indices):
+            # Only the terminal word is a street type; abbreviating place-name words inside the street name
+            # ("Orchard Road" -> "ORCH RD", "Mill Lane" -> "ML LN") corrupts real street names.
             norm_words.append(STREET_SUFFIXES[w_clean])
-        elif w_clean in DIRECTIONALS:
+        elif w_clean in DIRECTIONALS and (idx == 0 or idx == last_index or idx == 1 and words[0].isdigit()):
             norm_words.append(DIRECTIONALS[w_clean])
         else:
             norm_words.append(w)

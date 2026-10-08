@@ -28,6 +28,7 @@ def make_cache_key(
     enable_geocoding: bool = False,
     allow_locality: bool = False,
     is_vacant: Optional[bool] = None,
+    correct_state_from_zip: bool = False,
     **kwargs: Any,
 ) -> str:
     """Computes a normalized cache key from input address components.
@@ -47,6 +48,8 @@ def make_cache_key(
     vacant = is_vacant if is_vacant is not None else kwargs.get("vacant")
     if vacant is not None:
         parts.append("VACANT" if vacant else "NOT_VACANT")
+    if correct_state_from_zip:
+        parts.append("ZIP_STATE")
     if not enable_fuzzy:
         parts.append("NO_FUZZY")
     if enable_geocoding:

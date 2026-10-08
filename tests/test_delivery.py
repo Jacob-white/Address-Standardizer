@@ -313,3 +313,77 @@ class TestDeliveryHardening:
         assert self._eval("123 Main St", "New York", "NY", "90210").deliverability == Deliverability.UNDELIVERABLE
         assert self._eval("PO Box 12", "New York", "NY", "9021").deliverability == Deliverability.UNDELIVERABLE
         assert self._eval("123 Main St", "New York", "NY", "10005").deliverability == Deliverability.DELIVERABLE
+
+
+class TestZipStateMismatchPolicy:
+    """A ZIP in a different state is a data point (UNDELIVERABLE), never a reason to alter or reject the address."""
+
+    ROW = ("123 Main St", "", "New York", "NY", "90210")  # 90210 is a California ZIP
+
+    def test_default_keeps_the_given_state_and_flags_the_mismatch(self):
+        from address_standardizer import standardize_address
+
+        res = standardize_address(*self.ROW, use_cache=False)
+        assert res.address_status == "standardized"
+        assert (res.street1, res.city, res.state, res.postal_code) == ("123 MAIN ST", "NEW YORK", "NY", "90210")
+        assert res.deliverability.name == "UNDELIVERABLE"
+        assert "ERR_ZIP_STATE_MISMATCH" in res.failure_reason_codes
+        assert "A1" in [str(f) for f in res.dpv_footnotes]
+
+    def test_option_replaces_the_state_with_the_zips_state(self):
+        from address_standardizer import standardize_address
+
+        res = standardize_address(*self.ROW, use_cache=False, correct_state_from_zip=True)
+        assert res.state == "CA"
+        assert res.address_status == "standardized"
+        assert res.normalized_address_key == "123 MAIN ST||NEW YORK|CA|90210|USA"
+        assert "WARN_STATE_CORRECTED_FROM_ZIP" in res.failure_reason_codes
+        assert "ERR_ZIP_STATE_MISMATCH" not in res.failure_reason_codes
+        assert res.deliverability.name == "DELIVERABLE"
+
+    def test_environment_switch_enables_the_option(self, monkeypatch):
+        from address_standardizer import standardize_address
+
+        monkeypatch.setenv("ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP", "1")
+        assert standardize_address(*self.ROW, use_cache=False).state == "CA"
+        # an explicit per-call False wins over the environment
+        assert standardize_address(*self.ROW, use_cache=False, correct_state_from_zip=False).state == "NY"
+
+    def test_matching_missing_foreign_and_unknown_states_are_left_alone(self):
+        from address_standardizer import standardize_address as sa
+
+        assert sa("123 Main St", "", "New York", "NY", "10005", use_cache=False, correct_state_from_zip=True).state == "NY"
+        assert "WARN_STATE_CORRECTED_FROM_ZIP" not in sa(
+            "123 Main St", "", "New York", "NY", "10005", use_cache=False, correct_state_from_zip=True
+        ).failure_reason_codes
+        assert sa("123 Main St", "", "Toronto", "ON", "M5V 2T6", "CAN", use_cache=False, correct_state_from_zip=True).state == "ON"
+
+    def test_cached_results_do_not_mix_the_two_modes(self):
+        from address_standardizer import standardize_address as sa
+
+        assert sa(*self.ROW).state == "NY"
+        assert sa(*self.ROW, correct_state_from_zip=True).state == "CA"
+        assert sa(*self.ROW).state == "NY"
+
+    def test_api_and_cli_expose_the_option(self, tmp_path):
+        import subprocess
+        import sys
+
+        from fastapi.testclient import TestClient
+
+        from address_standardizer.server import app
+
+        client = TestClient(app)
+        plain = client.post("/v1/standardize", json={"street1": "123 Main St", "city": "New York", "state": "NY", "postal_code": "90210"}).json()
+        fixed = client.post(
+            "/v1/standardize",
+            json={"street1": "123 Main St", "city": "New York", "state": "NY", "postal_code": "90210", "correct_state_from_zip": True},
+        ).json()
+        assert (plain["state"], fixed["state"]) == ("NY", "CA")
+        batch = client.post("/v1/batch", json={"addresses": [{"street1": "123 Main St", "city": "New York", "state": "NY", "postal_code": "90210"}], "correct_state_from_zip": True}).json()
+        assert batch[0]["state"] == "CA"
+        out = subprocess.run(
+            [sys.executable, "-m", "address_standardizer.cli", "parse", "123 Main St", "--city", "New York", "--state", "NY", "--zip", "90210", "--correct-state-from-zip"],
+            capture_output=True, text=True, timeout=60,
+        )
+        assert '"state": "CA"' in out.stdout, out.stderr

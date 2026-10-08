@@ -12,6 +12,8 @@ from address_standardizer._patterns import (
     is_invalid_thoroughfare,
 )
 from address_standardizer.international.base import (
+    may_abbreviate_street_type,
+    street_type_index,
     CountryGrammar,
     ParsedAddressComponents,
 )
@@ -303,13 +305,14 @@ class UKGrammar(CountryGrammar):
             return ""
         words = text.strip().split()
         norm_words: List[str] = []
-        for w in words:
+        type_idx = street_type_index(words)
+        for idx, w in enumerate(words):
             if "-" in w and any(c.isalpha() for c in w):
                 subparts = w.split("-")
                 norm_sub = []
-                for sp in subparts:
+                for sub_idx, sp in enumerate(subparts):
                     sp_clean = RE_NON_ALPHANUMERIC.sub("", sp).upper()
-                    if sp_clean in STREET_SUFFIXES:
+                    if sub_idx == len(subparts) - 1 and sp_clean in STREET_SUFFIXES and may_abbreviate_street_type(sp_clean, idx, type_idx, allow_first=True):
                         norm_sub.append(STREET_SUFFIXES[sp_clean])
                     elif sp_clean in DIRECTIONALS:
                         norm_sub.append(DIRECTIONALS[sp_clean])
@@ -318,7 +321,7 @@ class UKGrammar(CountryGrammar):
                 norm_words.append("-".join(norm_sub))
             else:
                 w_clean = RE_NON_ALPHANUMERIC.sub("", w).upper()
-                if w_clean in STREET_SUFFIXES:
+                if w_clean in STREET_SUFFIXES and may_abbreviate_street_type(w_clean, idx, type_idx):
                     norm_words.append(STREET_SUFFIXES[w_clean])
                 elif w_clean in DIRECTIONALS:
                     norm_words.append(DIRECTIONALS[w_clean])

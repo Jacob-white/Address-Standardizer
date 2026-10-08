@@ -186,6 +186,11 @@ class StandardizeRequest(BaseModel):
     enable_geocoding: bool = Field(default=True, description="Enable offline rooftop/TIGER geocoding")
     enable_fuzzy: bool = Field(default=True, description="Enable Levenshtein typo correction")
     allow_locality: bool = Field(default=False, description="Allow locality-only / city-level fallback")
+    correct_state_from_zip: bool = Field(
+        default=False,
+        description="Replace a US state that contradicts the ZIP with the ZIP's state (reported as WARN_STATE_CORRECTED_FROM_ZIP). "
+        "Off by default: a mismatching state is kept and the address is flagged ERR_ZIP_STATE_MISMATCH / UNDELIVERABLE.",
+    )
     include_metadata: bool = Field(default=True, description="Include delivery intelligence and spatial metadata")
 
     model_config = {
@@ -246,6 +251,7 @@ class BatchStandardizeRequest(BaseModel):
     enable_geocoding: bool = Field(default=True, description="Enable offline geocoding")
     enable_fuzzy: bool = Field(default=True, description="Enable typo correction")
     allow_locality: bool = Field(default=False, description="Allow locality-level fallback")
+    correct_state_from_zip: bool = Field(default=False, description="Replace a state that contradicts the ZIP with the ZIP's state")
 
 
 class AutocompleteRequest(BaseModel):
@@ -304,6 +310,7 @@ def _standardize_from_req(req: StandardizeRequest) -> Dict[str, Any]:
         enable_geocoding=req.enable_geocoding,
         enable_fuzzy=req.enable_fuzzy,
         allow_locality=req.allow_locality,
+        correct_state_from_zip=req.correct_state_from_zip,
     )
     return std.as_dict(include_metadata=req.include_metadata, include_rooftop=True)
 
@@ -313,6 +320,7 @@ def _process_item_to_dict(
     default_geocoding: bool = True,
     default_fuzzy: bool = True,
     default_allow_locality: bool = False,
+    default_correct_state_from_zip: bool = False,
 ) -> Dict[str, Any]:
     if isinstance(item, str):
         req = StandardizeRequest(
@@ -320,6 +328,7 @@ def _process_item_to_dict(
             enable_geocoding=default_geocoding,
             enable_fuzzy=default_fuzzy,
             allow_locality=default_allow_locality,
+            correct_state_from_zip=default_correct_state_from_zip,
         )
     elif isinstance(item, dict):
         req = StandardizeRequest(
@@ -333,6 +342,7 @@ def _process_item_to_dict(
             enable_geocoding=item.get("enable_geocoding", default_geocoding),
             enable_fuzzy=item.get("enable_fuzzy", default_fuzzy),
             allow_locality=item.get("allow_locality", default_allow_locality),
+            correct_state_from_zip=item.get("correct_state_from_zip", default_correct_state_from_zip),
             include_metadata=item.get("include_metadata", True),
         )
     elif isinstance(item, StandardizeRequest):
@@ -496,6 +506,7 @@ def create_app() -> FastAPI:
         default_geo = True
         default_fuzzy = True
         default_allow_loc = False
+        default_zip_state = False
 
         if isinstance(body, list):
             addresses_list = body
@@ -504,10 +515,12 @@ def create_app() -> FastAPI:
             default_geo = body.get("enable_geocoding", True)
             default_fuzzy = body.get("enable_fuzzy", True)
             default_allow_loc = body.get("allow_locality", False)
+            default_zip_state = body.get("correct_state_from_zip", False)
             for flag_name, flag_value in (
                 ("enable_geocoding", default_geo),
                 ("enable_fuzzy", default_fuzzy),
                 ("allow_locality", default_allow_loc),
+                ("correct_state_from_zip", default_zip_state),
             ):
                 if not isinstance(flag_value, bool):
                     raise HTTPException(status_code=400, detail=f"'{flag_name}' must be a boolean")
@@ -534,6 +547,7 @@ def create_app() -> FastAPI:
                             default_geocoding=default_geo,
                             default_fuzzy=default_fuzzy,
                             default_allow_locality=default_allow_loc,
+                            default_correct_state_from_zip=default_zip_state,
                         )
                         yield json.dumps(res) + "\n"
                     except Exception as exc:
@@ -552,6 +566,7 @@ def create_app() -> FastAPI:
                             default_geocoding=default_geo,
                             default_fuzzy=default_fuzzy,
                             default_allow_locality=default_allow_loc,
+                            default_correct_state_from_zip=default_zip_state,
                         )
                     )
                 except ValidationError as exc:

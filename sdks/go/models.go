@@ -12,52 +12,55 @@ type StandardizeRequest struct {
 	EnableGeocoding *bool  `json:"enable_geocoding,omitempty"`
 	EnableFuzzy     *bool  `json:"enable_fuzzy,omitempty"`
 	AllowLocality   *bool  `json:"allow_locality,omitempty"`
-	IncludeMetadata *bool  `json:"include_metadata,omitempty"`
+	// CorrectStateFromZip replaces a US state that contradicts the ZIP with the ZIP's state (server default: false).
+	CorrectStateFromZip *bool `json:"correct_state_from_zip,omitempty"`
+	IncludeMetadata     *bool `json:"include_metadata,omitempty"`
 }
 
 // StandardizedAddress represents an ISO / USPS Pub 28 standardized address.
 type StandardizedAddress struct {
-	Street1               string                 `json:"street1"`
-	Street2               string                 `json:"street2"`
-	City                  string                 `json:"city"`
-	State                 string                 `json:"state"`
-	PostalCode            string                 `json:"postal_code"`
-	Country               string                 `json:"country"`
-	CountryISO3           string                 `json:"country_iso3"`
-	NormalizedAddressKey  string                 `json:"normalized_address_key"`
-	BuildingKey           string                 `json:"building_key"`
-	PhoneticKey           string                 `json:"phonetic_key"`
-	AddressStatus         string                 `json:"address_status"`
-	IsUS                  bool                   `json:"is_us"`
-	IsPrivateResidence    bool                   `json:"is_private_residence"`
-	IsRegisteredAgentHub  bool                   `json:"is_registered_agent_hub"`
-	Deliverability        string                 `json:"deliverability"`
-	Latitude              *float64               `json:"latitude"`
-	Longitude             *float64               `json:"longitude"`
-	Precision             string                 `json:"precision"`
-	AccuracyRadiusMeters  *float64               `json:"accuracy_radius_meters"`
-	CensusTract           string                 `json:"census_tract"`
-	FIPSCode              string                 `json:"fips_code"`
-	ConfidenceScore       *float64               `json:"confidence_score"`
-	RoutingTier           string                 `json:"routing_tier"`
-	RDI                   string                 `json:"rdi"`
-	CMRA                  bool                   `json:"cmra"`
-	Vacant                bool                   `json:"vacant"`
-	DPVFootnotes          []string               `json:"dpv_footnotes"`
-	CorporateRiskScore    *float64               `json:"corporate_risk_score"`
-	CorporateRiskFlags    []string               `json:"corporate_risk_flags"`
-	RooftopAddress        string                 `json:"rooftop_address"`
-	FullRooftopAddress    string                 `json:"full_rooftop_address"`
-	RawStreetAddress      string                 `json:"raw_street_address,omitempty"`
-	Extra                 map[string]interface{} `json:"-"`
+	Street1              string                 `json:"street1"`
+	Street2              string                 `json:"street2"`
+	City                 string                 `json:"city"`
+	State                string                 `json:"state"`
+	PostalCode           string                 `json:"postal_code"`
+	Country              string                 `json:"country"`
+	CountryISO3          string                 `json:"country_iso3"`
+	NormalizedAddressKey string                 `json:"normalized_address_key"`
+	BuildingKey          string                 `json:"building_key"`
+	PhoneticKey          string                 `json:"phonetic_key"`
+	AddressStatus        string                 `json:"address_status"`
+	IsUS                 bool                   `json:"is_us"`
+	IsPrivateResidence   bool                   `json:"is_private_residence"`
+	IsRegisteredAgentHub bool                   `json:"is_registered_agent_hub"`
+	Deliverability       string                 `json:"deliverability"`
+	Latitude             *float64               `json:"latitude"`
+	Longitude            *float64               `json:"longitude"`
+	Precision            string                 `json:"precision"`
+	AccuracyRadiusMeters *float64               `json:"accuracy_radius_meters"`
+	CensusTract          string                 `json:"census_tract"`
+	FIPSCode             string                 `json:"fips_code"`
+	ConfidenceScore      *float64               `json:"confidence_score"`
+	RoutingTier          string                 `json:"routing_tier"`
+	RDI                  string                 `json:"rdi"`
+	CMRA                 bool                   `json:"cmra"`
+	Vacant               bool                   `json:"vacant"`
+	DPVFootnotes         []string               `json:"dpv_footnotes"`
+	CorporateRiskScore   *float64               `json:"corporate_risk_score"`
+	CorporateRiskFlags   []string               `json:"corporate_risk_flags"`
+	RooftopAddress       string                 `json:"rooftop_address"`
+	FullRooftopAddress   string                 `json:"full_rooftop_address"`
+	RawStreetAddress     string                 `json:"raw_street_address,omitempty"`
+	Extra                map[string]interface{} `json:"-"`
 }
 
 // BatchStandardizeRequest contains a list of address items to standardize.
 type BatchStandardizeRequest struct {
-	Addresses       []interface{} `json:"addresses"`
-	EnableGeocoding *bool         `json:"enable_geocoding,omitempty"`
-	EnableFuzzy     *bool         `json:"enable_fuzzy,omitempty"`
-	AllowLocality   *bool         `json:"allow_locality,omitempty"`
+	Addresses           []interface{} `json:"addresses"`
+	EnableGeocoding     *bool         `json:"enable_geocoding,omitempty"`
+	EnableFuzzy         *bool         `json:"enable_fuzzy,omitempty"`
+	AllowLocality       *bool         `json:"allow_locality,omitempty"`
+	CorrectStateFromZip *bool         `json:"correct_state_from_zip,omitempty"`
 }
 
 // AutocompleteRequest represents a typeahead query with optional proximity bias.

@@ -36,6 +36,10 @@ namespace AddressStandardizer.Client
         [JsonPropertyName("allow_locality")]
         public bool AllowLocality { get; set; } = false;
 
+        /// <summary>Replace a US state that contradicts the ZIP with the ZIP's state. Null uses the server default (false).</summary>
+        [JsonPropertyName("correct_state_from_zip")]
+        public bool? CorrectStateFromZip { get; set; }
+
         [JsonPropertyName("include_metadata")]
         public bool IncludeMetadata { get; set; } = true;
     }
@@ -149,6 +153,10 @@ namespace AddressStandardizer.Client
 
         [JsonPropertyName("allow_locality")]
         public bool AllowLocality { get; set; } = false;
+
+        /// <summary>Replace a US state that contradicts the ZIP with the ZIP's state. Null uses the server default (false).</summary>
+        [JsonPropertyName("correct_state_from_zip")]
+        public bool? CorrectStateFromZip { get; set; }
     }
 
     public class AutocompleteRequest

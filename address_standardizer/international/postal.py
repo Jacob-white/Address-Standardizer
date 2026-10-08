@@ -987,6 +987,11 @@ def _extract_for_country(text: str, c_info: CountryInfo) -> Optional[str]:
             res = validate_postal_code(m.group(1), alpha3, return_details=True)
             if isinstance(res, PostalValidationResult) and res.is_valid:
                 return res.formatted_code
+        # Space-separated 3+2 groups as written in CZ, SK, SE, GR ("111 51")
+        for m in reversed(list(re.finditer(r"\b(\d{3}\s\d{2})\b", text))):
+            res = validate_postal_code(m.group(1), alpha3, return_details=True)
+            if isinstance(res, PostalValidationResult) and res.is_valid:
+                return res.formatted_code
         return None
 
     # Standard 6-digit countries (China, India, Russia, Singapore, Colombia, etc.)

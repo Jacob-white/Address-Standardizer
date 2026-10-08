@@ -261,8 +261,15 @@ def _port_number(value: str) -> int:
     return number
 
 
+def _apply_zip_state_flag(args: argparse.Namespace) -> None:
+    """Honour --correct-state-from-zip for this process and any batch worker processes it starts."""
+    if getattr(args, "correct_state_from_zip", False):
+        os.environ["ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP"] = "1"
+
+
 def _cmd_parse(args: argparse.Namespace) -> None:
     """Handler for the `parse` subcommand."""
+    _apply_zip_state_flag(args)
     if args.no_cache:
         configure_cache(enabled=False)
 
@@ -415,6 +422,7 @@ def _cmd_validate_postal(args: argparse.Namespace) -> None:
 
 def _cmd_batch(args: argparse.Namespace) -> None:
     """Handler for the `batch` subcommand."""
+    _apply_zip_state_flag(args)
     if args.no_cache:
         configure_cache(enabled=False)
 
@@ -809,6 +817,7 @@ def main():
         shorthand_parser = argparse.ArgumentParser(prog="address-standardizer", add_help=False, exit_on_error=False)
         shorthand_parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json")
         shorthand_parser.add_argument("--country", "-c", default="USA")
+        shorthand_parser.add_argument("--correct-state-from-zip", action="store_true")
         shorthand_parser.add_argument("address", nargs="*")
         unknown_flags: List[str] = []
         try:
@@ -827,7 +836,11 @@ def main():
         if s_args is not None and not (s_args.address and s_args.address[0] in _known_subcommands):
             if s_args.address:
                 raw_addr = " ".join(s_args.address)
-                res = standardize_address(street1=raw_addr, country=s_args.country)
+                res = standardize_address(
+                    street1=raw_addr,
+                    country=s_args.country,
+                    correct_state_from_zip=True if s_args.correct_state_from_zip else None,
+                )
                 data = res.as_dict()
                 if res.dependent_locality:
                     data["dependent_locality"] = res.dependent_locality
@@ -876,6 +889,7 @@ def main():
     parse_parser.add_argument("--confidence", action="store_true", help="Include composite confidence score and routing tier")
     parse_parser.add_argument("--audit", action="store_true", help="Include stewardship audit record details")
     parse_parser.add_argument("--no-cache", action="store_true", help="Bypass multi-tier reference cache")
+    parse_parser.add_argument("--correct-state-from-zip", action="store_true", help="Replace a US state that contradicts the ZIP with the ZIP's state (reported as WARN_STATE_CORRECTED_FROM_ZIP). Default: keep the given state, flag ERR_ZIP_STATE_MISMATCH and mark the address UNDELIVERABLE.")
 
     # Command: batch CSV processing
     batch_parser = subparsers.add_parser("batch", help="Batch standardize a CSV file")
@@ -899,6 +913,7 @@ def main():
     batch_parser.add_argument("--confidence", action="store_true", help="Include confidence_score and routing_tier columns")
     batch_parser.add_argument("--audit-csv", help="Path to write audit ledger records as CSV")
     batch_parser.add_argument("--no-cache", action="store_true", help="Disable caching during batch processing")
+    batch_parser.add_argument("--correct-state-from-zip", action="store_true", help="Replace a US state that contradicts the ZIP with the ZIP's state (reported as WARN_STATE_CORRECTED_FROM_ZIP). Default: keep the given state, flag ERR_ZIP_STATE_MISMATCH and mark the address UNDELIVERABLE.")
 
     # Command: benchmark
     bench_parser = subparsers.add_parser("benchmark", help="Execute performance and golden accuracy benchmarks")
