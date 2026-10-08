@@ -7,6 +7,7 @@ thread-safe zero-downtime atomic hot-swapping.
 """
 
 import copy
+import dataclasses
 import json
 import os
 import re
@@ -104,6 +105,7 @@ class OfflineReferenceIndex:
         self._pid = os.getpid()
         self._lock = threading.RLock()
         self._resolve_cache: Dict[Tuple[Any, ...], Optional[RooftopRecord]] = {}
+        self._resolve_token: Optional[Tuple[int, int, int]] = None
         self._real_conn = sqlite3.connect(self._db_path, check_same_thread=False)
         self._real_conn.row_factory = sqlite3.Row
         self._init_schema(self._real_conn)
@@ -432,10 +434,32 @@ class OfflineReferenceIndex:
             metadata=meta,
         )
 
+    _RESOLVE_CACHE_MAX = 8192
+
+    @staticmethod
+    def _clone_record(rec: Optional[RooftopRecord]) -> Optional[RooftopRecord]:
+        """Cheap copy that isolates the mutable containers of a cached record."""
+        if rec is None:
+            return None
+        return dataclasses.replace(
+            rec,
+            known_units=list(rec.known_units),
+            metadata=copy.deepcopy(rec.metadata) if rec.metadata else {},
+        )
+
+    def _resolve_cache_token(self, conn: sqlite3.Connection) -> Tuple[int, int, int]:
+        """Changes whenever the data under the cache may have changed.
+
+        `total_changes` covers writes through this connection (including direct `_conn.execute` calls),
+        `PRAGMA data_version` covers commits from other connections/processes, and `id(conn)` covers
+        reconnects (e.g. after a fork).
+        """
+        return (id(conn), conn.total_changes, conn.execute("PRAGMA data_version").fetchone()[0])
+
     def resolve_coordinates(self, address: Any) -> Optional[RooftopRecord]:
         """
-        Memoized front for `_resolve_coordinates_uncached` (structured addresses only; the cache is cleared
-        whenever records or street ranges are inserted or the connection is replaced).
+        Memoized front for `_resolve_coordinates_uncached` (structured addresses only). Cached results are
+        validated against the database state on every call, so writes made by any route invalidate them.
         """
         if isinstance(address, str):
             return self._resolve_coordinates_uncached(address)
@@ -447,13 +471,16 @@ class OfflineReferenceIndex:
             getattr(address, "state", None),
         )
         with self._lock:
-            if key in self._resolve_cache:
-                cached = self._resolve_cache[key]
-                return copy.deepcopy(cached) if cached is not None else None
-            result = self._resolve_coordinates_uncached(address)
-            if len(self._resolve_cache) >= 8192:
+            token = self._resolve_cache_token(self._get_conn())
+            if token != self._resolve_token:
                 self._resolve_cache.clear()
-            self._resolve_cache[key] = copy.deepcopy(result) if result is not None else None
+                self._resolve_token = token
+            if key in self._resolve_cache:
+                return self._clone_record(self._resolve_cache[key])
+            result = self._resolve_coordinates_uncached(address)
+            if len(self._resolve_cache) >= self._RESOLVE_CACHE_MAX:
+                self._resolve_cache.pop(next(iter(self._resolve_cache)))  # evict the oldest entry
+            self._resolve_cache[key] = self._clone_record(result)
             return result
 
     def _resolve_coordinates_uncached(self, address: Any) -> Optional[RooftopRecord]:

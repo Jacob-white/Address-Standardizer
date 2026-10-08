@@ -68,3 +68,15 @@ def test_canadian_po_box_with_suite_matches_us_behavior():
     assert (can.street1, can.street2, can.address_status) == ("PO BOX 450", "STE 400", "standardized")
     us = standardize_address("PO Box 450, Suite 400, Austin, TX 78701")
     assert (us.street1, us.street2) == (can.street1, can.street2)
+
+
+@pytest.mark.parametrize(
+    "street1, street2",
+    [("12", "PO Box 5"), ("N", "PO Box 9")],
+)
+def test_po_box_branch_only_applies_to_unit_phrases(street1, street2):
+    """A lone number/letter is not a unit: it must not become a bare street2 beside the PO box."""
+    res = standardize_address(
+        street1=street1, street2=street2, city="Winnipeg", state="MB", postal_code="R3C 3Z3", country="CAN"
+    )
+    assert res.street2 not in ("12", "N")

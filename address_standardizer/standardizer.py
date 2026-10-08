@@ -29,6 +29,7 @@ from address_standardizer.cache import (
     make_cache_key,
 )
 from address_standardizer._patterns import (
+    RE_SEC_UNIT,
     RE_WHITESPACE,
     RE_NON_ALPHANUMERIC,
     RE_PRIVATE_RESIDENCE,
@@ -611,9 +612,10 @@ def standardize_address(
 
         if is_invalid_thoroughfare(norm_s1):
             if norm_s1:
-                if norm_s2.startswith("PO BOX "):
-                    # A bare unit plus a PO box ("PO Box 450, Suite 400"): the box is the delivery line and
-                    # the unit stays secondary, matching the US pipeline.
+                if norm_s2.startswith("PO BOX ") and RE_SEC_UNIT.fullmatch(norm_s1):
+                    # A unit phrase plus a PO box ("PO Box 450, Suite 400"): the box is the delivery line and
+                    # the unit stays secondary, matching the US pipeline. Other invalid street1 values
+                    # (lone numbers/letters) keep the generic merge below.
                     norm_s1, norm_s2 = norm_s2, _standardize_secondary_unit(norm_s1)
                 else:
                     norm_s2 = f"{norm_s1} {norm_s2}".strip() if norm_s2 else norm_s1

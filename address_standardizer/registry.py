@@ -43,7 +43,6 @@ COUNTRY_SYNONYMS: Dict[str, List[str]] = {
 }
 
 
-@lru_cache(maxsize=16384)
 def lookup_corporate_registry(
     street1: str,
     street2: str = "",

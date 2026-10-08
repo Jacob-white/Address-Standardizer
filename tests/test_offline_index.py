@@ -334,3 +334,71 @@ class TestOfflineReferenceIndex:
             assert mode.lower() == "wal"
         index.close()
 
+
+
+class TestResolveCoordinatesMemoStaysFresh:
+    """The structured-address memo must never serve stale results, whichever way the DB changes."""
+
+    @staticmethod
+    def _addr():
+        from address_standardizer import standardize_address
+
+        return standardize_address("7 Cache Test Rd, Austin, TX 78701", use_cache=False)
+
+    def _index(self, tmp_path):
+        from address_standardizer.offline_index import OfflineReferenceIndex
+
+        return OfflineReferenceIndex(db_path=str(tmp_path / "idx.db"), seed=False)
+
+    def test_insert_after_cached_miss_is_seen(self, tmp_path):
+        idx = self._index(tmp_path)
+        addr = self._addr()
+        assert idx.resolve_coordinates(addr) is None  # cached miss
+        idx.insert_record(
+            address_key=addr.normalized_address_key, building_key=addr.building_key, street1=addr.street1,
+            city=addr.city, state=addr.state, postal_code=addr.postal_code, latitude=30.0, longitude=-97.0,
+        )
+        assert idx.resolve_coordinates(addr) is not None
+
+    def test_direct_sql_write_is_seen(self, tmp_path):
+        idx = self._index(tmp_path)
+        addr = self._addr()
+        assert idx.resolve_coordinates(addr) is None
+        idx.insert_record(
+            address_key="X", building_key="X", street1=addr.street1, city=addr.city, state=addr.state,
+            postal_code=addr.postal_code, latitude=1.0, longitude=2.0,
+        )
+        with idx._conn:
+            idx._conn.execute("UPDATE rooftop_reference SET latitude = 9.5 WHERE address_key = 'X'")
+        assert idx.resolve_coordinates(addr).latitude == 9.5
+
+    def test_write_from_another_connection_is_seen(self, tmp_path):
+        import sqlite3
+
+        idx = self._index(tmp_path)
+        addr = self._addr()
+        assert idx.resolve_coordinates(addr) is None
+        idx.insert_record(
+            address_key="Y", building_key="Y", street1=addr.street1, city=addr.city, state=addr.state,
+            postal_code=addr.postal_code, latitude=1.0, longitude=2.0,
+        )
+        assert idx.resolve_coordinates(addr).latitude == 1.0
+        other = sqlite3.connect(str(tmp_path / "idx.db"))
+        with other:
+            other.execute("UPDATE rooftop_reference SET latitude = 7.25 WHERE address_key = 'Y'")
+        other.close()
+        assert idx.resolve_coordinates(addr).latitude == 7.25
+
+    def test_returned_records_are_isolated_from_the_cache(self, tmp_path):
+        idx = self._index(tmp_path)
+        addr = self._addr()
+        idx.insert_record(
+            address_key="Z", building_key="Z", street1=addr.street1, city=addr.city, state=addr.state,
+            postal_code=addr.postal_code, latitude=1.0, longitude=2.0, known_units=["A"],
+        )
+        first = idx.resolve_coordinates(addr)
+        first.known_units.append("MUTATED")
+        first.latitude = 99.0
+        second = idx.resolve_coordinates(addr)
+        assert second.known_units == ["A"]
+        assert second.latitude == 1.0

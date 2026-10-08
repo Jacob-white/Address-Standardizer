@@ -9,14 +9,8 @@ from typing import Any, Dict
 
 
 def _emit_cli_output(text: str) -> None:
-    """Emit formatted CLI result text to stdout.
-
-    Note: In a CLI application, emitting the parsed result (including addresses
-    and coordinates) to standard output is the primary user-facing function.
-    We route through this helper using sys.stdout.writelines and suppression
-    annotations to prevent static analysis tools from misclassifying standard
-    CLI pipeline output as unencrypted logging sinks.
-    """
+    """Write CLI result text to stdout (the CLI's primary output, not logging)."""
+    # CodeQL treats printed address data as clear-text logging; this is the single intentional sink.
     # codeql[py/clear-text-logging-sensitive-data]
     sys.stdout.writelines([str(text), "\n"])
 

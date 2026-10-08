@@ -800,3 +800,38 @@ class TestCLI:
                 main()
             assert exc.value.code == 2
 
+
+
+def test_serve_subcommand_dispatches_to_uvicorn(monkeypatch):
+    """`serve` must be a known subcommand, not swallowed by the shorthand-address path."""
+    import sys
+    import types
+    from unittest.mock import MagicMock
+
+    from address_standardizer import cli
+
+    run = MagicMock()
+    monkeypatch.setitem(sys.modules, "uvicorn", types.SimpleNamespace(run=run))
+    monkeypatch.setattr(sys, "argv", ["address-standardizer", "serve", "--port", "9999"])
+    cli.main()
+    run.assert_called_once()
+    assert run.call_args.kwargs["port"] == 9999
+
+
+def test_every_registered_handler_is_a_known_subcommand():
+    from address_standardizer import cli
+
+    assert set(cli._COMMAND_HANDLERS) >= {"parse", "batch", "serve", "spatial", "validate-postal"}
+
+
+def test_handlers_work_without_main_state(capsys):
+    """Handlers no longer depend on a global filled in by main()."""
+    from argparse import Namespace
+
+    import pytest
+
+    from address_standardizer import cli
+
+    with pytest.raises(SystemExit) as exc:
+        cli._cmd_spatial(Namespace(spatial_action=None))
+    assert exc.value.code == 1

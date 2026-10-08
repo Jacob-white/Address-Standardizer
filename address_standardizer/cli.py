@@ -10,7 +10,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from address_standardizer.audit import get_audit_ledger
 from address_standardizer.batch import stream_standardize_csv
@@ -19,7 +19,7 @@ from address_standardizer.cache import (
     configure_cache,
     get_cache_stats,
 )
-from address_standardizer.cli_formatting import (  # noqa: F401
+from address_standardizer.cli_formatting import (
     _emit_cli_output,
     _format_csv_header,
     _format_csv_row,
@@ -343,18 +343,14 @@ def _cmd_parse(args: argparse.Namespace) -> None:
     if args.format == "upu":
         _emit_cli_output(res.format_upu())
     elif args.format == "text":
-        # codeql[py/clear-text-logging-sensitive-data]
         _emit_cli_output(_format_text_address(data))
     elif args.format == "table":
-        # codeql[py/clear-text-logging-sensitive-data]
         _emit_cli_output(_format_table_header())
         _emit_cli_output(_format_table_row(data))
     elif args.format == "csv":
-        # codeql[py/clear-text-logging-sensitive-data]
         _emit_cli_output(_format_csv_header())
         _emit_cli_output(_format_csv_row(data))
     else:
-        # codeql[py/clear-text-logging-sensitive-data]
         _emit_cli_output(json.dumps(data, indent=2))
 
 
@@ -388,7 +384,7 @@ def _cmd_validate_postal(args: argparse.Namespace) -> None:
             _emit_cli_output(json.dumps(res, indent=2))
         return
 
-    _SUBPARSERS["validate-postal"].print_help()
+    _print_subparser_help(args)
     sys.exit(1)
 
 
@@ -517,10 +513,28 @@ def _cmd_benchmark(args: argparse.Namespace) -> None:
         print_report(results)
 
 
+def _print_subparser_help(args: argparse.Namespace) -> None:
+    """Print help for the subcommand's own parser (stored by main() via set_defaults)."""
+    parser = getattr(args, "_parser", None)
+    if parser is not None:
+        parser.print_help()
+
+
+def _emit_spatial_points(results: List[Any], header: str, fmt: str) -> None:
+    """Render spatial query results as numbered text lines or a JSON array."""
+    if fmt == "text":
+        lines = [header]
+        for i, r in enumerate(results, 1):
+            lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
+        _emit_cli_output("\n".join(lines))
+    else:
+        _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
+
+
 def _cmd_spatial(args: argparse.Namespace) -> None:
     """Handler for the `spatial` subcommand."""
     if not args.spatial_action:
-        _SUBPARSERS["spatial"].print_help()
+        _print_subparser_help(args)
         sys.exit(1)
 
     if args.spatial_action == "build":
@@ -596,10 +610,8 @@ def _cmd_spatial(args: argparse.Namespace) -> None:
                         f"H3 Res10:              {sp_res.h3_res10}",
                         f"Parcel ID:             {sp_res.parcel_id or 'None'}",
                     ]
-                    # codeql[py/clear-text-logging-sensitive-data]
                     _emit_cli_output("\n".join(res_lines))
                 else:
-                    # codeql[py/clear-text-logging-sensitive-data]
                     _emit_cli_output(json.dumps([sp_res.as_dict()], indent=2))
             elif args.bbox:
                 try:
@@ -612,15 +624,7 @@ def _cmd_spatial(args: argparse.Namespace) -> None:
                     sys.exit(2)
                 min_lon, min_lat, max_lon, max_lat = parts
                 results = engine.query_bounding_box(min_lon, min_lat, max_lon, max_lat, limit=args.limit)
-                if args.format == "text":
-                    lines = [f"Found {len(results)} spatial point(s) in bounding box:"]
-                    for i, r in enumerate(results, 1):
-                        lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
-                    # codeql[py/clear-text-logging-sensitive-data]
-                    _emit_cli_output("\n".join(lines))
-                else:
-                    # codeql[py/clear-text-logging-sensitive-data]
-                    _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
+                _emit_spatial_points(results, f"Found {len(results)} spatial point(s) in bounding box:", args.format)
             elif (
                 args.min_lat is not None
                 and args.min_lon is not None
@@ -630,28 +634,12 @@ def _cmd_spatial(args: argparse.Namespace) -> None:
                 results = engine.query_bounding_box(
                     args.min_lon, args.min_lat, args.max_lon, args.max_lat, limit=args.limit
                 )
-                if args.format == "text":
-                    lines = [f"Found {len(results)} spatial point(s) in bounding box:"]
-                    for i, r in enumerate(results, 1):
-                        lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
-                    # codeql[py/clear-text-logging-sensitive-data]
-                    _emit_cli_output("\n".join(lines))
-                else:
-                    # codeql[py/clear-text-logging-sensitive-data]
-                    _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
+                _emit_spatial_points(results, f"Found {len(results)} spatial point(s) in bounding box:", args.format)
             elif args.lat is not None and args.lon is not None:
                 results = engine.query_radius(
                     lon=args.lon, lat=args.lat, radius_meters=args.radius, limit=args.limit
                 )
-                if args.format == "text":
-                    lines = [f"Found {len(results)} spatial point(s) within {args.radius:.1f}m:"]
-                    for i, r in enumerate(results, 1):
-                        lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
-                    # codeql[py/clear-text-logging-sensitive-data]
-                    _emit_cli_output("\n".join(lines))
-                else:
-                    # codeql[py/clear-text-logging-sensitive-data]
-                    _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
+                _emit_spatial_points(results, f"Found {len(results)} spatial point(s) within {args.radius:.1f}m:", args.format)
             else:
                 sys.stderr.write(
                     "Error: spatial lookup requires address, coordinates (--lat and --lon), or bounding box (--min-lat, --min-lon, --max-lat, --max-lon or --bbox).\n"
@@ -769,9 +757,6 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     )
 
 
-# Subparsers needed by handlers to print contextual help; populated by main().
-_SUBPARSERS: Dict[str, argparse.ArgumentParser] = {}
-
 _COMMAND_HANDLERS = {
     "parse": _cmd_parse,
     "validate-postal": _cmd_validate_postal,
@@ -786,9 +771,7 @@ _COMMAND_HANDLERS = {
 
 
 def main():
-    _known_subcommands = {
-        "parse", "batch", "benchmark", "spatial", "audit", "cache", "autocomplete", "validate-postal"
-    }
+    _known_subcommands = set(_COMMAND_HANDLERS)
 
     # Shorthand invocation check: when no subcommand or help flag is passed
     if len(sys.argv) > 1 and "-h" not in sys.argv[1:] and "--help" not in sys.argv[1:]:
@@ -885,7 +868,7 @@ def main():
 
     # Command: spatial
     spatial_parser = subparsers.add_parser("spatial", help="Offline SQLite R*Tree spatial engine lookup and diagnostics")
-    _SUBPARSERS["spatial"] = spatial_parser
+    spatial_parser.set_defaults(_parser=spatial_parser)
     spatial_sub = spatial_parser.add_subparsers(dest="spatial_action", help="Spatial action")
 
     # spatial build
@@ -945,7 +928,7 @@ def main():
         "validate-postal",
         help="Validate or extract international postal codes across 249 ISO-3166-1 jurisdictions",
     )
-    _SUBPARSERS["validate-postal"] = postal_parser
+    postal_parser.set_defaults(_parser=postal_parser)
     postal_parser.add_argument(
         "code_or_text",
         nargs="*",
