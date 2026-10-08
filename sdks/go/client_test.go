@@ -3,8 +3,10 @@ package standardizer_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,5 +144,24 @@ func TestHealth(t *testing.T) {
 	}
 	if h.Status != "healthy" || h.Version != "3.2.0" {
 		t.Errorf("unexpected health response: %+v", h)
+	}
+}
+
+func TestAPIErrorCarriesStatusAndBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"detail":"slow down"}`))
+	}))
+	defer server.Close()
+
+	client := standardizer.NewClient(server.URL)
+	_, err := client.Standardize(context.Background(), standardizer.StandardizeRequest{Address: "x"})
+
+	var apiErr *standardizer.APIError
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("expected *APIError, got %T: %v", err, err)
+	}
+	if apiErr.StatusCode != http.StatusTooManyRequests || !strings.Contains(apiErr.Body, "slow down") {
+		t.Fatalf("unexpected APIError: %+v", apiErr)
 	}
 }

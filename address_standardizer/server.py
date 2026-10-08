@@ -12,6 +12,7 @@ Production-grade FastAPI daemon exposing OpenAPI 3.1 endpoints for:
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Any, AsyncIterator, Dict, List, Optional, Union
 
@@ -98,6 +99,21 @@ class MetricsCollector:
 
 
 metrics = MetricsCollector()
+
+
+def _max_batch_size() -> int:
+    """Maximum addresses per /v1/batch request (env ADDRESS_STANDARDIZER_MAX_BATCH, default 10,000)."""
+    try:
+        return max(1, int(os.environ.get("ADDRESS_STANDARDIZER_MAX_BATCH", "10000")))
+    except ValueError:
+        return 10000
+
+
+def _batch_too_large(count: int, limit: int) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+        detail=f"Batch of {count} addresses exceeds the limit of {limit}; split it or use NDJSON streaming in smaller requests.",
+    )
 
 
 # ============================================================================
@@ -376,6 +392,9 @@ def create_app() -> FastAPI:
             # Handle incoming NDJSON stream
             body_bytes = await request.body()
             body_text = body_bytes.decode("utf-8", errors="replace")
+            ndjson_lines = [ln for ln in body_text.splitlines() if ln.strip()]
+            if len(ndjson_lines) > _max_batch_size():
+                raise _batch_too_large(len(ndjson_lines), _max_batch_size())
 
             async def ndjson_generator() -> AsyncIterator[str]:
                 for line in body_text.splitlines():
@@ -411,6 +430,9 @@ def create_app() -> FastAPI:
             default_allow_loc = body.get("allow_locality", False)
         else:
             raise HTTPException(status_code=400, detail="Request body must be an array or object with 'addresses'")
+
+        if len(addresses_list) > _max_batch_size():
+            raise _batch_too_large(len(addresses_list), _max_batch_size())
 
         if is_ndjson_resp:
             async def stream_array_as_ndjson() -> AsyncIterator[str]:

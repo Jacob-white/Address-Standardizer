@@ -200,3 +200,20 @@ def test_cli_serve_subcommand_help():
     assert "--host" in proc.stdout
     assert "--port" in proc.stdout
     assert "--workers" in proc.stdout
+
+
+def test_batch_rejects_oversized_requests(client, monkeypatch):
+    monkeypatch.setenv("ADDRESS_STANDARDIZER_MAX_BATCH", "2")
+    res = client.post("/v1/batch", json={"addresses": ["a", "b", "c"]})
+    assert res.status_code == 413
+    assert "limit of 2" in res.json()["detail"]
+
+    res = client.post(
+        "/v1/batch", content='{"address": "a"}\n{"address": "b"}\n{"address": "c"}\n',
+        headers={"Content-Type": "application/x-ndjson"},
+    )
+    assert res.status_code == 413
+
+    ok = client.post("/v1/batch", json={"addresses": ["100 Main St, Austin, TX 78701", "350 5th Ave, New York, NY 10118"]})
+    assert ok.status_code == 200
+    assert len(ok.json()) == 2

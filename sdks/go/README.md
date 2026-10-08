@@ -60,6 +60,17 @@ func main() {
 }
 ```
 
+### Error handling
+
+Non-2xx responses return `*standardizer.APIError` with `StatusCode` and `Body`:
+
+```go
+var apiErr *standardizer.APIError
+if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusTooManyRequests {
+	// back off and retry
+}
+```
+
 ---
 
 ## 📄 License & Ownership

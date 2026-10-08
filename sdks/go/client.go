@@ -14,6 +14,21 @@ import (
 	"time"
 )
 
+// APIError is returned when the service responds with a non-2xx status. Use errors.As to branch on StatusCode.
+type APIError struct {
+	StatusCode int
+	// Body is the full response body; it may echo submitted address data.
+	Body string
+}
+
+func (e *APIError) Error() string {
+	body := e.Body
+	if len(body) > 512 {
+		body = body[:512] + "..."
+	}
+	return fmt.Sprintf("http %d: %s", e.StatusCode, body)
+}
+
 // Option defines a functional configuration option for the Client.
 type Option func(*Client)
 
@@ -83,7 +98,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		respBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("http %d: %s", resp.StatusCode, string(respBytes))
+		return &APIError{StatusCode: resp.StatusCode, Body: string(respBytes)}
 	}
 
 	if target != nil {
@@ -155,7 +170,7 @@ func (c *Client) StreamBatch(ctx context.Context, addresses []string) (<-chan St
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			respBytes, _ := io.ReadAll(resp.Body)
-			errCh <- fmt.Errorf("http %d: %s", resp.StatusCode, string(respBytes))
+			errCh <- &APIError{StatusCode: resp.StatusCode, Body: string(respBytes)}
 			return
 		}
 

@@ -260,7 +260,7 @@ Address Standardizer provides official client libraries in `sdks/` for communica
 - **`AddressStandardizerClient`**:
   - `constructor(options?: ClientOptions)`: Initializes client with `baseUrl`, `timeoutMs`, custom `fetch`, and persistent headers.
   - `standardize(req: StandardizeRequest): Promise<StandardizeResponse>`: Sends single address for normalization and optional spatial geocoding.
-  - `standardizeBatch(req: BatchStandardizeRequest | (string | StandardizeRequest)[]): Promise<StandardizeResponse[]>`: Processes many addresses in one request.
+  - `standardizeBatch(req: BatchStandardizeRequest | (string | StandardizeRequest)[]): Promise<StandardizeResponse[]>`: Processes many addresses in one request (the server rejects batches over `ADDRESS_STANDARDIZER_MAX_BATCH`, default 10,000, with HTTP 413).
   - `streamBatch(addresses: (string | StandardizeRequest)[]): AsyncIterable<StandardizeResponse>`: Async generator (`for await`) that reads the NDJSON stream without unbounded buffering.
   - `autocomplete(req: AutocompleteRequest | string): Promise<AutocompleteSuggestion[]>`: Queries prefix trie with latitude/longitude spatial biasing.
   - `health(): Promise<HealthResponse>`: Diagnostic ping returning status, version, engine details, and uptime.
