@@ -939,7 +939,11 @@ class TestRuleBasedFallbackAndEdgeCases:
         """Test normalize_us_postal_code with missing, short, or invalid formats."""
         assert normalize_us_postal_code(None) == ("", "")
         assert normalize_us_postal_code("") == ("", "")
-        assert normalize_us_postal_code("123") == ("123", "123")
+        assert normalize_us_postal_code("123") == ("123", "")  # not a ZIP: kept as given, no fabricated zip5
+        assert normalize_us_postal_code("123456") == ("123456", "")  # never truncated into a plausible ZIP
+        assert normalize_us_postal_code("1234-5678") == ("1234-5678", "")
+        assert normalize_us_postal_code("123456789") == ("12345-6789", "12345")
+        assert normalize_us_postal_code("ABCDE") == ("ABCDE", "")
         assert normalize_us_postal_code("7030") == ("07030", "07030")
         assert normalize_us_postal_code("10005") == ("10005", "10005")
         assert normalize_us_postal_code("10005-1234") == ("10005-1234", "10005")

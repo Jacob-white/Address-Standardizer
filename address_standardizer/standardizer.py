@@ -237,6 +237,9 @@ def _is_unit_phrase(text: str) -> bool:
     return all(len(tok) <= 2 for tok in re.findall(r"\w+", rest))
 
 
+_RE_TRAILING_STATE_ZIP = re.compile(r"(?<![A-Za-z])(?P<state>[A-Za-z]{2})[ ,]+(?P<zip>\d{5}(?:-\d{4})?)\s*$")
+
+
 def standardize_address(
     street1: Optional[str] = None,
     street2: Optional[str] = None,
@@ -280,6 +283,14 @@ def standardize_address(
     state_corrected_from: Optional[str] = None
     if correct_state_from_zip_enabled(correct_state_from_zip):
         state, state_corrected_from = correct_state_from_zip_helper(state, postal_code, country)
+        if state_corrected_from is None and street1 and not (state or "").strip() and not (postal_code or "").strip():
+            # Single-line input ("100 Main St, Los Angeles, NY 90012"): the state/ZIP live inside the street text.
+            tail = _RE_TRAILING_STATE_ZIP.search(street1)
+            if tail:
+                new_state, was = correct_state_from_zip_helper(tail.group("state"), tail.group("zip"), country)
+                if was is not None and new_state:
+                    street1 = street1[: tail.start("state")] + new_state + street1[tail.end("state"):]
+                    state_corrected_from = was
     allow_locality = allow_locality or bool(
         kwargs.get("allow_locality_only")
         or kwargs.get("allow_city_level")

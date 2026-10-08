@@ -419,3 +419,16 @@ class TestBatchZipStateOption:
             stream_standardize_csv(str(src), str(out), max_workers=1, correct_state_from_zip=flag)
             rows = list(csv.DictReader(out.open(encoding="utf-8")))
             assert rows[0]["std_state"] == expected
+
+
+class TestSingleLineZipStateCorrection:
+    def test_single_line_input_honours_the_option(self):
+        from address_standardizer import standardize_address
+
+        text = "100 Main St, Los Angeles, NY 90012"
+        kept = standardize_address(text)
+        fixed = standardize_address(text, correct_state_from_zip=True)
+        assert kept.state == "NY"
+        assert fixed.state == "CA"
+        assert fixed.postal_code == "90012"
+        assert standardize_address("100 Main St, Los Angeles, CA 90012", correct_state_from_zip=True).state == "CA"

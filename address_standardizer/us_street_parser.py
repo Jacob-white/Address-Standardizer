@@ -181,7 +181,7 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
     if len(rem_tokens) == 2:
         tok0 = rem_tokens[0]
         tok1 = rem_tokens[1]
-        f_suf = get_fuzzy_suffix(tok1)
+        f_suf = get_fuzzy_suffix(tok1) if enable_fuzzy else None
         if (tok0 in DIRECTIONALS or tok0 in FROZEN_DIRECTIONAL_VALUES) and (tok1 in STREET_SUFFIXES or f_suf):
             is_named_directional = True
 
@@ -190,7 +190,7 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
     if len(rem_tokens) == 3:
         comp_dir = f"{rem_tokens[0]} {rem_tokens[1]}"
         tok2 = rem_tokens[2]
-        f_suf = get_fuzzy_suffix(tok2)
+        f_suf = get_fuzzy_suffix(tok2) if enable_fuzzy else None
         if comp_dir in ("NORTH EAST", "NORTH WEST", "SOUTH EAST", "SOUTH WEST") and (tok2 in STREET_SUFFIXES or f_suf):
             is_compound_directional = True
 
@@ -232,7 +232,7 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
             # Check route prefix exclusion
             prev = norm_tokens[-1] if norm_tokens else ""
             prev2 = f"{norm_tokens[-2]} {prev}" if len(norm_tokens) >= 2 else ""
-            if prev not in ROUTE_PREFIXES and prev2 not in ROUTE_PREFIXES and j + 1 < len(rem_tokens) and (rem_tokens[j+1] in STREET_SUFFIXES or get_fuzzy_suffix(rem_tokens[j+1])):
+            if prev not in ROUTE_PREFIXES and prev2 not in ROUTE_PREFIXES and j + 1 < len(rem_tokens) and (rem_tokens[j+1] in STREET_SUFFIXES or (enable_fuzzy and get_fuzzy_suffix(rem_tokens[j+1]))):
                 norm_tokens.append(num_to_ordinal(int(t)))
             else:
                 norm_tokens.append(t)
@@ -463,7 +463,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
             if clean == "ROUTE" and street_parts and street_parts[-1] == "STATE":
                 norm_suf = "ROUTE"
             else:
-                norm_suf = STREET_SUFFIXES.get(clean, get_fuzzy_suffix(clean) or clean)
+                norm_suf = STREET_SUFFIXES.get(clean, (get_fuzzy_suffix(clean) if enable_fuzzy else None) or clean)
             street_parts.append(norm_suf)
         elif label == "StreetName":
             # Compound directional check: NORTH EAST, NORTH WEST, SOUTH EAST, SOUTH WEST

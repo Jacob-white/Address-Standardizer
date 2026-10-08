@@ -310,8 +310,9 @@ def _cmd_parse(args: argparse.Namespace) -> None:
         else:
             sp_res = resolve_spatial_coordinates(res)
         if sp_res:
-            data["latitude"] = sp_res.latitude
-            data["longitude"] = sp_res.longitude
+            unresolved = sp_res.precision == "UNRESOLVED"  # an unresolved lookup must not look like (0, 0)
+            data["latitude"] = None if unresolved else sp_res.latitude
+            data["longitude"] = None if unresolved else sp_res.longitude
             data["spatial_precision"] = sp_res.precision
             data["geocode_precision"] = sp_res.precision
             data["spatial_source"] = sp_res.source
@@ -816,7 +817,7 @@ def main():
     if len(sys.argv) > 1 and "-h" not in sys.argv[1:] and "--help" not in sys.argv[1:]:
         shorthand_parser = argparse.ArgumentParser(prog="address-standardizer", add_help=False, exit_on_error=False)
         shorthand_parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json")
-        shorthand_parser.add_argument("--country", "-c", default="USA")
+        shorthand_parser.add_argument("--country", "-c", default=None)
         shorthand_parser.add_argument("--correct-state-from-zip", action="store_true")
         shorthand_parser.add_argument("address", nargs="*")
         unknown_flags: List[str] = []
@@ -880,7 +881,7 @@ def main():
     parse_parser.add_argument("--city", help="City name")
     parse_parser.add_argument("--state", help="State / province code or name")
     parse_parser.add_argument("--zip", dest="postal_code", help="Postal code or ZIP")
-    parse_parser.add_argument("--country", "-c", default="USA", help="Country name or ISO code (default: USA)")
+    parse_parser.add_argument("--country", "-c", default=None, help="Country name or ISO code (default: detected from the address, USA when none is found)")
     parse_parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json", help="Output format (default: json)")
     parse_parser.add_argument("--enable-geocoding", action="store_true", help="Enrich with offline spatial R*Tree geocoder")
     parse_parser.add_argument("--spatial-db", "--db", dest="spatial_db", help="Path to offline SQLite spatial database file")

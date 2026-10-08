@@ -442,6 +442,19 @@ def _hold_env(gen, name: str, value: str, previous: Optional[str]):
         _restore_env(name, previous)
 
 
+_BOOL_COLUMNS = ("is_registered_agent_hub", "is_private_residence", "cmra", "vacant", "is_us")
+
+
+def _json_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    """JSON output: boolean flags the row builder stringifies for CSV ("True"/"False") become real booleans."""
+    out = dict(row)
+    for key in _BOOL_COLUMNS:
+        for name in (key, f"std_{key}"):
+            if out.get(name) in ("True", "False"):
+                out[name] = out[name] == "True"
+    return out
+
+
 def process_chunk(
     chunk: List[Dict[str, Any]],
     street_col: str = "street1",
@@ -817,7 +830,7 @@ def stream_standardize_jsonl(
                     if enable_geocoding:
                         processed = _apply_spatial_to_chunk(processed)
                     for row in processed:
-                        fout.write(json.dumps(row) + "\n")
+                        fout.write(json.dumps(_json_row(row)) + "\n")
                     total_processed += len(processed)
             else:
                 chunk_args_gen = (
@@ -832,7 +845,7 @@ def stream_standardize_jsonl(
                         if enable_geocoding:
                             processed_chunk = _apply_spatial_to_chunk(processed_chunk)
                         for row in processed_chunk:
-                            fout.write(json.dumps(row) + "\n")
+                            fout.write(json.dumps(_json_row(row)) + "\n")
                         total_processed += len(processed_chunk)
         os.replace(tmp_output, output_path)
     finally:
@@ -899,7 +912,7 @@ def stream_standardize_json(
     tmp_output = f"{output_path}.tmp-{os.getpid()}"
     try:
         with open(tmp_output, mode="w", encoding="utf-8") as fout:
-            json.dump(all_processed, fout, indent=2)
+            json.dump([_json_row(r) for r in all_processed], fout, indent=2)
         os.replace(tmp_output, output_path)
     finally:
         if os.path.exists(tmp_output):

@@ -18,7 +18,6 @@ from address_standardizer.tables import (
 from address_standardizer._patterns import (
     RE_CLEAN_TOKEN,
     RE_NON_ALPHANUMERIC,
-    RE_NON_DIGITS,
     RE_STATE_ZIP,
     RE_UK_POSTCODE,
     RE_CAN_POSTCODE,
@@ -282,18 +281,32 @@ def normalize_us_state(state_raw: Optional[str], zip5: Optional[str] = None) -> 
 
 
 def normalize_us_postal_code(postal_raw: Optional[str]) -> Tuple[str, str]:
-    """Returns (formatted_postal_code, zip5)."""
+    """Returns (formatted_postal_code, zip5).
+
+    Accepts ZIP (``12345``), ZIP+4 (``12345-6789`` / ``123456789``) and a 4-digit ZIP whose leading zero was lost
+    (``1234`` -> ``01234``). Anything else (3, 6-8 or 10+ digits, letters, a ``1234-5678`` split) is not a US ZIP: it
+    is returned cleaned but unchanged with an empty ``zip5``, never truncated or padded into a plausible-looking ZIP.
+    """
     if not postal_raw:
         return "", ""
-    digits = RE_NON_DIGITS.sub("", postal_raw.strip())
-    if len(digits) == 4:
-        digits = f"0{digits}"
-    if len(digits) >= 9:
-        return f"{digits[:5]}-{digits[5:9]}", digits[:5]
-    elif len(digits) >= 5:
-        return digits[:5], digits[:5]
     clean = postal_raw.strip().upper()
-    return clean, clean[:5]
+    if not clean:
+        return "", ""
+    only = clean.replace("-", "").replace(" ", "")
+    if only.isascii() and only.isdigit():
+        if len(only) == 4 and "-" not in clean and " " not in clean:
+            only = f"0{only}"
+        if len(only) == 5 and ("-" not in clean or clean.endswith("-")):
+            return only, only
+        if len(only) == 9 and (clean.count("-") == 0 or RE_ZIP_PLUS4_SPLIT.match(clean)):
+            return f"{only[:5]}-{only[5:]}", only[:5]
+        if len(only) == 5 and RE_ZIP5_SPLIT.match(clean):
+            return only, only
+    return clean, ""
+
+
+RE_ZIP_PLUS4_SPLIT = re.compile(r"^\d{5}[-\s]\d{4}$")
+RE_ZIP5_SPLIT = re.compile(r"^\d{2,3}\s\d{2,3}$")
 
 
 def is_registered_agent_hub_address(
