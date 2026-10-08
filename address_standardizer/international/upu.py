@@ -155,9 +155,7 @@ def format_upu_address(
         all_cjk = any(_is_cjk(s) for s in (state, city, dept_loc, st1))
         if all_cjk:
             # CJK characters concatenated hierarchically without spaces
-            hierarchy = f"{state}{city}{dept_loc}{st1}".strip()
-            if hierarchy:
-                lines.append(hierarchy)
+            lines.append(f"{state}{city}{dept_loc}{st1}".strip())  # non-empty: at least one part is CJK text
         else:
             # Romanized / ASCII representation
             parts = [p for p in (state, city, dept_loc, st1) if p]
@@ -183,9 +181,7 @@ def format_upu_address(
         if dept_loc and dept_loc != city:
             lines.append(dept_loc)
 
-        locality_line = f"{postal} {city}".strip()
-        if locality_line:
-            lines.append(locality_line)
+        lines.append(f"{postal} {city}".strip())  # postal is non-empty in this layout
 
     else:
         # -------------------------------------------------------------------
@@ -201,14 +197,9 @@ def format_upu_address(
         if dept_loc and dept_loc != city:
             lines.append(dept_loc)
 
-        if state and postal:
-            lines.append(f"{city}, {state} {postal}".strip())
-        elif state:
-            lines.append(f"{city}, {state}".strip())
-        elif postal:
-            lines.append(f"{city} {postal}".strip())
-        elif city:
-            lines.append(city)
+        # postal is non-empty in this layout (postal-less addresses use the non-postal layout above)
+        city_state = ", ".join(p for p in (city, state) if p)  # no leading comma when the city is missing
+        lines.append(f"{city_state} {postal}")
 
     # Country line on the bottom in capital letters
     if include_country_name:

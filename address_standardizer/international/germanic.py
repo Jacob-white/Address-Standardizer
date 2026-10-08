@@ -26,6 +26,7 @@ RE_INVERTED_STREET_NUMBER = re.compile(
 )
 
 # Nordic floor and door indicators (e.g. "2. tv.", "st. th.", "1. mf.")
+RE_NORDIC_TAIL = re.compile(r"^(?:\d+\.|st\.)\s*(?:tv|th|mf)\.?$", re.IGNORECASE)
 RE_NORDIC_FLOOR_DOOR = re.compile(
     r"[, ]+(\d+\.|\bst\.)\s*(tv|th|mf)\.?",
     re.IGNORECASE,
@@ -167,6 +168,11 @@ class GermanicGrammar(CountryGrammar):
             if len(parts_comma) >= 2 and parts_comma[-1].upper() in self.supported_countries:
                 parts_comma = parts_comma[:-1]
 
+            # A trailing Nordic floor/door ("45, 2. tv.") belongs to the street line, not the city.
+            nordic_tail = ""
+            if len(parts_comma) >= 2 and RE_NORDIC_TAIL.match(parts_comma[-1]):
+                nordic_tail = f", {parts_comma.pop()}"
+
             if len(parts_comma) >= 2:
                 last_part = parts_comma[-1].strip()
                 # Check for "10115 Berlin", "1016 EK Amsterdam", or "111 35 Stockholm"
@@ -184,6 +190,7 @@ class GermanicGrammar(CountryGrammar):
                     street_line = ", ".join(parts_comma[:-1])
             elif len(parts_comma) == 1:
                 street_line = parts_comma[0]
+            street_line += nordic_tail
 
         if country_iso in _GERMAN_COUNTRIES:
             street_line = expand_german_street_abbreviations(street_line)
@@ -196,8 +203,7 @@ class GermanicGrammar(CountryGrammar):
         # Check for Nordic floor/door (e.g. "45, 2. tv.")
         m_nordic_fd = RE_NORDIC_FLOOR_DOOR.search(street_line)
         if m_nordic_fd:
-            if not unit_number:
-                unit_number = f"{m_nordic_fd.group(1)} {m_nordic_fd.group(2).lower()}"
+            unit_number = f"{m_nordic_fd.group(1)} {m_nordic_fd.group(2).lower()}"
             street_line = street_line[:m_nordic_fd.start()] + street_line[m_nordic_fd.end():]
             street_line = street_line.strip(" ,")
 
@@ -207,6 +213,9 @@ class GermanicGrammar(CountryGrammar):
             s2_parts = st2_base.split(maxsplit=1)
             unit_type = s2_parts[0]
             unit_number = s2_parts[1] if len(s2_parts) > 1 else None
+        elif st2_base:
+            # Nordic floor/door plus a street2 unit: keep both rather than dropping street2.
+            unit_number = f"{unit_number} {st2_base}"
 
         # Check for Dutch/Germanic addition like "421-B" -> number: 421, unit: APT B
         m_dash_unit = re.match(r"^(.*?)\s+(\d+)-([A-Za-z0-9]+)$", st1_base)

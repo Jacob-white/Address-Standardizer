@@ -388,15 +388,13 @@ class ConfidenceScorer:
             reason_codes.append(WARN_CRA_HUB_DETECTED)
         if std_address.is_private_residence:
             reason_codes.append(WARN_RESIDENTIAL_COMM)
+        # (no de-duplication needed: none of these codes can already be present on the non-locality path)
         if getattr(std_address, "is_cmra", False):
-            if WARN_CMRA_DETECTED not in reason_codes:
-                reason_codes.append(WARN_CMRA_DETECTED)
+            reason_codes.append(WARN_CMRA_DETECTED)
         if getattr(std_address, "is_vacant", False):
-            if WARN_VACANT_DELIVERY_POINT not in reason_codes:
-                reason_codes.append(WARN_VACANT_DELIVERY_POINT)
+            reason_codes.append(WARN_VACANT_DELIVERY_POINT)
         if "N1" in getattr(std_address, "dpv_footnotes", []):
-            if WARN_MISSING_SECONDARY_UNIT not in reason_codes:
-                reason_codes.append(WARN_MISSING_SECONDARY_UNIT)
+            reason_codes.append(WARN_MISSING_SECONDARY_UNIT)
 
         # Disguised PMB check
         raw_has_pmb = "PMB" in raw_combined or "PRIVATE MAILBOX" in raw_combined

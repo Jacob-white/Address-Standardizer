@@ -230,7 +230,7 @@ def _split_international_secondary_unit(street1: str, street2: str) -> Tuple[str
             st2 = f"{sec_type_norm} {sec_id}"
             st1 = st1[:m.start()] + st1[m.end():]
             st1 = RE_WHITESPACE.sub(" ", st1.strip(" ,.-"))
-    elif st2:
+    else:
         m2 = RE_INTL_SEC_START.match(st2)
         if m2:
             sec_type = m2.group(1).upper()

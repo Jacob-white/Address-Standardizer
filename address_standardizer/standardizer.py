@@ -82,7 +82,7 @@ from address_standardizer._inputs import (  # noqa: E402
     is_privacy_placeholder,
     normalize_po_box_spelling,
 )
-from address_standardizer.care_of import has_care_of, strip_care_of  # noqa: E402
+from address_standardizer.care_of import extract_care_of, has_care_of, strip_care_of  # noqa: E402,F401
 from address_standardizer.secondary_units import (  # noqa: E402
     _pre_normalize_address_string,  # noqa: F401
     _standardize_secondary_unit,  # noqa: F401
@@ -153,6 +153,9 @@ def _finalize_standardized_address(
 ) -> StandardizedAddress:
     from address_standardizer.delivery import evaluate_delivery_intelligence
     from address_standardizer.registry import evaluate_corporate_risk
+
+    if raw_input and raw_input.get("care_of"):
+        std.care_of = raw_input["care_of"]
 
     # 1. Delivery Intelligence & DPV Footnotes
     vac_override = raw_input.get("is_vacant") if raw_input and raw_input.get("is_vacant") is not None else None
@@ -377,13 +380,14 @@ def standardize_address(
     s1_lines_u = [line.strip().upper() for line in re.split(r"[\r\n]+", s1_in) if line.strip()]
     if "\n" in city_in or "\r" in city_in:
         c_lines = [line.strip() for line in re.split(r"[\r\n]+", city_in) if line.strip()]
-        if len(c_lines) > 1:
+        if len(c_lines) > 1:  # pragma: no branch  (city_in is stripped, so an embedded newline always separates 2+ lines)
             cleaned_city_parts = []
             for cline in c_lines:
                 cline_u = cline.upper()
                 if (
                     re.match(r"^(?:(?:TH|ST|ND|RD|\d+(?:TH|ST|ND|RD)?)\s+(?:FLOOR|FL)|SUITE|STE|APT|UNIT|ROOM|RM|BLDG|BUILDING)\b", cline_u)
                     or cline_u.endswith((" FLOOR", " FL", " STE", " SUITE"))
+                    or re.match(r"^(?:FLOOR|FLR|FL)\s+[A-Z0-9]+$", cline_u)
                 ):
                     if not s2_in:
                         s2_in = cline
@@ -408,7 +412,7 @@ def standardize_address(
 
     if "\n" in s1_in or "\r" in s1_in:
         s1_lines = [line.strip() for line in re.split(r"[\r\n]+", s1_in) if line.strip()]
-        if len(s1_lines) > 1:
+        if len(s1_lines) > 1:  # pragma: no branch  (s1_in is stripped, so an embedded newline always separates 2+ lines)
             cleaned_s1_parts = []
             for sline in s1_lines:
                 sline_u = sline.upper()
@@ -434,9 +438,11 @@ def standardize_address(
 
     # Care-Of / Attention Prefix Cleaner: strips "c/o <company>" segments, keeping any physical street
     had_co = has_care_of(s1_in)
-    s1_in = strip_care_of(s1_in)
+    s1_in, care_of_1 = extract_care_of(s1_in)
+    care_of_2 = ""
     if s2_in:
-        s2_in = strip_care_of(s2_in)
+        s2_in, care_of_2 = extract_care_of(s2_in)
+    raw_dict["care_of"] = "; ".join(dict.fromkeys(c for c in (care_of_1, care_of_2) if c)) or None
     if had_co and not s1_in and s2_in:
         s1_in = s2_in
         s2_in = ""

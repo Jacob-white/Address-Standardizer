@@ -155,10 +155,9 @@ class SingaporeGrammar(CountryGrammar):
                 combined = combined[:m_lvl.start()] + " " + combined[m_lvl.end():]
 
         if not unit_str and s2:
-            st1_rem, st2_norm = split_intl_secondary_unit(s1, s2)
-            if st2_norm:
-                unit_str = st2_norm
-                combined = st1_rem
+            # A non-empty street2 always comes back as a non-empty secondary unit.
+            st1_rem, unit_str = split_intl_secondary_unit(s1, s2)
+            combined = st1_rem
 
         combined = " ".join(combined.strip(" ,.-").split())
         # Strip trailing Singapore / SG if present

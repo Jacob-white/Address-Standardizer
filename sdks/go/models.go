@@ -40,6 +40,7 @@ type StandardizedAddress struct {
 	AccuracyRadiusMeters *float64               `json:"accuracy_radius_meters"`
 	CensusTract          string                 `json:"census_tract"`
 	FIPSCode             string                 `json:"fips_code"`
+	CareOf               *string                `json:"care_of"` // removed "c/o" / "attn" clause, if any
 	ConfidenceScore      *float64               `json:"confidence_score"`
 	RoutingTier          string                 `json:"routing_tier"`
 	RDI                  string                 `json:"rdi"`

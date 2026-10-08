@@ -1441,6 +1441,101 @@
       "street2": "",
       "normalized_address_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU",
       "building_key": "FRIEDRICHSTRASSE 43-45||BERLIN||10117|DEU"
+    },
+    "INTL-04-020": {
+      "city": "LIMA",
+      "postal_code": "15023",
+      "normalized_address_key": "AVE JAVIER PRADO ESTE 4200||LIMA||15023|PER",
+      "building_key": "AVE JAVIER PRADO ESTE 4200||LIMA||15023|PER",
+      "phonetic_key": "A100|15023"
+    },
+    "INTL-04-042": {
+      "city": "LIMA",
+      "postal_code": "15023",
+      "normalized_address_key": "AVE JAVIER PRADO ESTE 4205||LIMA||15023|PER",
+      "building_key": "AVE JAVIER PRADO ESTE 4205||LIMA||15023|PER",
+      "phonetic_key": "A100|15023"
+    },
+    "INTL-04-064": {
+      "city": "LIMA",
+      "postal_code": "15023",
+      "normalized_address_key": "AVE JAVIER PRADO ESTE 4210||LIMA||15023|PER",
+      "building_key": "AVE JAVIER PRADO ESTE 4210||LIMA||15023|PER",
+      "phonetic_key": "A100|15023"
+    },
+    "INTL-04-086": {
+      "city": "LIMA",
+      "postal_code": "15023",
+      "normalized_address_key": "AVE JAVIER PRADO ESTE 4215||LIMA||15023|PER",
+      "building_key": "AVE JAVIER PRADO ESTE 4215||LIMA||15023|PER",
+      "phonetic_key": "A100|15023"
+    },
+    "INTL-04-108": {
+      "city": "LIMA",
+      "postal_code": "15023",
+      "normalized_address_key": "AVE JAVIER PRADO ESTE 4220||LIMA||15023|PER",
+      "building_key": "AVE JAVIER PRADO ESTE 4220||LIMA||15023|PER",
+      "phonetic_key": "A100|15023"
+    },
+    "INTL-04-130": {
+      "city": "LIMA",
+      "postal_code": "15023",
+      "normalized_address_key": "AVE JAVIER PRADO ESTE 4225||LIMA||15023|PER",
+      "building_key": "AVE JAVIER PRADO ESTE 4225||LIMA||15023|PER",
+      "phonetic_key": "A100|15023"
+    },
+    "INTL-05-012": {
+      "street2": "STE 400",
+      "city": "LUXEMBOURG",
+      "postal_code": "2449",
+      "normalized_address_key": "40 BLVD ROYAL|STE 400|LUXEMBOURG||2449|LUX",
+      "building_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "phonetic_key": "40|B413|LUXEMBOURG"
+    },
+    "INTL-05-032": {
+      "city": "LUXEMBOURG",
+      "postal_code": "2449",
+      "normalized_address_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "building_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "phonetic_key": "40|B413|LUXEMBOURG"
+    },
+    "INTL-05-052": {
+      "street2": "STE 400",
+      "city": "LUXEMBOURG",
+      "postal_code": "2449",
+      "normalized_address_key": "40 BLVD ROYAL|STE 400|LUXEMBOURG||2449|LUX",
+      "building_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "phonetic_key": "40|B413|LUXEMBOURG"
+    },
+    "INTL-05-072": {
+      "city": "LUXEMBOURG",
+      "postal_code": "2449",
+      "normalized_address_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "building_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "phonetic_key": "40|B413|LUXEMBOURG"
+    },
+    "INTL-05-092": {
+      "street2": "STE 400",
+      "city": "LUXEMBOURG",
+      "postal_code": "2449",
+      "normalized_address_key": "40 BLVD ROYAL|STE 400|LUXEMBOURG||2449|LUX",
+      "building_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "phonetic_key": "40|B413|LUXEMBOURG"
+    },
+    "INTL-05-112": {
+      "city": "LUXEMBOURG",
+      "postal_code": "2449",
+      "normalized_address_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "building_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "phonetic_key": "40|B413|LUXEMBOURG"
+    },
+    "INTL-05-132": {
+      "street2": "STE 400",
+      "city": "LUXEMBOURG",
+      "postal_code": "2449",
+      "normalized_address_key": "40 BLVD ROYAL|STE 400|LUXEMBOURG||2449|LUX",
+      "building_key": "40 BLVD ROYAL||LUXEMBOURG||2449|LUX",
+      "phonetic_key": "40|B413|LUXEMBOURG"
     }
   }
 }

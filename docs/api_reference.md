@@ -138,6 +138,7 @@ A dataclass returned by `standardize_address` and `batch_standardize` (`from add
 | `is_private_residence` | `bool` | Privacy placeholders such as "Private Residence" are detected and not published. |
 | `is_registered_agent_hub` | `bool` | |
 | `dependent_locality`, `building_name` | `Optional[str]` | International fields. |
+| `care_of` | `Optional[str]` | Text of a removed `c/o` / `C/-` / `attn` clause (for example `Acme Holdings LLC`); `None` when there was none. The clause is never part of `street1`/`street2`. Returned by `as_dict(include_metadata=True)` and the REST API. |
 | `rooftop_address` | `Optional[str]` | Street line without the unit (`None` for PO boxes, private residences, locality-only and failed parses). |
 
 **Computed properties** (set by `finalize=True` processing; all settable)

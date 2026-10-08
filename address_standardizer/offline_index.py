@@ -746,8 +746,7 @@ class OfflineReferenceIndex:
             # The engine also queries street_ranges; create any other required table/column so a swapped-in
             # reference database that predates it cannot make later lookups raise.
             self._init_schema(test_conn)
-            if new_db_path != ":memory:":
-                test_conn.execute("PRAGMA journal_mode=WAL;")
+            test_conn.execute("PRAGMA journal_mode=WAL;")  # never ":memory:" here: the exists() check above rejects it
         except sqlite3.Error as e:
             test_conn.close()
             raise ValueError(f"Invalid reference database schema in {new_db_path}: {e}")

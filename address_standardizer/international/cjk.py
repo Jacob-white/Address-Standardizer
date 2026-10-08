@@ -72,7 +72,7 @@ RE_TW_ROOM = re.compile(r"(\d+(?:[\s\-]+)?(?:樓|楼|室|F\b))", re.IGNORECASE)
 
 # Latin/Romanized Unit indicators
 RE_LATIN_UNIT = re.compile(
-    r"\b(?:Apt|Suite|Ste|Unit|Room|Rm|Fl|Floor|#)\.?\s*([A-Za-z0-9\-]+)\b",
+    r"(?:\b(?:Apt|Suite|Ste|Unit|Room|Rm|Floor|Fl)\b|\b#)\.?\s*([A-Za-z0-9\-]+)\b",
     re.IGNORECASE,
 )
 
@@ -254,22 +254,16 @@ class CJKGrammar(CountryGrammar):
                 rem_parts = parts[:-2]
                 if len(rem_parts) == 1:
                     street_line = rem_parts[0]
-                elif len(rem_parts) >= 2:
+                else:  # two or more leading parts (rem_parts is never empty when len(parts) >= 3)
                     if re.match(r"^(?:No\.?\s*)?\d", rem_parts[0], re.IGNORECASE):
                         street_line = ", ".join(rem_parts)
                     else:
                         building_name = rem_parts[0]
                         street_line = ", ".join(rem_parts[1:])
             elif len(parts) == 2:
-                # e.g. ["6-10-1 Roppongi, Minato-ku", "Tokyo"]
-                m_st_ct = re.match(r"^(.*?)\s*,\s*(.*)$", parts[0])
-                if m_st_ct:
-                    street_line = m_st_ct.group(1)
-                    city_raw = m_st_ct.group(2)
-                    state_raw = parts[1]
-                else:
-                    city_raw = parts[1]
-                    street_line = parts[0]
+                # e.g. ["6-10-1 Roppongi", "Tokyo"] (parts never contain commas: the line was split on them)
+                city_raw = parts[1]
+                street_line = parts[0]
             elif len(parts) == 1:
                 street_line = parts[0]
 
@@ -367,8 +361,12 @@ class CJKGrammar(CountryGrammar):
                 country_iso = "KOR"
                 for kr_prov in KR_PROVINCES:
                     if main_block.startswith(kr_prov):
+                        rest_block = main_block[len(kr_prov):].strip()
+                        if rest_block.endswith(("로", "길")) and not re.search(r"[시군구]", rest_block):
+                            # "세종대로": the province-like prefix is part of a road name, not a province.
+                            break
                         state_raw = kr_prov
-                        main_block = main_block[len(kr_prov):].strip()
+                        main_block = rest_block
                         break
                 m_kr_city = re.match(r"^(.*?[시군구])\s*(.*)$", main_block)
                 if m_kr_city:
@@ -378,7 +376,7 @@ class CJKGrammar(CountryGrammar):
                     street_line = main_block
 
             # 2D. Taiwan native hierarchy
-            elif country_iso == "TWN" or any(main_block.startswith(p) for p in TW_DIVISIONS):
+            else:  # country_iso is always one of JPN/CHN/KOR/TWN here, and the first three were handled above
                 country_iso = "TWN"
                 for tw_div in TW_DIVISIONS:
                     if main_block.startswith(tw_div):
@@ -391,12 +389,18 @@ class CJKGrammar(CountryGrammar):
                     street_line = m_tw_dist.group(2)
                 else:
                     street_line = main_block
-            else:
-                street_line = main_block
 
             # Process tail tokens for building, room, or trailing postal code
             if tail_tokens:
                 for token in tail_tokens:
+                    # Korean road name (…로/…길) followed by a short number: that is the building number.
+                    if (
+                        country_iso == "KOR"
+                        and street_line.endswith(("로", "길"))
+                        and re.match(r"^\d{1,4}(?:-\d{1,4})?$", token.strip())
+                    ):
+                        street_line = f"{street_line} {token.strip()}"
+                        continue
                     # Check for trailing postal code (e.g. "110", "106-6132", "06236")
                     if re.match(r"^\d{3}(?:-?\d{2,4})?$", token.strip()) and not postal_raw:
                         postal_raw = token.strip()

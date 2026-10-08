@@ -138,14 +138,7 @@ def normalize_country_code(
         return country_cand
 
     # Cross-Border Foreign Operating Bank Branches / Metadata check:
-    # When state is absent or not a US state (e.g. 'US' or empty), or dummy '00000' zip,
-    # or raw_street indicates foreign branch, check city against global metros.
-    is_foreign_indicator = (
-        state_raw in ("US", "USA", "", None)
-        or postal_raw in ("00000", "", None)
-        or (raw_street and any(ind in raw_street.upper() for ind in ("(FRGN)", "(FOREIGN)", " FRGN", " OVERSEAS")))
-    )
-
+    # The state is absent or not a US state here (a US state returned above), so check the city against global metros.
     # International metro check: When state is absent or not a US state,
     # check city against global metros to prevent erroneous USA defaulting
     if city_raw:
@@ -166,13 +159,12 @@ def normalize_country_code(
                     candidates.append(p_c)
 
         for cand in candidates:
+            # (a valid US state already returned "USA" above, so a global-metro city name always wins here)
             if cand in GLOBAL_METRO_TO_COUNTRY:
-                if not is_valid_us_state or is_foreign_indicator:
-                    return GLOBAL_METRO_TO_COUNTRY[cand]
+                return GLOBAL_METRO_TO_COUNTRY[cand]
             cand_unaccent = unicodedata.normalize("NFKD", cand).encode("ASCII", "ignore").decode("utf-8")
             if cand_unaccent in GLOBAL_METRO_TO_COUNTRY:
-                if not is_valid_us_state or is_foreign_indicator:
-                    return GLOBAL_METRO_TO_COUNTRY[cand_unaccent]
+                return GLOBAL_METRO_TO_COUNTRY[cand_unaccent]
 
     if postal_raw:
         p_clean = postal_raw.strip().upper()
@@ -221,11 +213,10 @@ def normalize_country_code(
             elif last_clean in FROZEN_US_STATE_CODES or last_clean in US_STATES:
                 return "USA"
             else:
-                subwords = raw_parts[-1].split()
-                if subwords:
-                    sub_last = RE_NON_ALPHANUMERIC.sub("", subwords[-1]).strip().upper()
-                    if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
-                        return "USA"
+                subwords = raw_parts[-1].split()  # non-empty: the parts were filtered to non-blank strings
+                sub_last = RE_NON_ALPHANUMERIC.sub("", subwords[-1]).strip().upper()
+                if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
+                    return "USA"
 
         # A trailing comma part that is a country's name in any supported language/accent ("Italia", "Belgique",
         # "Sverige", "México") resolves through the same registry the structured `country` field uses.
@@ -351,13 +342,10 @@ def normalize_us_postal_code(postal_raw: Optional[str]) -> Tuple[str, str]:
             return only, only
         if len(only) == 9 and (clean.count("-") == 0 or RE_ZIP_PLUS4_SPLIT.match(clean)):
             return f"{only[:5]}-{only[5:]}", only[:5]
-        if len(only) == 5 and RE_ZIP5_SPLIT.match(clean):
-            return only, only
     return clean, ""
 
 
 RE_ZIP_PLUS4_SPLIT = re.compile(r"^\d{5}[-\s]\d{4}$")
-RE_ZIP5_SPLIT = re.compile(r"^\d{2,3}\s\d{2,3}$")
 
 
 def is_registered_agent_hub_address(

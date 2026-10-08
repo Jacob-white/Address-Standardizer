@@ -66,7 +66,7 @@ RE_IN_PINCODE = re.compile(
 
 # SEZ, Plot, Sector, Phase, Block patterns
 RE_IN_PLOT = re.compile(
-    r"\b(?:PLOT|PLOT\s+NO|PLOT\s+NUMBER)\.?\s*([0-9A-Za-z\/\-]+)\b",
+    r"\b(?:PLOT\s+NUMBER\b|PLOT\s+NO\b|PLOT)\.?\s*([0-9A-Za-z\/\-]+)\b",
     re.IGNORECASE,
 )
 RE_IN_SECTOR = re.compile(
@@ -170,10 +170,9 @@ class IndiaGrammar(CountryGrammar):
             combined = combined[:m_sez.start()] + " " + combined[m_sez.end():]
 
         if not sec_unit_str and s2:
-            st1_rem, st2_norm = split_intl_secondary_unit(s1, s2)
-            if st2_norm:
-                sec_unit_str = st2_norm
-                combined = st1_rem
+            # A non-empty street2 always comes back as a non-empty secondary unit.
+            st1_rem, sec_unit_str = split_intl_secondary_unit(s1, s2)
+            combined = st1_rem
 
         combined = " ".join(combined.strip(" ,.-").split())
 

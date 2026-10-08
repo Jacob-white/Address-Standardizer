@@ -327,8 +327,7 @@ class IrelandGrammar(CountryGrammar):
             if parts:
                 m_end_eir = RE_EIRCODE_SEARCH.search(parts[-1])
                 if m_end_eir:
-                    if not postal_raw:
-                        postal_raw = f"{m_end_eir.group(1).upper()} {m_end_eir.group(2).upper()}"
+                    # postal_raw is already populated: the Eircode search above covers street1 as well.
                     rem = parts[-1][:m_end_eir.start()].strip()
                     if rem:
                         parts[-1] = rem
@@ -382,9 +381,12 @@ class IrelandGrammar(CountryGrammar):
                         parts = parts[:-1]
                         break
 
-            if len(parts) == 1:
+            if not parts:
+                # Everything was country / county / city / Eircode: nothing is left for a thoroughfare.
+                street_line = ""
+            elif len(parts) == 1:
                 street_line = parts[0]
-            elif len(parts) >= 2:
+            else:
                 # Part 0 could be building name if next part has digits
                 if re.search(r"\d", parts[1]) and not re.search(r"\d", parts[0]):
                     building_name = parts[0].upper()
@@ -396,12 +398,12 @@ class IrelandGrammar(CountryGrammar):
 
         # Handle secondary unit from s2_raw or inline street_line
         if s2_raw and not unit_number:
+            # A non-empty street2 always comes back as a non-empty secondary unit.
             st1_rem, st2_norm = split_intl_secondary_unit(street_line, s2_raw)
-            if st2_norm:
-                parts_u = st2_norm.split(None, 1)
-                unit_type = parts_u[0] if parts_u else None
-                unit_number = parts_u[1] if len(parts_u) > 1 else None
-                street_line = st1_rem
+            parts_u = st2_norm.split(None, 1)
+            unit_type = parts_u[0] if parts_u else None
+            unit_number = parts_u[1] if len(parts_u) > 1 else None
+            street_line = st1_rem
         elif not unit_number:
             m_block = re.search(r"\b(?:BLOCK|BLK)\s+([A-Za-z0-9]+)\b", street_line, re.IGNORECASE)
             if m_block:
@@ -418,13 +420,21 @@ class IrelandGrammar(CountryGrammar):
                     street_line = st1_rem
 
         # Extract locality from street_line if present (e.g. "IFSC")
-        for loc in sorted(IR_LOCALITIES, key=len, reverse=True):
-            if not dep_locality and re.search(rf"\b{re.escape(loc)}\b", street_line.upper()):
+        if not dep_locality:
+            # Several known localities can occur in one line ("Custom House Quay IFSC": the quay is the street, IFSC
+            # the locality). Prefer the one that ends last, then the longest, and never one that is the whole line.
+            candidates = []
+            upper_line = street_line.upper()
+            for loc in IR_LOCALITIES:
+                for m_loc in re.finditer(rf"\b{re.escape(loc)}\b", upper_line):
+                    candidates.append((m_loc.end(), len(loc), loc))
+            for _end, _length, loc in sorted(candidates, reverse=True):
                 # Ensure it's not the primary street itself (e.g. "1 IFSC" or "CUSTOM HOUSE QUAY")
-                if not re.match(rf"^\d+\s+{re.escape(loc)}$", street_line.upper()):
-                    dep_locality = loc
-                    street_line = re.sub(rf"(?:,\s*|\s+)\b{re.escape(loc)}\b", "", street_line, flags=re.IGNORECASE).strip(" ,.-")
-                    break
+                if re.match(rf"^\d+\s+{re.escape(loc)}$", upper_line) or upper_line.strip(" ,.-") == loc:
+                    continue
+                dep_locality = loc
+                street_line = re.sub(rf"(?:,\s*|\s+)\b{re.escape(loc)}\b", "", street_line, flags=re.IGNORECASE).strip(" ,.-")
+                break
 
         premise_cand, st_num, st_name = self.extract_premise_and_thoroughfare(street_line)
         if premise_cand and not building_name:

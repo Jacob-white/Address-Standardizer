@@ -303,10 +303,10 @@ def heal_street_name(name_raw: str, max_distance: int = 1) -> Optional[str]:
                 continue
             d = damerau_levenshtein_distance(clean_name, cand)
             if d <= allowed_distance and d < min_dist:
+                # cand is a COMMON_STREET_NAME and clean_name is not (checked above), so d >= 1 == allowed_distance
                 min_dist = d
                 best_match = cand
-                if d == 1:
-                    break
+                break
 
     return best_match
 
@@ -384,8 +384,8 @@ def heal_street_number_transposition(
             cand_val = int(cand_str)
             for low, high in valid_ranges:
                 if low <= cand_val <= high:
-                    if cand_str not in candidates:
-                        candidates.append(cand_str)
+                    # Distinct adjacent swaps always yield distinct strings, so no de-duplication is needed.
+                    candidates.append(cand_str)
                     break
 
     if len(candidates) == 1:

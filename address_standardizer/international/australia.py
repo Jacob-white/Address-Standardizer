@@ -109,6 +109,13 @@ class AustraliaGrammar(CountryGrammar):
 
         s_clean = " ".join(street_line.strip().split())
 
+        # "Tower, 12 George St": a leading premise name followed by a number-led street line
+        if "," in s_clean:
+            head, tail = (p.strip() for p in s_clean.rsplit(",", 1))
+            if head and tail[:1].isdigit():
+                _, tail_num, tail_name = self.extract_premise_and_thoroughfare(tail)
+                return head.upper(), tail_num, tail_name
+
         # Check slash unit: "5/100 GEORGE ST"
         m_slash = RE_AU_SLASH_UNIT.match(s_clean)
         if m_slash:
@@ -165,9 +172,14 @@ class AustraliaGrammar(CountryGrammar):
                         last_p = (last_p[:m_s_c.start()] + last_p[m_s_c.end():]).strip()
                         break
 
-                if last_p:
+                if last_p and not last_p[0].isdigit():
                     city_raw = last_p
-                parts.pop()
+                    parts.pop()
+                elif last_p:
+                    # A number-led remainder is the street ("12 George St, AUSTRALIA"), never a suburb.
+                    parts[-1] = last_p
+                else:
+                    parts.pop()
 
             combined = ", ".join(parts)
 
@@ -228,7 +240,7 @@ class AustraliaGrammar(CountryGrammar):
                 break
 
         # Extract suburb/city if comma separated
-        if not city_raw and "," in combined:
+        if not city_raw and "," in combined and not combined.rsplit(",", 1)[1].strip()[:1].isdigit():
             st_part, city_part = combined.rsplit(",", 1)
             city_raw = city_part.strip().upper()
             combined = st_part.strip()

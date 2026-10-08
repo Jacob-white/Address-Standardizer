@@ -100,6 +100,16 @@ RE_HK_FLAT_ONLY = re.compile(r"\b(FLAT|UNIT|RM|ROOM|SUITE|STE|OFC|OFFICE)\s*([A-
 RE_HK_FLOOR_ONLY = re.compile(r"\b(\d+)\s*(?:TH|ST|ND|RD)?\s*(?:FLOOR|FL|FLR)\b", re.IGNORECASE)
 
 
+# Roads whose official name ends in a district word ("Queen's Road Central", "Des Voeux Road West"): there the district
+# word is part of the street name. For any other road ("8 Finance Street Central") it is the locality.
+_HK_DISTRICT_NAMED_ROADS = frozenset({"QUEENSROAD", "DESVOEUXROAD", "CONNAUGHTROAD"})
+
+
+def _is_district_named_road(words_before_district: list) -> bool:
+    name = "".join(re.sub(r"[^A-Z]", "", w.upper()) for w in words_before_district[-3:])
+    return any(name.endswith(road) for road in _HK_DISTRICT_NAMED_ROADS)
+
+
 class HongKongGrammar(CountryGrammar):
     """Hong Kong localized address grammar."""
 
@@ -223,10 +233,9 @@ class HongKongGrammar(CountryGrammar):
                         combined = combined[:m_fl.start()] + " " + combined[m_fl.end():]
 
         if not sec_unit_str and s2:
-            st1_rem, st2_norm = split_intl_secondary_unit(s1, s2)
-            if st2_norm:
-                sec_unit_str = st2_norm
-                combined = st1_rem
+            # A non-empty street2 always comes back as a non-empty secondary unit.
+            st1_rem, sec_unit_str = split_intl_secondary_unit(s1, s2)
+            combined = st1_rem
 
         if not sec_unit_str:
             m_flat = RE_HK_FLAT_ONLY.search(combined)
@@ -251,7 +260,7 @@ class HongKongGrammar(CountryGrammar):
                 lead = m_d.group(1)
                 prev_words = combined[: m_d.start()].split()
                 prev_word = re.sub(r"[^A-Z]", "", prev_words[-1].upper()) if prev_words else ""
-                if "," not in lead and prev_word in _HK_ROAD_TYPE_WORDS:
+                if "," not in lead and prev_word in _HK_ROAD_TYPE_WORDS and _is_district_named_road(prev_words):
                     continue
                 chosen = m_d
             if chosen is None:

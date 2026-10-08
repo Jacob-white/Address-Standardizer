@@ -94,7 +94,7 @@ def _normalize_fast_sec_unit(sec_raw: str) -> Optional[str]:
                 sec_parts.append(f"{stype} {sval}")
             elif m.group(3):
                 sec_parts.append(f"STE {m.group(3).upper()}")
-            elif m.group(4):
+            else:  # alternation 3 (descriptive position word): the only one left once groups 1 and 3 are empty
                 stype = SECONDARY_UNITS.get(m.group(4).upper(), m.group(4).upper())
                 sval = m.group(5).upper() if m.group(5) else ""
                 sec_parts.append(f"{stype} {sval}".strip())
@@ -149,7 +149,7 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
                 sec_parts.append(f"{stype} {sval}")
             elif m.group(3):
                 sec_parts.append(f"STE {m.group(3).lstrip('#-').upper()}")
-            elif m.group(4):
+            else:  # alternation 3 (descriptive position word): the only one left once groups 1 and 3 are empty
                 stype = SECONDARY_UNITS.get(m.group(4).upper(), m.group(4).upper())
                 sval = m.group(5).lstrip("#-").upper() if m.group(5) else ""
                 sec_parts.append(f"{stype} {sval}".strip())
@@ -276,8 +276,7 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
     if pre_dir:
         st1_parts.append(pre_dir)
     st1_parts.extend(norm_name_parts)
-    if suffix:
-        st1_parts.append(suffix)
+    st1_parts.append(suffix)  # always set: a missing suffix returned None above
     if post_dir:
         st1_parts.append(post_dir)
 

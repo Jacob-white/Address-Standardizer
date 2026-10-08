@@ -60,9 +60,7 @@ def split_single_line_locality(text: str, country_iso: str) -> Optional[Tuple[st
         if not locality and len(rest) >= 2:
             locality = rest[-1]
             rest = rest[:-1]
-        if not rest:
-            return None
-        return ", ".join(rest), locality, postal
+        return ", ".join(rest), locality, postal  # rest is never empty: len(parts) >= 2 here
 
     # No postal code in the last part: it is the city; look for the code in the part before it.
     before = parts[-2]
@@ -154,24 +152,31 @@ def split_intl_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
         st2 = f"{st2_cand} {st2}".strip() if st2 else st2_cand
         st1 = (m_ord_floor.group(3) or "").strip(" ,.-")
 
-    if not st2:
-        m = RE_INTL_SEC_INLINE.search(st1)
-        if m:
-            sec_type = m.group(1).upper()
-            sec_id = m.group(2).upper()
-            sec_type_norm = SECONDARY_UNITS.get(sec_type, "APT" if sec_type == "FLAT" else sec_type)
-            st2 = f"{sec_type_norm} {sec_id}"
-            st1 = st1[:m.start()] + st1[m.end():]
-            st1 = RE_WHITESPACE.sub(" ", st1.strip(" ,.-"))
-            if len(st1) == 1 and st1.isalpha():
-                st2 = f"{st2}{st1}"
-                st1 = ""
-    elif st2:
+    if st2:
         m2 = RE_INTL_SEC_START.match(st2)
         if m2:
             sec_type = m2.group(1).upper()
             sec_type_norm = SECONDARY_UNITS.get(sec_type, "APT" if sec_type == "FLAT" else sec_type)
             st2 = f"{sec_type_norm} {m2.group(2).strip()}"
+
+    # Inline unit inside the street line is split out even when a street2 unit exists; both are kept.
+    m = RE_INTL_SEC_INLINE.search(st1)
+    rest = ""
+    if m:
+        rest = RE_WHITESPACE.sub(" ", (st1[:m.start()] + st1[m.end():]).strip(" ,.-"))
+    # With a street2 present, a PO Box or a unit-only street line (nothing but unit tokens) stays in the street line.
+    if m and not (
+        st2 and (m.group(1).upper() == "PO BOX" or len(rest) <= 1 or RE_INTL_SEC_INLINE.search(rest))
+    ):
+        sec_type = m.group(1).upper()
+        sec_id = m.group(2).upper()
+        sec_type_norm = SECONDARY_UNITS.get(sec_type, "APT" if sec_type == "FLAT" else sec_type)
+        inline_unit = f"{sec_type_norm} {sec_id}"
+        st1 = rest
+        if len(st1) == 1 and st1.isalpha():
+            inline_unit = f"{inline_unit}{st1}"
+            st1 = ""
+        st2 = f"{inline_unit} {st2}".strip()
 
     words = st1.split()
     norm_words = []
@@ -401,17 +406,16 @@ class UniversalInternationalGrammar(CountryGrammar):
                     norm_s1 = norm_s1_base
                     norm_s2 = norm_s2_base
                     city_raw = parts_comma[1]
-                    if len(parts_comma) >= 3:
-                        rem_loc = parts_comma[2]
-                        m_can = RE_CAN_PROV_POSTAL.match(rem_loc.upper())
-                        if m_can:
-                            state_raw = m_can.group(1)
-                            if has_pc:
-                                postal_raw = m_can.group(2)
-                        elif has_pc:
-                            postal_raw = rem_loc
-                        else:
-                            state_raw = rem_loc
+                    rem_loc = parts_comma[2]
+                    m_can = RE_CAN_PROV_POSTAL.match(rem_loc.upper())
+                    if m_can:
+                        state_raw = m_can.group(1)
+                        if has_pc:
+                            postal_raw = m_can.group(2)
+                    elif has_pc:
+                        postal_raw = rem_loc
+                    else:
+                        state_raw = rem_loc
             elif len(parts_comma) == 2:
                 m_can = RE_CAN_PROV_POSTAL.match(parts_comma[1].upper())
                 m_can_post = RE_CAN_POSTCODE.match(parts_comma[1].upper())
@@ -544,12 +548,6 @@ class CountryGrammarRegistry:
         if country_cand in ("PRI", "GUM", "VIR", "MNP", "ASM"):
             return country_cand
 
-        is_foreign_indicator = (
-            state_raw in ("US", "USA", "", None)
-            or postal_raw in ("00000", "", None)
-            or (raw_street and any(ind in raw_street.upper() for ind in ("(FRGN)", "(FOREIGN)", " FRGN", " OVERSEAS")))
-        )
-
         if city_raw:
             c_clean = RE_NON_ALPHANUMERIC.sub(" ", city_raw).strip().upper()
             c_clean = " ".join(c_clean.split())
@@ -567,14 +565,13 @@ class CountryGrammarRegistry:
                     if p_c:
                         candidates.append(p_c)
 
+            # (a valid US state already returned "USA" above, so a namesake city never reaches this point)
             for cand in candidates:
                 if cand in GLOBAL_METRO_TO_COUNTRY:
-                    if not is_valid_us_state or is_foreign_indicator:
-                        return GLOBAL_METRO_TO_COUNTRY[cand]
+                    return GLOBAL_METRO_TO_COUNTRY[cand]
                 cand_unaccent = fold_to_ascii_key(cand)
                 if cand_unaccent in GLOBAL_METRO_TO_COUNTRY:
-                    if not is_valid_us_state or is_foreign_indicator:
-                        return GLOBAL_METRO_TO_COUNTRY[cand_unaccent]
+                    return GLOBAL_METRO_TO_COUNTRY[cand_unaccent]
 
         if postal_raw:
             p_clean = postal_raw.strip().upper()
@@ -619,11 +616,9 @@ class CountryGrammarRegistry:
                 elif last_clean in FROZEN_US_STATE_CODES or last_clean in US_STATES:
                     return "USA"
                 else:
-                    subwords = raw_parts[-1].split()
-                    if subwords:
-                        sub_last = RE_NON_ALPHANUMERIC.sub("", subwords[-1]).strip().upper()
-                        if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
-                            return "USA"
+                    sub_last = RE_NON_ALPHANUMERIC.sub("", raw_parts[-1].split()[-1]).strip().upper()
+                    if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
+                        return "USA"
 
             for part in raw_street.split(","):
                 p_clean = RE_NON_ALPHANUMERIC.sub(" ", part).strip().upper()

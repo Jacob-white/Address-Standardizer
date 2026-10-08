@@ -42,6 +42,8 @@ export interface StandardizeResponse {
   accuracy_radius_meters?: number | null;
   census_tract?: string | null;
   fips_code?: string | null;
+  /** Text of a removed "c/o" / "attn" clause (the delivery address itself never contains it). */
+  care_of?: string | null;
   confidence_score?: number | null;
   routing_tier?: string | null;
   rdi?: string | null;

@@ -238,6 +238,7 @@ class StandardizeResponse(BaseModel):
     corporate_risk_flags: Optional[List[str]] = None
     rooftop_address: Optional[str] = None
     full_rooftop_address: Optional[str] = None
+    care_of: Optional[str] = None  # text of a removed "c/o" / "attn" clause
 
     model_config = {"extra": "allow"}
 

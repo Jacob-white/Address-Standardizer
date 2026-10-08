@@ -38,6 +38,12 @@ RE_PO_BOX = re.compile(
     re.IGNORECASE,
 )
 
+# Secondary unit designator that makes up a whole comma part: "Office 5", "Suite 12", "Floor 3"
+RE_UNIT_PART = re.compile(
+    r"^(?:OFFICE|OFC|SUITE|STE|UNIT|FLOOR|FL|APT|APARTMENT|FLAT|ROOM|SHOP|LEVEL)\b\.?\s*[A-Za-z0-9\-]+$",
+    re.IGNORECASE,
+)
+
 # Plot pattern (Nigeria / Africa)
 RE_PLOT = re.compile(
     r"^\b(?:PLOT|PLT)\.?\s*([A-Za-z0-9\-\/]+)\b",
@@ -130,11 +136,7 @@ class MenaAfricaGrammar(CountryGrammar):
         if m_nga:
             return m_nga.group(1)
 
-        # Egypt & Kenya: 5 digits
-        m_5d = re.match(r"^(\d{5})$", clean)
-        if m_5d:
-            return m_5d.group(1)
-
+        # Egypt & Kenya 5-digit codes are already returned by the Saudi 5-digit branch above.
         return clean
 
     def extract_premise_and_thoroughfare(
@@ -224,10 +226,21 @@ class MenaAfricaGrammar(CountryGrammar):
 
             sec_parts: List[str] = []
             rem_parts: List[str] = []
+            inline_box_seen = False
             for part in parts:
                 m_box = RE_PO_BOX.search(part)
                 if m_box:
                     sec_parts.append(normalize_po_box_str(part.strip()))
+                    # "Sheikh Zayed Road PO Box 5": the thoroughfare before the box is kept, not discarded.
+                    before_box = part[:m_box.start()].strip(" ,.-")
+                    if before_box:
+                        rem_parts.append(before_box)
+                        inline_box_seen = True
+                    continue
+
+                # A unit designator following a street+box part ("..., Office 5") is secondary, not a city.
+                if inline_box_seen and RE_UNIT_PART.match(part.strip()):
+                    sec_parts.append(part.strip())
                     continue
 
                 # Check if entire part is a standalone postal code
@@ -238,7 +251,7 @@ class MenaAfricaGrammar(CountryGrammar):
                 rem_parts.append(part)
 
             if sec_parts:
-                unit_number = " ".join(sec_parts)
+                unit_number = ", ".join(sec_parts)
 
             if len(rem_parts) >= 3:
                 # e.g. ["100 Sandton Drive", "Sandton", "Johannesburg 2196", "Gauteng"]
@@ -281,12 +294,15 @@ class MenaAfricaGrammar(CountryGrammar):
                     street_line = ""
                 else:
                     street_line = rem_parts[0]
+            else:
+                # Every part was consumed as a PO box / postal code: nothing is left for the street line.
+                street_line = ""
 
             # In postal routing where an address consists of a PO Box without a thoroughfare street,
             # promote the PO Box to street_line rather than leaving street_line empty.
             if not street_line and sec_parts:
                 street_line = sec_parts.pop(0)
-                unit_number = " ".join(sec_parts) if sec_parts else None
+                unit_number = ", ".join(sec_parts) if sec_parts else None
 
         # Handle secondary units in s2_raw or embedded in street_line
         if s2_raw and not unit_number:
@@ -302,8 +318,11 @@ class MenaAfricaGrammar(CountryGrammar):
             rem_st = street_line[:m_box_inline.start()] + street_line[m_box_inline.end():]
             rem_st = rem_st.strip(" ,.-")
             if rem_st:
+                # Keep the box alongside any caller-supplied unit rather than dropping it.
                 if not unit_number:
                     unit_number = box_str
+                elif box_str.upper() not in unit_number.upper():
+                    unit_number = f"{box_str}, {unit_number}"
                 street_line = rem_st
             else:
                 street_line = box_str

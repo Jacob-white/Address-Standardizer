@@ -75,3 +75,44 @@ def test_locality_only_status_contract():
     assert status != "parse_failed" and status != "standardized"
     assert status in ("locality_only", "city_level")
     assert hash(status) == hash("locality_only")
+
+
+@pytest.mark.parametrize(
+    "street1,street2,expected_street,expected_care_of",
+    [
+        ("c/o Acme Holdings LLC, 100 Main St", "", "100 MAIN ST", "Acme Holdings LLC"),
+        ("100 Main St (c/o John Smith)", "", "100 MAIN ST", "John Smith"),
+        ("100 Main St", "c/o Jane Doe", "100 MAIN ST", "Jane Doe"),
+        ("100 Main St", "", "100 MAIN ST", None),
+    ],
+)
+def test_care_of_text_is_reported_not_discarded(street1, street2, expected_street, expected_care_of):
+    res = _std(street1, street2)
+    assert res.street1 == expected_street
+    assert res.care_of == expected_care_of
+    assert ("care_of" in res.as_dict(include_metadata=True)) and "care_of" not in res.as_dict()
+    assert res.as_dict(include_metadata=True)["care_of"] == expected_care_of
+
+
+def test_care_of_for_international_c_slash_dash_and_german_c_o():
+    au = standardize_address("C/- Smith Pty Ltd", "12 George St", "Sydney", "NSW", "2000", "AUS", use_cache=False)
+    assert (au.street1, au.care_of) == ("12 GEORGE ST", "Smith Pty Ltd")
+    de = standardize_address("c/o Müller GmbH", "Hauptstraße 5", "Berlin", "", "10115", "DEU", use_cache=False)
+    assert (de.street1, de.care_of) == ("HAUPTSTRASSE 5", "Müller GmbH")
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("St. Louis Ave 100", "100 ST LOUIS AVE"),
+        ("Main Street 12", "12 MAIN ST"),
+        ("Elm St 12B", "12B ELM ST"),
+        ("County Road 12", "COUNTY RD 12"),  # a route name, not a house number
+        ("State Route 9", "STATE ROUTE 9"),
+        ("Highway 66", "HWY 66"),
+        ("Farm to Market Road 1960", "FM 1960"),
+        ("123 Farm-to-Market Rd 620", "123 FM 620"),
+    ],
+)
+def test_trailing_house_numbers_and_route_names(raw, expected):
+    assert _std(raw).street1 == expected

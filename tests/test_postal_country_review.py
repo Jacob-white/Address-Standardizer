@@ -86,3 +86,31 @@ def test_bare_canadian_province_tail_selects_canada():
 def test_german_postfach_with_unit_in_one_field(raw):
     res = standardize_address(raw, city="Berlin", postal_code="10115", country="DEU", use_cache=False)
     assert (res.street1, res.street2) == ("POSTFACH 309", "ZIMMER 100")
+
+
+def test_non_latin_street_keys_are_ascii_and_never_collide():
+    a = standardize_address("北京市朝阳区建国路87号 100022", use_cache=False).normalized_address_key
+    b = standardize_address("北京市朝阳区光华路87号 100022", use_cache=False).normalized_address_key
+    assert a != b
+    assert a.isascii() and b.isascii()
+    kr = standardize_address("서울특별시 강남구 테헤란로 152 06236", use_cache=False).normalized_address_key
+    assert kr.isascii() and "~" in kr and "|06236|" in kr
+
+
+def test_latin_and_greek_keys_are_unchanged_by_the_non_latin_encoding():
+    assert standardize_address("Café Straße 5, Zürich", use_cache=False).normalized_address_key.startswith("CAFE STRASSE 5")
+    a = standardize_address("Οδός Ερμού 10", "", "Αθήνα", "", "105 63", "GRC", use_cache=False).normalized_address_key
+    b = standardize_address("Οδος Ερμου 10", "", "Αθηνα", "", "105 63", "GRC", use_cache=False).normalized_address_key
+    assert a == b and "~" not in a
+
+
+def test_hong_kong_district_word_is_part_of_the_street_only_for_district_named_roads():
+    named = standardize_address("88 Queen's Road Central", "", "Central", "", "", "HKG", use_cache=False)
+    assert named.street1.endswith("CENTRAL")
+    other = standardize_address("8 Finance Street Central", "", "", "", "", "HKG", use_cache=False)
+    assert "CENTRAL" not in other.street1 and other.city == "CENTRAL"
+
+
+def test_russian_single_and_structured_input_split_the_unit_like_other_cyrillic_grammars():
+    res = standardize_address("ул. Ленина 5, кв. 12", "", "Москва", "", "125009", "RUS", use_cache=False)
+    assert (res.street1, res.street2, res.country) == ("УЛ. ЛЕНИНА 5", "КВ. 12", "RUS")

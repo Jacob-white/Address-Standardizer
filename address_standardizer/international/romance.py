@@ -99,6 +99,24 @@ def make_strict_sec_regex(types: str) -> "re.Pattern[str]":
 RE_ROMANCE_SEC_STRICT = make_strict_sec_regex(_ROMANCE_SEC_TYPES)
 
 
+# "1578 - Bela Vista": street number followed by a barrio after a spaced dash
+RE_NUM_BARRIO = re.compile(r"^(\d+[A-Za-z0-9\/]*)\s+-\s+(.+)$")
+
+
+def merge_num_barrio(rem_parts: List[str]) -> Optional[str]:
+    """Fold a "number - barrio" comma part into the street part before it (in place); return the barrio.
+
+    "Av Paulista, 1578 - Bela Vista, Sao Paulo" -> parts ["Av Paulista 1578", "Sao Paulo"], barrio "Bela Vista".
+    """
+    for idx, part in enumerate(rem_parts):
+        m_nb = RE_NUM_BARRIO.match(part)
+        if idx and m_nb:
+            rem_parts[idx - 1] = f"{rem_parts[idx - 1]} {m_nb.group(1)}"
+            del rem_parts[idx]
+            return m_nb.group(2).strip()
+    return None
+
+
 def unit_text(text: str) -> str:
     """Upper-cased unit text with punctuation stripped ("Esc. 2" -> "ESC 2")."""
     return " ".join(re.sub(r"[.,;]", " ", text).upper().split())
@@ -301,6 +319,9 @@ class RomanceGrammar(CountryGrammar):
                     state_raw = m_city_st.group(2).strip()
                     rem_parts = rem_parts[:-1]
 
+            if not city_raw and not dep_locality:
+                dep_locality = merge_num_barrio(rem_parts)
+
             if city_raw:
                 street_line = ", ".join(rem_parts)
             elif len(rem_parts) >= 3:
@@ -347,6 +368,9 @@ class RomanceGrammar(CountryGrammar):
                     street_line = ""
                 else:
                     street_line = rem_parts[0]
+            else:
+                # Every part was consumed as colonia / unit / postal code: no street line remains.
+                street_line = ""
 
         # Handle secondary units in s2_raw or embedded in street_line
         s2_type: Optional[str] = None

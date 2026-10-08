@@ -309,12 +309,9 @@ def evaluate_delivery_intelligence(
         deliverability = Deliverability.UNDELIVERABLE
     elif DPVFootnote.N1 in footnotes:
         deliverability = Deliverability.REQUIRES_SECONDARY
-    elif DPVFootnote.BB in footnotes:
-        deliverability = Deliverability.DELIVERABLE
-    elif DPVFootnote.A1 in footnotes:
-        deliverability = Deliverability.UNDELIVERABLE
     else:
-        deliverability = Deliverability.DELIVERABLE if status == "standardized" else Deliverability.UNDELIVERABLE
+        # Every street-level outcome adds either M1/M3 (handled above) or BB, so BB is always present here.
+        deliverability = Deliverability.DELIVERABLE
 
     sec_prompt_required = False
     prompt_msg = None

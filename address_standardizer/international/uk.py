@@ -246,9 +246,9 @@ def is_valid_uk_postcode(raw_code: str) -> bool:
     if len(outward) >= 2 and outward[1].isalpha() and outward[1] in DISALLOWED_OUTWARD_POS2:
         return False
 
-    if len(inward) == 3:
-        if inward[1] in DISALLOWED_INWARD_LETTERS or inward[2] in DISALLOWED_INWARD_LETTERS:
-            return False
+    # The regex guarantees a 3-character inward code (digit + two letters).
+    if inward[1] in DISALLOWED_INWARD_LETTERS or inward[2] in DISALLOWED_INWARD_LETTERS:
+        return False
 
     return True
 
@@ -406,7 +406,10 @@ class UKGrammar(CountryGrammar):
                     new_parts.append(part)
             parts_comma = new_parts
 
-            if len(parts_comma) == 1:
+            if not parts_comma:
+                # Everything was a postcode / unit; do not re-parse the raw line as a thoroughfare.
+                street_line = ""
+            elif len(parts_comma) == 1:
                 p0 = parts_comma[0].strip().upper()
                 if p0 in UK_POST_TOWNS:
                     city_raw = parts_comma[0]
@@ -428,7 +431,7 @@ class UKGrammar(CountryGrammar):
                 else:
                     street_line = p0
                     city_raw = p1
-            elif len(parts_comma) >= 3:
+            else:  # three or more parts
                 last_token = parts_comma[-1].strip().upper()
                 if last_token in UK_POST_TOWNS:
                     city_raw = parts_comma[-1]

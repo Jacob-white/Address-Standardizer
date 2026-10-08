@@ -105,10 +105,9 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
     # Check for Military Unit Box
     m_mil = RE_MILITARY_UNIT_BOX.search(clean_addr)
     if m_mil and not RE_PHYSICAL_STREET_INDICATOR.search(clean_addr):
-        prefix_before = clean_addr[:m_mil.start()].strip()
-        if not any(c.isdigit() for c in prefix_before):
-            st1_mil = f"{' '.join(m_mil.group(1).upper().split())} {' '.join(m_mil.group(2).upper().split())}"
-            return st1_mil, "", True
+        # (the pattern is anchored at the start of the string, so nothing can precede the unit/box)
+        st1_mil = f"{' '.join(m_mil.group(1).upper().split())} {' '.join(m_mil.group(2).upper().split())}"
+        return st1_mil, "", True
 
     # Check for PO Box
     m_po = RE_PO_BOX.search(clean_addr)
@@ -140,7 +139,7 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
                 sec_parts.append(f"{sec_type} {sec_val}")
             elif m_sec.group(3):
                 sec_parts.append(f"STE {m_sec.group(3).lstrip('#-').upper()}")
-            elif m_sec.group(4):
+            else:  # alternation 3 (descriptive position word): the only one left once groups 1 and 3 are empty
                 sec_type = SECONDARY_UNITS.get(m_sec.group(4).upper(), m_sec.group(4).upper())
                 sec_val = m_sec.group(5).lstrip("#-").upper() if m_sec.group(5) else ""
                 sec_parts.append(f"{sec_type} {sec_val}".strip())
@@ -284,9 +283,7 @@ def _ordinal_floor_to_unit(match: "re.Match[str]") -> str:
     nxt = match.string[match.end():].split(None, 1)
     if nxt and nxt[0].strip(".,").upper() in STREET_SUFFIXES:
         return match.group(0)  # "100 Fifth Floor Rd": Floor is part of the street name
-    word = match.group("ord").upper()
-    if word[0].isdigit():
-        return f"FL {int(word[:-2])}"
+    word = match.group("ord").upper()  # letters only (the pattern excludes digits), so never "3RD"
     value = _words_to_number([word])
     return f"FL {value}" if value > 0 else match.group(0)
 
@@ -346,18 +343,17 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
     # Check for Military Unit Box
     m_mil = RE_MILITARY_UNIT_BOX.search(clean_input)
     if m_mil and not RE_PHYSICAL_STREET_INDICATOR.search(clean_input):
-        prefix_before = clean_input[:m_mil.start()].strip()
-        if not any(c.isdigit() for c in prefix_before):
-            st1_mil = f"{' '.join(m_mil.group(1).upper().split())} {' '.join(m_mil.group(2).upper().split())}"
-            m_sz = RE_STATE_ZIP.search(clean_input.upper())
-            p_st = m_sz.group(1) if m_sz else ""
-            p_zp = m_sz.group(2) if m_sz else ""
-            p_city = ""
-            if m_sz:
-                before_sz = clean_input[:m_sz.start()].rstrip(" ,")
-                after_mil = before_sz[m_mil.end():].strip(" ,")
-                p_city = after_mil
-            return USStreetParseResult(st1_mil, "", True, p_city, p_st, p_zp)
+        # (the pattern is anchored at the start of the string, so nothing can precede the unit/box)
+        st1_mil = f"{' '.join(m_mil.group(1).upper().split())} {' '.join(m_mil.group(2).upper().split())}"
+        m_sz = RE_STATE_ZIP.search(clean_input.upper())
+        p_st = m_sz.group(1) if m_sz else ""
+        p_zp = m_sz.group(2) if m_sz else ""
+        p_city = ""
+        if m_sz:
+            before_sz = clean_input[:m_sz.start()].rstrip(" ,")
+            after_mil = before_sz[m_mil.end():].strip(" ,")
+            p_city = after_mil
+        return USStreetParseResult(st1_mil, "", True, p_city, p_st, p_zp)
 
     p_city = ""
     p_st = ""
@@ -555,7 +551,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 sec_parts.append(SECONDARY_UNITS.get(clean, clean))
         elif label in ("OccupancyIdentifier", "SubaddressIdentifier"):
             clean_id = clean.lstrip("#-").strip()
-            if clean_id:
+            if clean_id:  # pragma: no branch  (clean already has leading "#"/"-" stripped and is non-empty)
                 if street_parts and (
                     street_parts[-1].upper() in SPANISH_PREFIX_THOROUGHFARES
                     or (
@@ -801,8 +797,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
             else:
                 st1 = " ".join(city_parts).strip()
             city_parts = []
-            if not city_raw and not (p_st or p_zp):
-                p_city = ""
+            # (no p_city reset needed: an input-derived p_city only exists together with a state and ZIP)
 
     st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
     st2 = _standardize_secondary_unit(st2)
@@ -850,10 +845,44 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
     return USStreetParseResult(st1, st2, True, p_city, p_state, p_zip, building_name=bldg_name)
 
 
+# Words that make a trailing number part of the road's NAME ("County Road 12", "State Route 9", "Forest Road 5",
+# "Farm to Market Road 1960"), not a house number written after the street.
+_ROUTE_NAME_WORDS = frozenset({
+    "COUNTY", "CO", "STATE", "ST", "ROUTE", "RTE", "RT", "HIGHWAY", "HWY", "INTERSTATE", "US", "FM", "RM", "CR", "SR",
+    "FARM", "MARKET", "RANCH", "FOREST", "FOREST SERVICE", "FS", "NATIONAL", "TOWNSHIP", "TWP", "BYPASS",
+})
+_RE_FARM_TO_MARKET = re.compile(r"\bFARM[\s-]+TO[\s-]+MARKET\s+(?:ROAD|RD)\s+(\d+)\b", re.IGNORECASE)
+_RE_TRAILING_HOUSE_NUMBER = re.compile(r"^(?P<street>[A-Za-z][A-Za-z.'\- ]*?)\s+(?P<num>\d{1,6}[A-Za-z]?)$")
+
+
+def _move_trailing_house_number(street: str) -> str:
+    """"St. Louis Ave 100" -> "100 St. Louis Ave" (house number written after the street, as in much of Europe).
+
+    Only when the text is letters, then a street-type word, then a bare number, and no route-style word precedes the
+    type ("County Road 12", "Highway 66" and "Route 9" are names, not house numbers).
+    """
+    m = _RE_TRAILING_HOUSE_NUMBER.match(street.strip())
+    if not m:
+        return street
+    words = m.group("street").replace(".", " ").upper().split()
+    if len(words) < 2 or words[-1] not in STREET_SUFFIXES and words[-1] not in STREET_SUFFIXES.values():
+        return street
+    name_words = words[:-1]
+    # "St"/"Saint" at the very start is part of a name (St. Louis); anywhere else ST is a street type.
+    check = name_words[1:] if name_words and name_words[0] in ("ST", "SAINT") else name_words
+    if not check and name_words and name_words[0] in ("ST", "SAINT"):
+        return street
+    if any(w in _ROUTE_NAME_WORDS for w in check) or (check and check[0] in DIRECTIONALS and len(check) == 1):
+        return street
+    return f"{m.group('num')} {m.group('street').strip()}"
+
+
 def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
     """Parses US address lines and returns (st1, st2, ok, p_city, p_state, p_zip)."""
     s1_clean = (street1_raw or "").strip()
     s2_clean = (street2_raw or "").strip()
+    s1_clean = _RE_FARM_TO_MARKET.sub(r"FM \1", s1_clean)
+    s1_clean = _move_trailing_house_number(s1_clean)
     if city_raw:
         s1_clean = clean_redundant_street_tail(s1_clean, city=city_raw)
         if s2_clean:
@@ -873,6 +902,11 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
                 or RE_PR_HIGHWAY.match(s2_clean)
                 or re.match(r"^\d+[A-Z]?\s+[A-Za-z]", s2_clean)
             )
+            if s2_clean and not has_thoroughfare and not RE_PO_BOX.match(s2_clean):
+                # "Urb Las Flores" + "Apt 5": the urbanization name is street1 and street2 is just the unit.
+                return USStreetParseResult(
+                    f"URB {m_s1_urb.group(1).strip().upper()}", _standardize_secondary_unit(s2_clean), True, "", "", ""
+                )
             if has_thoroughfare and not RE_PO_BOX.match(s2_clean):
                 urb_prefix = f"URB {m_s1_urb.group(1).strip().upper()}"
                 parse_res = _parse_us_street_tokens(s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
@@ -907,6 +941,7 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
             p2 = _parse_us_street_tokens(s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
             p2_words = set(p2[0].upper().split()[1:])
             has_suffix = bool(p2_words & set(STREET_SUFFIXES.values()))  # a real street ("OAK AVE"), not "3 FL"/"5 OAK"
+            has_suffix = has_suffix or bool(p2[1] and p2_words - set(p2[1].upper().split()))  # "200 Oak Ste 5"
             if p1[0] and p2[0] and has_suffix:
                 second = f"{p2[0]} {p2[1]}".strip() if p2[1] else p2[0]
                 st2_dual = f"{p1[1]} {second}".strip() if p1[1] else second

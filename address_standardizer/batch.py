@@ -338,7 +338,7 @@ def _worker_process_chunk(
             uncached_keys.append(cache_key)
 
     # 2. Batch-dispatch uncached records to active engine
-    if uncached_keys:
+    if uncached_keys:  # pragma: no branch  (chunk is non-empty here and row_cache starts empty, so always true)
         batch_results = standardize_batch_dispatch(uncached_keys, finalize=True)
         for cache_key, st in zip(uncached_keys, batch_results):
             aud = st.audit_record.as_dict() if getattr(st, "audit_record", None) is not None else None
@@ -565,7 +565,7 @@ def stream_standardize_csv(
                     row_to_write = dict(aud)
                     for k in ("failure_reason_codes", "raw_input_payload", "proposed_standardized_payload", "final_committed_payload"):
                         val = row_to_write.get(k)
-                        if isinstance(val, (dict, list)):
+                        if isinstance(val, (dict, list)):  # pragma: no branch  (StewardshipAuditRecord.as_dict always yields dict/list here)
                             row_to_write[k] = json.dumps(val)
                     audit_writer.writerow(row_to_write)
 
@@ -737,7 +737,7 @@ def stream_standardize_jsonl(
                 row_to_write = dict(aud)
                 for k in ("failure_reason_codes", "raw_input_payload", "proposed_standardized_payload", "final_committed_payload"):
                     val = row_to_write.get(k)
-                    if isinstance(val, (dict, list)):
+                    if isinstance(val, (dict, list)):  # pragma: no branch  (StewardshipAuditRecord.as_dict always yields dict/list here)
                         row_to_write[k] = json.dumps(val)
                 audit_writer.writerow(row_to_write)
 

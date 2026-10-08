@@ -95,9 +95,7 @@ def _street_after_legal_suffix(after_co: str) -> str:
     """Pick the street following the *last* legal suffix whose tail is not just more suffix words."""
     matches = list(_RE_LEGAL_SUFFIX_THEN_TEXT.finditer(after_co))
     for m in reversed(matches):
-        candidate = after_co[m.end():].strip(" ,.-")
-        if not candidate:
-            continue
+        candidate = after_co[m.end():].strip(" ,.-")  # never empty: the regex lookahead requires an alphanumeric
         words = [w.upper() for w in re.findall(r"\w+", candidate)]
         if words and all(w in LEGAL_SUFFIXES_CLEAN for w in words):
             continue
@@ -111,14 +109,29 @@ def _street_after_legal_suffix(after_co: str) -> str:
 
 def strip_care_of(text: str) -> str:
     """Remove care-of / attention clauses, keeping any physical street address."""
-    if not text:
-        return ""
+    return extract_care_of(text)[0]
 
+
+def extract_care_of(text: str) -> "tuple[str, str]":
+    """Split ``text`` into ``(address_without_care_of, care_of_text)``.
+
+    ``care_of_text`` is what was removed ("ACME HOLDINGS LLC" for "c/o Acme Holdings LLC, 100 Main St"), so the
+    information is reported instead of discarded; it is ``""`` when there is no care-of clause.
+    """
+    if not text:
+        return "", ""
+
+    removed: list = []
     prev = None
     curr = text
-    while curr != prev:
+    while curr != prev:  # pragma: no branch  (every pass either breaks or removes a marker, so the guard never ends the loop)
         prev = curr
         # Strip parenthesized or bracketed care-of / attn clauses: (C/O ...) or [C/O ...]
+        for m_paren in RE_CO_PAREN.finditer(curr):
+            inner = re.sub(rf"^[\(\[]\s*{_CO_MARKER}{_CO_END}[:\s\-]*", "", m_paren.group(0), flags=re.IGNORECASE)
+            inner = inner.rstrip(")] ").strip(" ,.-")
+            if inner:
+                removed.append(inner)
         curr = RE_CO_PAREN.sub(" ", curr).strip(" ,.-")
 
         m_co = RE_CO_MARKER.search(curr)
@@ -140,6 +153,15 @@ def strip_care_of(text: str) -> str:
             if m_fb:
                 extracted_street = m_fb.group(1).strip(" ,.-")
 
+        if extracted_street:
+            idx = after_co.rfind(extracted_street)
+            care_piece = after_co[:idx] if idx >= 0 else after_co.replace(extracted_street, "", 1)
+            care_piece = care_piece.strip(" ,.-")
+            if care_piece:
+                removed.append(care_piece)
+        elif prefix:
+            removed.append(after_co.strip(" ,.-"))
+
         if prefix and extracted_street:
             curr = f"{prefix}, {extracted_street}"
         elif extracted_street:
@@ -155,6 +177,10 @@ def strip_care_of(text: str) -> str:
                 words = set(re.findall(r"\w+", rem_co[0].upper()))
                 if not (words & _SINGLE_PART_STREET_WORDS):
                     rem_co = []
-            curr = ", ".join(rem_co)
+            kept = ", ".join(rem_co)
+            care_piece = after_co.replace(kept, "", 1).strip(" ,.-") if kept else after_co.strip(" ,.-")
+            if care_piece:
+                removed.append(care_piece)
+            curr = kept
         curr = curr.strip(" ,.-")
-    return curr
+    return curr, "; ".join(dict.fromkeys(removed))

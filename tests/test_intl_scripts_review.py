@@ -49,7 +49,8 @@ def test_russian_single_line():
     r = std("г. Москва, ул. Тверская, д. 7, кв. 12, 125009")
     assert r.country_iso3 == "RUS"
     assert r.postal_code == "125009" and r.city == "МОСКВА"
-    assert "TH" not in r.street1 and "КВ 12" in r.street1 and "Д 7" in r.street1
+    # same shape as the other Cyrillic grammars: local abbreviations keep their dots, the flat goes to street2
+    assert "TH" not in r.street1 and r.street1 == "УЛ. ТВЕРСКАЯ, Д. 7" and r.street2 == "КВ. 12"
 
 
 def test_bulgarian_single_line():
@@ -59,7 +60,7 @@ def test_bulgarian_single_line():
 
 def test_russian_structured_keeps_cyrillic():
     r = std("ул. Ленина 5, кв. 12", "", "Москва", "", "101000", "Russia")
-    assert r.street1 == "УЛ ЛЕНИНА 5 КВ 12"
+    assert (r.street1, r.street2) == ("УЛ. ЛЕНИНА 5", "КВ. 12")
 
 
 def test_greek_tonos_key_stable():

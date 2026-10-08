@@ -67,7 +67,7 @@ def fold_to_ascii_key(text: Optional[str]) -> str:
     3. NFKD decomposition to separate base characters from combining marks.
     4. Filter non-spacing combining marks (category != 'Mn').
     5. Second-pass transliteration for decomposed base characters.
-    6. Encode to ASCII, decode to uppercase string.
+    6. Keep ASCII; encode remaining non-Latin letters/digits as ``~<hex>`` (never silently dropped); uppercase.
     7. Clean redundant whitespace.
     """
     if not text:
@@ -95,5 +95,12 @@ def fold_to_ascii_key(text: Optional[str]) -> str:
     chars2 = [CYRILLIC_GREEK_MAP.get(ch, ch) for ch in stripped]
     stripped = "".join(chars2)
 
-    ascii_clean = stripped.encode("ascii", "ignore").decode("ascii").upper()
-    return " ".join(ascii_clean.split())
+    # Letters and digits with no ASCII transliteration (CJK, Hangul, Arabic, Hebrew, Thai, ...) are encoded as ``~<hex
+    # code point>`` instead of being dropped, so two different non-Latin streets never share a key. Keys stay pure ASCII.
+    # Fixed width (6 hex digits) so an encoded character can never run into a following ASCII digit or letter, and
+    # re-composed (NFC) so Hangul syllables are one code point instead of several jamo.
+    encoded = "".join(
+        ch if ch.isascii() else (f"~{ord(ch):06X}" if unicodedata.category(ch)[0] in "LN" else "")
+        for ch in unicodedata.normalize("NFC", stripped)
+    )
+    return " ".join(encoded.upper().split())

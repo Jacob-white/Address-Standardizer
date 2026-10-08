@@ -12,6 +12,8 @@ import unicodedata
 from dataclasses import dataclass
 from typing import ClassVar, Dict, List, Optional, Set, Tuple
 
+from address_standardizer.international.diacritics import fold_to_ascii_key
+
 
 @dataclass(frozen=True)
 class CountryInfo:
@@ -2617,9 +2619,7 @@ class CountryRegistry:
 
         # Numeric stripped or padded
         if q_raw.isdigit():
-            padded = q_raw.zfill(3)
-            if padded in cls._BY_NUMERIC:
-                return cls._BY_NUMERIC[padded]
+            # (zero-padded numerics such as "36" are already indexed unpadded, so only the over-padded form lands here)
             unpadded = q_raw.lstrip("0")
             if unpadded in cls._LOOKUP_INDEX:
                 return cls._LOOKUP_INDEX[unpadded]
@@ -2702,20 +2702,13 @@ class CountryRegistry:
             # from being hijacked by sovereign country names (on parts[-2]) or GLOBAL_METRO_TO_COUNTRY.
             from address_standardizer.tables import US_STATES
 
+            # (a trailing "USA"/"United States" part was already resolved by the direct lookups above)
             last_clean = re.sub(r"[^\w\s]", "", parts[-1]).strip().upper()
-            if last_clean in ("USA", "US", "UNITED STATES", "UNITED STATES OF AMERICA"):
-                if len(parts) >= 2:
-                    prev_clean = re.sub(r"[^\w\s]", "", parts[-2]).strip().upper()
-                    if prev_clean in FROZEN_US_STATE_CODES or prev_clean in US_STATES:
-                        return cls.get("USA")
-            elif last_clean in FROZEN_US_STATE_CODES or last_clean in US_STATES:
+            if last_clean in FROZEN_US_STATE_CODES or last_clean in US_STATES:
                 return cls.get("USA")
-            else:
-                subwords = parts[-1].split()
-                if subwords:
-                    sub_last = re.sub(r"[^\w\s]", "", subwords[-1]).strip().upper()
-                    if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
-                        return cls.get("USA")
+            sub_last = re.sub(r"[^\w\s]", "", parts[-1].split()[-1]).strip().upper()
+            if sub_last in FROZEN_US_STATE_CODES or sub_last in US_STATES:
+                return cls.get("USA")
 
             # If last part had postal code or metro, check second to last part
             if len(parts) >= 2:
@@ -2728,6 +2721,8 @@ class CountryRegistry:
         # Check Global Metros
         from address_standardizer.tables import GLOBAL_METRO_TO_COUNTRY, STREET_SUFFIXES
 
+        # Metro keys are ASCII: fold diacritics first ("Zürich" -> "ZURICH") so accented spellings still match.
+        parts = [fold_to_ascii_key(p) for p in parts]
         for p in parts:
             p_clean = re.sub(r"[^a-zA-Z0-9\s]", " ", p).strip().upper()
             p_clean = " ".join(p_clean.split())

@@ -59,7 +59,7 @@ RE_URBANIZATION = re.compile(
 )
 
 # International Postcodes
-RE_UK_POSTCODE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.IGNORECASE)
+RE_UK_POSTCODE = re.compile(r"\b(?:GIR\s*0AA|[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b", re.IGNORECASE)
 RE_CAN_POSTCODE = re.compile(r"\b[A-Z]\d[A-Z]\s?\d[A-Z]\d\b", re.IGNORECASE)
 
 # Sovereign Country Terminal Pattern
@@ -339,18 +339,15 @@ def clean_redundant_street_tail(
             st_clean = state.strip().upper()
             if st_clean:
                 st_variants = [re.escape(st_clean)]
-                try:
-                    from address_standardizer.tables import CANADIAN_PROVINCES, US_STATES
-                    for k, v in CANADIAN_PROVINCES.items():
-                        if k == st_clean or v == st_clean:
-                            st_variants.append(re.escape(k))
-                            st_variants.append(re.escape(v))
-                    for k, v in US_STATES.items():
-                        if k == st_clean or v == st_clean:
-                            st_variants.append(re.escape(k))
-                            st_variants.append(re.escape(v))
-                except ImportError:
-                    pass
+                from address_standardizer.tables import CANADIAN_PROVINCES, US_STATES
+                for k, v in CANADIAN_PROVINCES.items():
+                    if k == st_clean or v == st_clean:
+                        st_variants.append(re.escape(k))
+                        st_variants.append(re.escape(v))
+                for k, v in US_STATES.items():
+                    if k == st_clean or v == st_clean:
+                        st_variants.append(re.escape(k))
+                        st_variants.append(re.escape(v))
                 st_pat = "|".join(set(st_variants))
                 m_st = re.search(r"(?:,\s*|\s+)(?:" + st_pat + r")$", curr, re.IGNORECASE)
                 if m_st:
@@ -453,8 +450,7 @@ def clean_repetitive_cycles(s: str) -> str:
             return " ".join(tokens)
 
         def _is_prefix_seq(rem_seq: list, chunk_seq: list) -> bool:
-            if not rem_seq:
-                return True
+            # (callers only pass a non-empty remainder)
             if len(rem_seq) > len(chunk_seq):
                 return False
             for idx_p in range(len(rem_seq) - 1):
@@ -593,8 +589,6 @@ def parse_intersection_address(s: str) -> Optional[str]:
         delim = m_split.group(1).upper()
         p1 = raw[:m_split.start()].strip()
         p2 = raw[m_split.end():].strip()
-        if not p1 or not p2:
-            return None
         # Avoid false positives like secondary units
         if p1.upper().startswith(("SUITE", "STE", "APT", "UNIT", "FLOOR", "FL")):
             return None
@@ -763,7 +757,7 @@ def clean_rooftop_address(street_line: Optional[str]) -> Optional[str]:
         kw in val_upper
         for kw in (
             "#", "STE", "SUITE", "APT", "FL", "UNIT", "RM", "ROOM",
-            "BLDG", "DEPT", "PH", "BSMT", "MEZZ", "OFC", "SPC", "LOT",
+            "BLDG", "BUILDING", "DEPT", "DEPARTMENT", "OFFICE", "PH", "BSMT", "MEZZ", "OFC", "SPC", "LOT",
             "LEVEL", "FLAT", "FRNT", "REAR", "SIDE", "SLIP", "HNGR", "PIER"
         )
     ):
@@ -772,7 +766,7 @@ def clean_rooftop_address(street_line: Optional[str]) -> Optional[str]:
         return None if is_invalid_thoroughfare(val) else val
 
     # Iteratively strip trailing secondary units (e.g., 'BLDG 4 STE 200')
-    for _ in range(3):
+    for _ in range(8):
         m = RE_ROOFTOP_SEC.search(val)
         if m:
             cand_id = (m.group(1) or m.group(3) or "").upper()

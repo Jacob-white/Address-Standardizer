@@ -221,6 +221,9 @@ class OffshoreGrammar(CountryGrammar):
                 street_line = rem_parts[0]
             elif len(rem_parts) == 1:
                 street_line = rem_parts[0]
+            else:
+                # Every part was consumed as a PO box / apartado / postal code: no street line remains.
+                street_line = ""
 
         # Check secondary unit in s2_raw
         if s2_raw and not unit_number:
@@ -244,14 +247,10 @@ class OffshoreGrammar(CountryGrammar):
         if st2_base:
             if not unit_number:
                 m_box_s2 = RE_OFFSHORE_PO_BOX.search(st2_base)
-                m_apdo_s2 = RE_APARTADO.search(st2_base)
                 if m_box_s2:
                     unit_type = "PO BOX"
                     unit_number = m_box_s2.group(1).upper()
-                elif m_apdo_s2:
-                    unit_type = "APARTADO"
-                    unit_number = m_apdo_s2.group(1).upper()
-                else:
+                else:  # (the inline-unit splitter never yields an APARTADO unit)
                     s2_p = st2_base.split(maxsplit=1)
                     unit_type = s2_p[0]
                     unit_number = s2_p[1] if len(s2_p) > 1 else None

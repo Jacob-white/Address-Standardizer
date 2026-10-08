@@ -26,6 +26,7 @@ from address_standardizer.international.romance import (
     _SEC_END,
     extract_units_from_part,
     make_strict_sec_regex,
+    merge_num_barrio,
     merge_units,
     parse_street2_unit,
 )
@@ -251,6 +252,11 @@ class LatinAmericaGrammar(CountryGrammar):
                     state_raw = m_city_st.group(2).strip()
                     rem_parts = rem_parts[:-1]
 
+            # "street, number - barrio, city" (Brazil / Mexico style): the number belongs to the street line and the
+            # barrio is the dependent locality, so the remaining parts read "street number, city".
+            if not city_raw and not dep_locality:
+                dep_locality = merge_num_barrio(rem_parts)
+
             if city_raw:
                 if len(rem_parts) >= 2 and not dep_locality:
                     last_rem = rem_parts[-1].strip()
@@ -325,6 +331,9 @@ class LatinAmericaGrammar(CountryGrammar):
                     street_line = ""
                 else:
                     street_line = rem_parts[0]
+            else:
+                # Every part was consumed as colonia / unit / postal code: no street line remains.
+                street_line = ""
 
         # Handle secondary units in s2_raw or embedded in street_line
         s2_type: Optional[str] = None

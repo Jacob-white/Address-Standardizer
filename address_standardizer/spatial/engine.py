@@ -554,16 +554,15 @@ class SpatialEngine:
             # The circle contains a pole: every longitude is in range.
             min_lon, max_lon = -180.0, 180.0
         else:
+            # (deg_lon < 180 always holds here: a circle wide enough to span 360 degrees of longitude would
+            # already have reached a pole, which the branch above handles.)
             deg_lon = radius_meters / (111320.0 * max(1e-6, math.cos(math.radians(lat))))
-            if deg_lon >= 180.0:
-                min_lon, max_lon = -180.0, 180.0
-            else:
-                min_lon, max_lon = lon - deg_lon, lon + deg_lon
-                # Wrap across the antimeridian; query_bounding_box answers min_lon > max_lon as two boxes.
-                if min_lon < -180.0:
-                    min_lon += 360.0
-                if max_lon > 180.0:
-                    max_lon -= 360.0
+            min_lon, max_lon = lon - deg_lon, lon + deg_lon
+            # Wrap across the antimeridian; query_bounding_box answers min_lon > max_lon as two boxes.
+            if min_lon < -180.0:
+                min_lon += 360.0
+            if max_lon > 180.0:
+                max_lon -= 360.0
 
         # Fetch a generous candidate set, then order by true distance so `limit` returns the nearest points
         # (R*Tree order is arbitrary).

@@ -109,6 +109,10 @@ namespace AddressStandardizer.Client
         [JsonPropertyName("fips_code")]
         public string? FipsCode { get; set; }
 
+        /// <summary>Text of a removed "c/o" / "attn" clause, if any.</summary>
+        [JsonPropertyName("care_of")]
+        public string? CareOf { get; set; }
+
         [JsonPropertyName("confidence_score")]
         public double? ConfidenceScore { get; set; }
 

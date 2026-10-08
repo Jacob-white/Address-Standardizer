@@ -52,6 +52,7 @@ class EasternEuropeGrammar(CountryGrammar):
         "BGR", "BULGARIA", "BALGARIYA", "БЪЛГАРИЯ", "BG",
         "SRB", "SERBIA", "SRBIJA", "СРБИЈА", "RS",
         "UKR", "UKRAINE", "UKRAYINA", "УКРАЇНА", "УКРАИНА", "UA",
+        "RUS", "RUSSIA", "RUSSIAN FEDERATION", "ROSSIYA", "РОССИЯ", "РОССИЙСКАЯ ФЕДЕРАЦИЯ", "RU",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -60,7 +61,7 @@ class EasternEuropeGrammar(CountryGrammar):
             return ""
         clean = " ".join(raw_code.strip().upper().split())
         # Strip European ISO prefix if present (e.g. "PL-00-950", "CZ-110 00", "GR-105 63")
-        m_pfx = re.match(r"^(?:PL|CZ|RO|GR|BG|RS|UA)-?(.*)$", clean)
+        m_pfx = re.match(r"^(?:PL|CZ|RO|GR|BG|RS|UA|RU)-?(.*)$", clean)
         if m_pfx:
             clean = m_pfx.group(1).strip()
 
@@ -134,6 +135,8 @@ class EasternEuropeGrammar(CountryGrammar):
             return "SRB"
         if c in ("UKR", "UKRAINE", "UKRAYINA", "УКРАЇНА", "УКРАИНА", "UA"):
             return "UKR"
+        if c in ("RUS", "RUSSIA", "RUSSIAN FEDERATION", "ROSSIYA", "РОССИЯ", "РОССИЙСКАЯ ФЕДЕРАЦИЯ", "RU"):
+            return "RUS"
         return "POL"
 
     def parse(self, raw_tokens: List[str], metadata: dict) -> ParsedAddressComponents:
@@ -167,11 +170,10 @@ class EasternEuropeGrammar(CountryGrammar):
                 if m_sec:
                     if m_sec.start() > 0:
                         street_p = part[:m_sec.start()].strip(" ,.-")
-                        sec_p = part[m_sec.start():].strip(" ,.-")
+                        sec_p = part[m_sec.start():].strip(" ,.-")  # never empty: it starts at the keyword match
                         if street_p:
                             rem_parts.append(street_p)
-                        if sec_p:
-                            sec_units.append(sec_p)
+                        sec_units.append(sec_p)
                     else:
                         sec_units.append(part.strip())
                     continue
@@ -221,27 +223,27 @@ class EasternEuropeGrammar(CountryGrammar):
 
         # Handle secondary units in s2_raw or embedded in street_line
         if s2_raw and not unit_number:
-            m_sec = RE_EE_SECONDARY.search(s2_raw)
-            if m_sec:
-                unit_number = s2_raw.strip()
-            else:
-                unit_number = s2_raw.strip()
+            unit_number = s2_raw.strip()
 
         # Check inline secondary unit in street_line
         m_sec_inline = RE_EE_SECONDARY.search(street_line)
-        if m_sec_inline and not unit_number:
-            unit_number = street_line[m_sec_inline.start():].strip(" ,.-")
+        if m_sec_inline:
+            inline_unit = street_line[m_sec_inline.start():].strip(" ,.-")
             street_line = street_line[:m_sec_inline.start()].strip(" ,.-")
+            if not unit_number:
+                unit_number = inline_unit
+            elif inline_unit.upper() not in unit_number.upper():  # (comma parsing may already have taken it)
+                unit_number = f"{inline_unit} {unit_number}"
 
-        # Extract secondary unit via split_intl_secondary_unit
+        # Extract secondary unit via split_intl_secondary_unit (kept alongside any street2 unit)
         st1_base, st2_base = split_intl_secondary_unit(street_line, "")
         if st2_base and not unit_number:
             s2_p = st2_base.split(maxsplit=1)
             unit_type = s2_p[0]
             unit_number = s2_p[1] if len(s2_p) > 1 else None
-            street_line = st1_base
-        else:
-            street_line = st1_base
+        elif st2_base:
+            unit_number = f"{st2_base} {unit_number}"
+        street_line = st1_base
 
         # Ensure Polish postal code \b\d{2}-\d{3}\b is isolated and extracted
         if not postal_raw or country_iso == "POL":
@@ -257,9 +259,7 @@ class EasternEuropeGrammar(CountryGrammar):
                     city_raw = re.sub(r"\b\d{2}-\d{3}\b", "", city_raw).strip(" ,.-")
             if street_line:
                 m_s_post = re.search(r"\b(\d{2}-\d{3})\b", street_line)
-                if m_s_post:
-                    if not postal_raw:
-                        postal_raw = m_s_post.group(1)
+                if m_s_post:  # (postal_raw is already set from s1_raw above, which this line was derived from)
                     street_line = re.sub(r"\b\d{2}-\d{3}\b", "", street_line).strip(" ,.-")
 
         _, st_num, thoroughfare = self.extract_premise_and_thoroughfare(street_line)
@@ -274,13 +274,9 @@ class EasternEuropeGrammar(CountryGrammar):
         norm_street = normalize_to_canonical_unicode(thoroughfare.strip()) if thoroughfare else None
 
         # Uppercase Latin scripts while preserving authentic Cyrillic and Greek Unicode casing
-        if norm_city and norm_city.isascii():
+        if norm_city:
             norm_city = norm_city.upper()
-        elif norm_city:
-            norm_city = norm_city.upper()
-        if norm_state and norm_state.isascii():
-            norm_state = norm_state.upper()
-        elif norm_state:
+        if norm_state:
             norm_state = norm_state.upper()
         if norm_street:
             norm_street = norm_street.upper()

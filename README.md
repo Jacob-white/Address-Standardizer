@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)](https://github.com/Jacob-white/Address-Standardizer)
 [![CI](https://github.com/Jacob-white/Address-Standardizer/actions/workflows/ci.yml/badge.svg)](https://github.com/Jacob-white/Address-Standardizer/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/badge/coverage-~90%25-green.svg)](https://github.com/Jacob-white/Address-Standardizer)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen.svg)](https://github.com/Jacob-white/Address-Standardizer)
 [![Python Version](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Standards](https://img.shields.io/badge/Standards-USPS%20Pub%2028%20%7C%20UPU%20S42%20%7C%20ISO%2019160--4-orange.svg)](https://pe.usps.com/text/pub28/welcome.htm)
@@ -64,7 +64,7 @@ A standalone multi-national address standardization, offline spatial geocoding, 
   - **Nordic & Germanic Europe (`DEU`, `AUT`, `CHE`, `NLD`, `FIN`, `SWE`, `NOR`, `DNK`):** Compound thoroughfare words, Finnish suffixes (`katu`, `tie`), Nordic floor/door designators.
   - **Eastern Europe & Cyrillic (`POL`, `CZE`, `ROU`, `GRC`, `BGR`, `SRB`, `UKR`):** Prefix street designators (`ul.`, `str.`, `ул.`), house slashes (`10/12`), localized apartment designators (`lok.`, `кв.`).
   - **Middle East & Africa (`ARE`, `SAU`, `EGY`, `ZAF`, `NGA`, `KEN`):** PO Box routing and regional address layouts.
-  - **Multi-Script Unicode Fidelity:** Native script preserved in user-facing fields (Kanji, Hanzi, Hangul, Cyrillic, Greek, Arabic), with ASCII-folded matching keys.
+  - **Multi-Script Unicode Fidelity:** Native script preserved in user-facing fields (Kanji, Hanzi, Hangul, Cyrillic, Greek, Arabic), with ASCII matching keys: Latin, Cyrillic and Greek are transliterated; other scripts (CJK, Hangul, Arabic, ...) are encoded as `~<6-digit hex code point>` so different non-Latin streets never share a key.
   - Coverage depth varies by country; see `benchmarks/data/golden_dataset_multinational.json` for the cases that are regression-tested.
 - **Universal Postal Union (UPU S42)-style Address Layout Formatter:**
   - Envelope layout generator for international conventions: European postal-first (`10117 Berlin`), Anglo-Saxon postal-last (`New York, NY 10005`), East Asian top-down (`〒106-6132 ...`), and non-postal layouts.
@@ -692,8 +692,8 @@ The repository ships unit tests, property-based fuzzing (Hypothesis), and two go
 python -m pytest tests -q -p no:cacheprovider -m "not perf" --cov=address_standardizer --cov-report=term
 ```
 
-- **1,369 passed, 3 skipped** (7 `perf`-marked tests deselected; run them separately without coverage via `pytest -m perf`).
-- **89.96% statement coverage** (`fail_under = 85` is enforced in `pyproject.toml`). Coverage is not 100%.
+- **2,716 passed, 2 skipped** (7 `perf`-marked tests deselected; run them separately without coverage via `pytest -m perf`).
+- **100% line and branch coverage** of `address_standardizer` (`branch = true`, `fail_under = 100` in `pyproject.toml`). 16 `# pragma: no branch` markers cover branches that cannot be taken; each carries its reason inline. Coverage measures executed code, not correctness.
 - `ruff check address_standardizer tests benchmarks` reports no errors.
 
 Counts and coverage are from a run on 2026-10-08 and will drift as tests are added.

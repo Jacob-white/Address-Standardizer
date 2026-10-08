@@ -241,9 +241,9 @@ def _validate_uk_semantics(code: str) -> bool:
         return False
     if len(outward) >= 2 and outward[1].isalpha() and outward[1] in _DISALLOWED_UK_OUTWARD_POS2:
         return False
-    if len(inward) == 3:
-        if inward[1] in _DISALLOWED_UK_INWARD or inward[2] in _DISALLOWED_UK_INWARD:
-            return False
+    # The regex guarantees a 3-character inward code (digit + two letters).
+    if inward[1] in _DISALLOWED_UK_INWARD or inward[2] in _DISALLOWED_UK_INWARD:
+        return False
     return True
 
 
@@ -798,6 +798,19 @@ def validate_postal_code(
     return res if return_details else True
 
 
+_UNANCHORED_CACHE: Dict[str, "re.Pattern[str]"] = {}
+
+
+def _unanchored(pattern: "re.Pattern[str]") -> "re.Pattern[str]":
+    """A search version of an anchored validation pattern: ``^code$`` becomes ``(?<![A-Z0-9])code(?![A-Z0-9])``."""
+    cached = _UNANCHORED_CACHE.get(pattern.pattern)
+    if cached is None:
+        body = pattern.pattern.removeprefix("^").removesuffix("$")
+        cached = re.compile(r"(?<![A-Za-z0-9])(?:" + body + r")(?![A-Za-z0-9])", pattern.flags | re.IGNORECASE)
+        _UNANCHORED_CACHE[pattern.pattern] = cached
+    return cached
+
+
 def _extract_for_country(text: str, c_info: CountryInfo) -> Optional[str]:
     """Isolate postal code for a known country using specific matching heuristics."""
     alpha3 = c_info.alpha3
@@ -848,7 +861,7 @@ def _extract_for_country(text: str, c_info: CountryInfo) -> Optional[str]:
 
     # Japan
     if alpha3 == "JPN":
-        m = re.search(r"(?:〒\s*)?(\d{3}-\d{4})\b", text)
+        m = re.search(r"(?:〒\s*)?(?<!\d)(\d{3}-\d{4})\b", text)
         if m:
             res = validate_postal_code(m.group(1), "JPN", return_details=True)
             if isinstance(res, PostalValidationResult) and res.is_valid:
@@ -1014,7 +1027,7 @@ def _extract_for_country(text: str, c_info: CountryInfo) -> Optional[str]:
 
     # Generic search using country's regex
     if rule:
-        matches = list(rule.pattern.finditer(text))
+        matches = list(_unanchored(rule.pattern).finditer(text))
         for m in reversed(matches):
             res = validate_postal_code(m.group(0), alpha3, return_details=True)
             if isinstance(res, PostalValidationResult) and res.is_valid:
@@ -1062,7 +1075,7 @@ def _extract_candidate_any(text: str) -> Optional[str]:
             return res.formatted_code
 
     # 5. Japan 3+4
-    m_jpn = re.search(r"(?:〒\s*)?(\d{3}-\d{4})\b", text)
+    m_jpn = re.search(r"(?:〒\s*)?(?<!\d)(\d{3}-\d{4})\b", text)
     if m_jpn:
         res = validate_postal_code(m_jpn.group(1), "JPN", return_details=True)
         if isinstance(res, PostalValidationResult) and res.is_valid:

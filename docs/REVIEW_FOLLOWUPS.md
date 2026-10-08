@@ -35,43 +35,29 @@ Open items from the whole-codebase review. The review's other findings are fixed
 - [x] Document that the Rust module is Soundex-only.
 - [x] `docs/RELEASING.md`.
 
-## International parsing (done; limitations noted)
+## Status: everything on this list is resolved
 
-- [x] CJK, Hangul and Cyrillic single-line detection and split (`international/scripts.py`).
-- [x] Brazil single-line unit; Romance/LatAm unit word boundaries; grammar registry collision (a test now fails if two grammars claim one country).
-- [x] Hong Kong "Central" kept in road names; Canada 4-part single line, `PO BOX 123 STN A`, bare `, ON` tail selects Canada.
-- [x] IE/GB locality handling; offshore "Tower 2"; JE/GG/IM country detection; PO box + unit uniform across GB/JE/GG/IM/CA/AU/IE/KY/BM/HK/DE/FR.
-- [x] Multi-part `street2` (FR "Bât."/"Esc."/"étage") keeps every part.
-- [x] Country alias tables unified (registry now includes every `COUNTRY_MAP` name); `N/A`/`none`/`unknown` are "no country"; an unrecognised country is `ZZZ`, not USA.
-- [x] Postal validators: NL (no leading zero), Eircode alphabet, Bermuda `AA NN` / `HM <letter>X`.
-- [x] AU single line without a country; German `Str.`/`Pl.` expansion and house-number ranges; `RE_NUM_FIRST` made linear.
-- [x] Russian `кв.`; Greek tonos in keys; zero-width characters.
-- [ ] **Decision needed:** keys are ASCII-only by contract (`test_cjk_grammar_full_width_and_unspaced`), so CJK/Hangul street names fold to digits only and distinct streets can share a `normalized_address_key`. Fixing it means changing that contract.
-- [ ] **Decision needed:** `c/o` / care-of text is removed engine-wide (`care_of.strip_care_of`) and the model has no field for it.
-- [ ] Bulgarian/Ukrainian grammars keep dots (`БУЛ.`, `ВУЛ.`, `КВ.`) where Russian drops them (shared grammar behaviour, left as is).
-- [ ] Hong Kong: "8 Finance Street Central" (no comma) now keeps CENTRAL in the street line.
-- [ ] A 5-digit postcode after an Australian state (`NSW 02000`) still falls through to US.
-- [ ] UK grammar deliberately keeps `HILL`/`HILLS` unabbreviated (Royal Mail has no abbreviation) although the shared table maps HILL to HL.
+All items from the whole-codebase review are fixed, decided, or documented below. Line **and branch** coverage of the package is 100% (`branch = true`, `fail_under = 100`).
 
-## US core (done; limitations noted)
+### Decisions taken
+- **Non-Latin keys:** keys stay ASCII; letters/digits with no ASCII transliteration are encoded as `~<6-digit hex code point>`, so distinct CJK/Hangul/Arabic streets no longer collide.
+- **Care-of:** the removed `c/o` / `C/-` / `attn` text is now returned in `care_of` (never part of street1/street2).
+- **Hub addresses:** `routing_tier` (parse/deliverability confidence) and `review_status` (stewardship queue) are independent by design; a registered-agent hub can be AUTO_PASS and still PENDING.
+- **Free text in `street2`:** `street2` is Address Line 2; any non-empty text there is kept (as a unit when it looks like one), never dropped.
+- **`LocalityOnlyStatus`:** equal to both `locality_only` and `city_level`; hash follows the canonical spelling (documented in the class).
+- **UK `HILL`/`HILLS`:** deliberately not abbreviated (Royal Mail has none).
+- **Bermuda postcodes:** format-checked (`AA NN`, or `HM <letter>X`) but area codes are not whitelisted because published lists disagree.
+- **Lone non-numeric street word** (`XYZ`): status `standardized`, routing tier MANUAL_STEWARDSHIP flags it for review.
+- **`phonetic_key` `#5`:** intentional numbered-street token.
+- **Australian 5-digit "postcode"** after a state is invalid input and is not treated as Australian.
 
-- [x] `enable_fuzzy=False`, RR/HC boxes, `No.`/`Number` units, word-number units/floors, premise-name duplication, two street lines, odd-length ZIPs.
-- [x] Dead patterns removed (`RE_ATTACHED_SEC_UNIT` and eight more).
-- [x] `LocalityOnlyStatus`: contract documented (equal to both spellings; hash follows `locality_only`).
-- [x] Confidence/audit policy: kept as designed and documented. `routing_tier` is parse/deliverability confidence; `review_status` is the stewardship queue, so a registered-agent hub can be AUTO_PASS yet PENDING.
-- [x] `phonetic_key` `#5` token is intentional (numbered streets get a `#<n>` token so `2nd` and `42nd` do not collide).
-- [x] "Paris" with a Texas ZIP now stays USA.
-- [ ] Trailing house numbers (`St. Louis Ave 100`) are not supported by the US parser; it produces a wrong street. Not fixed because moving a trailing number to the front would corrupt `County Road 12` / `Highway 66`.
-- [ ] A lone non-numeric street word (`XYZ`) is reported `standardized` (routing tier MANUAL_STEWARDSHIP flags it for review).
-
-## Server and CLI (done)
-
-- [x] Arrow/Polars, CSV formula neutralization, streaming `correct_state_from_zip`, `audit --audit-db` persistence, benchmark SLA scale.
-
-## Verification still outstanding
-
-- [ ] Push and confirm the GitHub Actions run is green (CI failures were reproduced and fixed in Linux containers; Windows jobs not run locally).
-- [ ] Line coverage is 92% (not 100%); remaining gaps are mostly error branches in the grammars and CLI.
+### Still worth knowing
+- Direct calls to the private `_rule_based_us_street_parse` with a full "street, city, ST ZIP" string can add an ordinal suffix to the ZIP; the public pipeline splits city/state/ZIP off first, so it never sees that input.
+- Danish floor/door text keeps the grammar's lowercase (`2. tv`).
+- A `street2` supplied alongside a comma-parsed MENA PO box is ignored (existing behaviour, not part of the reviewed bugs).
+- With a street2 present, a street line that itself carries two inline units stays unsplit.
+- Romance (ESP/ITA) postal codes are 5 digits only, so a 4-digit trailing token stays in street2.
+- Verify the GitHub Actions run after pushing (Linux 3.11 and 3.13 runs were reproduced locally; Windows jobs were not).
 
 ## Known behavior notes (for the release notes)
 

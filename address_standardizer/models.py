@@ -64,7 +64,8 @@ class LocalityOnlyStatus(str):
         return super().__eq__(other)
 
     def __ne__(self, other):
-        return not self.__eq__(other)
+        result = self.__eq__(other)
+        return result if result is NotImplemented else not result
 
     def __hash__(self):
         return hash("locality_only")
@@ -89,6 +90,7 @@ class StandardizedAddress:
     is_registered_agent_hub: bool = False
     dependent_locality: Optional[str] = None
     building_name: Optional[str] = None
+    care_of: Optional[str] = None  # text of a removed "c/o <name>" / "attn" clause, kept for reference
     rooftop_address: Optional[str] = None
 
     def __post_init__(self):
@@ -459,6 +461,7 @@ class StandardizedAddress:
             d["is_city_level"] = self.is_city_level
             d["dependent_locality"] = self.dependent_locality
             d["building_name"] = self.building_name
+            d["care_of"] = self.care_of
             d["confidence_score"] = self.confidence_score
             d["routing_tier"] = self.routing_tier
             d["failure_reason_codes"] = self.failure_reason_codes

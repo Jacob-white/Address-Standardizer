@@ -142,7 +142,7 @@ def lookup_corporate_registry(
             if entry.state:
                 if st_norm == entry.state:
                     state_match = True
-                elif not st_norm:
+                else:  # a differing explicit state was already ruled out above, so none was supplied
                     state_match = bool(re.search(r"\b" + re.escape(entry.state) + r"\b", combined))
 
             city_match = False
@@ -157,7 +157,7 @@ def lookup_corporate_registry(
             if entry.postal_code:
                 if zip_digits and zip_digits.startswith(entry.postal_code[:3]):
                     zip_match = True
-                elif not zip_digits:
+                else:  # a non-matching ZIP was already ruled out above, so none was supplied
                     zip_match = entry.postal_code in combined
 
             if state_match or city_match or zip_match:
