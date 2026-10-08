@@ -263,7 +263,7 @@ class TestOfflineReferenceIndex:
         assert res.precision == CascadePrecision.CONFIRMED_ROOFTOP
         assert res.source == "OFFLINE_ROOFTOP_INDEX"
         assert res.latitude == 40.7061
-        assert res.census_tract == "NY-MAN-00100"
+        assert res.census_tract == "000900"  # the record's census tract (NY-MAN-00100 is its parcel id)
 
     def test_corrupted_json_in_row_to_record(self):
         index = OfflineReferenceIndex(seed=False)
@@ -402,3 +402,72 @@ class TestResolveCoordinatesMemoStaysFresh:
         second = idx.resolve_coordinates(addr)
         assert second.known_units == ["A"]
         assert second.latitude == 1.0
+
+
+class TestOfflineIndexHardening:
+    """Regressions from the whole-codebase review."""
+
+    @staticmethod
+    def _ix():
+        from address_standardizer.offline_index import OfflineReferenceIndex
+
+        ix = OfflineReferenceIndex(seed=False)
+        ix.insert_street_range("MAINE AVE", "10001", "NY", 100, 200, 10.0, -70.0, 10.1, -70.0)
+        return ix
+
+    def test_bare_prefix_and_wildcards_do_not_match(self):
+        ix = self._ix()
+        assert ix.interpolate_street_range(150, "MAINE AVE", "10001") is not None
+        for bad in ("MAIN", "%", "_____ ___", "MAINE AVENUE EXTENSION"):
+            assert ix.interpolate_street_range(150, bad, "10001") is None, bad
+
+    def test_partial_zip_does_not_match(self):
+        assert self._ix().interpolate_street_range(150, "MAINE AVE", "1") is None
+
+    def test_whole_trailing_words_still_match(self):
+        ix = self._ix()
+        assert ix.interpolate_street_range(150, "MAINE", "10001") is not None  # input shorter than the range name
+
+    def test_street_range_parity_selects_the_correct_side(self):
+        from address_standardizer.offline_index import OfflineReferenceIndex
+
+        ix = OfflineReferenceIndex(seed=False)
+        ix.insert_street_range("OAK ST", "10001", "NY", 100, 198, 40.0, -74.0001, 40.1, -74.0001, parity="E")
+        ix.insert_street_range("OAK ST", "10001", "NY", 101, 199, 40.0, -73.9999, 40.1, -73.9999, parity="O")
+        assert ix.interpolate_street_range(150, "OAK ST", "10001").longitude == -74.0001
+        assert ix.interpolate_street_range(151, "OAK ST", "10001").longitude == -73.9999
+
+    def test_hot_swap_to_database_without_street_ranges_stays_usable(self, tmp_path):
+        import sqlite3
+
+        from address_standardizer.offline_index import OfflineReferenceIndex
+
+        path = tmp_path / "old.db"
+        src = OfflineReferenceIndex(db_path=str(tmp_path / "src.db"), seed=False)
+        src.close()
+        conn = sqlite3.connect(src._db_path)
+        conn.execute("DROP TABLE street_ranges")
+        conn.commit()
+        conn.close()
+        import shutil
+
+        shutil.copy(src._db_path, path)
+        ix = OfflineReferenceIndex(seed=False)
+        ix.hot_swap(str(path))
+        assert ix.count_ranges() == 0
+
+    def test_state_centroid_fallback_is_not_reported_as_a_postal_centroid(self):
+        from address_standardizer.offline_index import OfflineReferenceIndex
+
+        class Addr:
+            is_us = True
+            normalized_address_key = None
+            building_key = None
+            street1 = "9 Zzz Rd"
+            postal_code = "59999"
+            state = "MT"
+
+        res = OfflineReferenceIndex(seed=False).geocode(Addr())
+        assert res["precision"] != "POSTAL_CENTROID" or res["accuracy_radius_meters"] <= 8000.0
+        if res["precision"] == "LOCALITY":
+            assert res["accuracy_radius_meters"] == 100000.0

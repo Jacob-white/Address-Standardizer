@@ -47,6 +47,14 @@ CENSUS_ONELINE_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelin
 
 def get_fallback_centroid(zip5: Optional[str] = None, state: Optional[str] = None) -> Optional[Tuple[float, float]]:
     """Returns fallback (latitude, longitude) based on ZIP3 or State when rooftop geocoding fails."""
+    found = get_fallback_centroid_tier(zip5=zip5, state=state)
+    return (found[0], found[1]) if found else None
+
+
+def get_fallback_centroid_tier(
+    zip5: Optional[str] = None, state: Optional[str] = None
+) -> Optional[Tuple[float, float, str]]:
+    """Like get_fallback_centroid, but also reports which tier answered: ``"ZIP3"`` or ``"STATE"``."""
     if zip5:
         z_digits = re.sub(r"[^\d]", "", zip5.strip())
         if len(z_digits) == 4:
@@ -54,22 +62,28 @@ def get_fallback_centroid(zip5: Optional[str] = None, state: Optional[str] = Non
         if len(z_digits) >= 3:
             z3 = z_digits[:3]
             if z3 in METRO_ZIP3_CENTROIDS:
-                return METRO_ZIP3_CENTROIDS[z3]
+                lat, lon = METRO_ZIP3_CENTROIDS[z3]
+                return lat, lon, "ZIP3"
             st = ZIP3_TO_STATE.get(z3)
             if st and st in STATE_CENTROIDS:
-                return STATE_CENTROIDS[st]
+                lat, lon = STATE_CENTROIDS[st]
+                return lat, lon, "STATE"
     if state:
         s_clean = re.sub(r"[^\w\s]", "", state.strip().upper())
         st_code = US_STATES.get(s_clean, s_clean[:2] if len(s_clean) == 2 else s_clean)
         if st_code in STATE_CENTROIDS:
-            return STATE_CENTROIDS[st_code]
+            lat, lon = STATE_CENTROIDS[st_code]
+            return lat, lon, "STATE"
     return None
 
 
 def parse_census_geocoder_response(response_text: str) -> Dict[str, Tuple[float, float, str]]:
     """
     Parses CSV output from the US Census Bureau Batch Geocoding API.
-    Returns mapping: { id_str: (latitude, longitude, census_tract) }
+    Returns mapping: { id_str: (latitude, longitude, tiger_line_id) }
+
+    Column 7 of the addressbatch format is the TIGER/Line edge id, *not* a census tract (tracts need the
+    geographies endpoint), so it is exposed as ``tiger_line_id``.
     """
     results = {}
     reader = csv.reader(io.StringIO(response_text))
@@ -78,12 +92,12 @@ def parse_census_geocoder_response(response_text: str) -> Dict[str, Tuple[float,
             rec_id = row[0].strip()
             match_status = row[2].strip() if len(row) > 2 else ""
             coords = row[5].strip() if len(row) > 5 else ""
-            tract = row[6].strip() if len(row) > 6 else ""
+            tiger_line_id = row[6].strip() if len(row) > 6 else ""
 
             if match_status.upper() == "MATCH" and coords and "," in coords:
                 try:
                     lon_str, lat_str = coords.split(",")
-                    results[rec_id] = (float(lat_str.strip()), float(lon_str.strip()), tract)
+                    results[rec_id] = (float(lat_str.strip()), float(lon_str.strip()), tiger_line_id)
                 except Exception:
                     continue
     return results
@@ -138,11 +152,12 @@ class CensusGeocoder:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:  # nosec B310
                 resp_text = resp.read().decode("utf-8", errors="replace")
                 results = parse_census_geocoder_response(resp_text)
-                for rec_id, (lat, lon, tract) in results.items():
+                for rec_id, (lat, lon, tiger_line_id) in results.items():
                     output[rec_id] = {
                         "latitude": lat,
                         "longitude": lon,
-                        "census_tract": tract,
+                        "census_tract": None,
+                        "tiger_line_id": tiger_line_id or None,
                         "precision": "rooftop",
                     }
                     matched_ids.add(rec_id)

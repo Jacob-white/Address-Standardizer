@@ -54,8 +54,16 @@ class RDI(str, Enum):
 CMRA_KEYWORDS = frozenset({
     "THE UPS STORE", "UPS STORE", "POSTALANNEX", "POSTAL ANNEX",
     "MAIL BOXES ETC", "MAIL BOXES ETC.", "PAK MAIL", "POSTNET",
-    "DAVINCI", "REGUS", "INTELLIGENT OFFICE", "OFFICE EVOLUTION"
+    "DAVINCI VIRTUAL", "DAVINCI MEETING", "REGUS", "INTELLIGENT OFFICE", "OFFICE EVOLUTION"
 })
+
+# Whole-word matching: "DAVINCI" must not flag "123 Davinci Dr" via a substring of a longer word, and a street
+# such as "Vacantville Rd" is not a vacancy marker.
+_RE_CMRA_KEYWORD = re.compile(
+    r"(?<![A-Z0-9])(?:" + "|".join(re.escape(k) for k in sorted(CMRA_KEYWORDS, key=len, reverse=True)) + r")(?![A-Z0-9])"
+)
+_RE_PMB_WORD = re.compile(r"(?<![A-Z])PMB(?![A-Z])")
+_RE_VACANT_WORD = re.compile(r"(?<![A-Z])VACANT(?![A-Z])")
 
 COMMERCIAL_SEC_UNITS = frozenset({
     "STE", "SUITE", "OFC", "OFFICE", "FL", "FLOOR", "BLDG", "BUILDING", "DEPT", "DEPARTMENT", "RM", "ROOM"
@@ -169,9 +177,14 @@ def evaluate_delivery_intelligence(
 
     # 2. CMRA Evaluation
     is_cmra = False
-    if "PMB" in st1 or "PMB" in st2 or "PRIVATE MAILBOX" in raw_combined or "PMB" in raw_combined:
+    if (
+        _RE_PMB_WORD.search(st1)
+        or _RE_PMB_WORD.search(st2)
+        or "PRIVATE MAILBOX" in raw_combined
+        or _RE_PMB_WORD.search(raw_combined)
+    ):
         is_cmra = True
-    elif any(kw in raw_combined or kw in st1 for kw in CMRA_KEYWORDS):
+    elif _RE_CMRA_KEYWORD.search(raw_combined) or _RE_CMRA_KEYWORD.search(st1):
         is_cmra = True
     else:
         reg_entry = lookup_corporate_registry(
@@ -191,7 +204,7 @@ def evaluate_delivery_intelligence(
 
     # 3. Vacancy Evaluation
     is_vacant = bool(is_vacant_override) if is_vacant_override is not None else False
-    if "VACANT" in raw_combined or raw.get("vacant") is True or raw.get("is_vacant") is True:
+    if _RE_VACANT_WORD.search(raw_combined) or raw.get("vacant") is True or raw.get("is_vacant") is True:
         is_vacant = True
 
     # 4. RDI (Residential Delivery Indicator) Evaluation
@@ -289,6 +302,10 @@ def evaluate_delivery_intelligence(
 
     # Consolidated deliverability classification
     if status == "parse_failed" or DPVFootnote.M1 in footnotes or DPVFootnote.M3 in footnotes:
+        deliverability = Deliverability.UNDELIVERABLE
+    elif DPVFootnote.A1 in footnotes and zip_digits:
+        # A ZIP was supplied but is malformed or belongs to a different state: it cannot be confirmed
+        # (a missing ZIP is left to the street-level result).
         deliverability = Deliverability.UNDELIVERABLE
     elif DPVFootnote.N1 in footnotes:
         deliverability = Deliverability.REQUIRES_SECONDARY

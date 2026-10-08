@@ -52,13 +52,9 @@ def _pure_compute_soundex(token: str) -> str:
 
 def compute_soundex(token: str) -> str:
     """Computes standard American Soundex code for a word token with native Rust acceleration."""
-    from address_standardizer import _native_dispatch
-    if _native_dispatch.is_using_native() and _native_dispatch._NATIVE_MODULE is not None:
-        try:
-            return _native_dispatch._NATIVE_MODULE.compute_soundex(token)
-        except Exception:
-            pass
-    return _pure_compute_soundex(token)
+    from address_standardizer._native_dispatch import try_native
+    ok, result = try_native("compute_soundex", token)
+    return result if ok else _pure_compute_soundex(token)
 
 
 def _pure_generate_phonetic_address_key(street1: Optional[str], postal_or_zip: str = "", city: str = "") -> Optional[str]:
@@ -102,17 +98,17 @@ def _pure_generate_phonetic_address_key(street1: Optional[str], postal_or_zip: s
         rr_prefix = f"{parts[0]} {parts[1]}"
         rem = parts[2:]
         if rem and rem[0] == "BOX":
-            snd = compute_soundex("BOX")
+            snd = _pure_compute_soundex("BOX")
         elif rem:
-            snd = compute_soundex(rem[0])
+            snd = _pure_compute_soundex(rem[0])
         else:
-            snd = compute_soundex(parts[0])
+            snd = _pure_compute_soundex(parts[0])
         return f"{rr_prefix}|{snd}|{loc}".strip("|")
 
     # Military Unit Box handling (e.g. UNIT 1234 BOX 5678)
     if len(parts) >= 4 and parts[0] == "UNIT" and parts[1].isdigit():
         unit_num = parts[1]
-        snd = compute_soundex(parts[2]) if parts[2] else "B200"
+        snd = _pure_compute_soundex(parts[2]) if parts[2] else "B200"
         return f"{unit_num}|{snd}|{loc}".strip("|")
 
     # Puerto Rico Urbanization handling (e.g. URB LAS GLADIOLAS 123 CALLE FLAMBOYAN)
@@ -127,7 +123,7 @@ def _pure_generate_phonetic_address_key(street1: Optional[str], postal_or_zip: s
             house_num = parts[h_idx]
             rem_words = parts[h_idx + 1:]
             street_word = rem_words[0] if rem_words else parts[1]
-            snd = compute_soundex(street_word)
+            snd = _pure_compute_soundex(street_word)
             return f"{house_num}|{snd}|{loc}".strip("|")
 
     # Extract house number (including fractional like '100 1/2' and Queens like '123-45')
@@ -167,7 +163,7 @@ def _pure_generate_phonetic_address_key(street1: Optional[str], postal_or_zip: s
     if m_num:
         snd = f"#{m_num.group(1)}"
     else:
-        snd = compute_soundex(street_word)
+        snd = _pure_compute_soundex(street_word)
 
     res = f"{house_num}|{snd}|{loc}".strip("|")
     return res or None
@@ -179,12 +175,6 @@ def generate_phonetic_address_key(
     city: str = "",
 ) -> Optional[str]:
     """Generates a fuzzy blocking key with native Rust acceleration."""
-    from address_standardizer import _native_dispatch
-    if _native_dispatch.is_using_native() and _native_dispatch._NATIVE_MODULE is not None:
-        try:
-            return _native_dispatch._NATIVE_MODULE.generate_phonetic_address_key(
-                street1, postal_or_zip=postal_or_zip, city=city
-            )
-        except Exception:
-            pass
-    return _pure_generate_phonetic_address_key(street1, postal_or_zip=postal_or_zip, city=city)
+    from address_standardizer._native_dispatch import try_native
+    ok, result = try_native("generate_phonetic_address_key", street1, postal_or_zip=postal_or_zip, city=city)
+    return result if ok else _pure_generate_phonetic_address_key(street1, postal_or_zip=postal_or_zip, city=city)

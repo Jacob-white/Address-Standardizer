@@ -775,12 +775,17 @@ def main():
 
     # Shorthand invocation check: when no subcommand or help flag is passed
     if len(sys.argv) > 1 and "-h" not in sys.argv[1:] and "--help" not in sys.argv[1:]:
-        if not any(arg in _known_subcommands for arg in sys.argv[1:]):
-            shorthand_parser = argparse.ArgumentParser(prog="address-standardizer", add_help=False)
-            shorthand_parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json")
-            shorthand_parser.add_argument("--country", "-c", default="USA")
-            shorthand_parser.add_argument("address", nargs="*")
+        shorthand_parser = argparse.ArgumentParser(prog="address-standardizer", add_help=False, exit_on_error=False)
+        shorthand_parser.add_argument("--format", choices=["json", "text", "table", "csv", "upu"], default="json")
+        shorthand_parser.add_argument("--country", "-c", default="USA")
+        shorthand_parser.add_argument("address", nargs="*")
+        try:
             s_args, _ = shorthand_parser.parse_known_args(sys.argv[1:])
+        except argparse.ArgumentError:
+            s_args = None  # options this parser does not understand: let the subcommand parser handle them
+        # Shorthand mode only when the first positional word is not a subcommand, so an address such as
+        # "12 audit rd" or an option value such as "--country cache" is never mistaken for a subcommand.
+        if s_args is not None and not (s_args.address and s_args.address[0] in _known_subcommands):
             if s_args.address:
                 raw_addr = " ".join(s_args.address)
                 res = standardize_address(street1=raw_addr, country=s_args.country)

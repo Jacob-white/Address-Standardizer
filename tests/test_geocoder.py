@@ -91,10 +91,10 @@ class TestGeocoder:
         parsed = parse_census_geocoder_response(mock_csv)
         assert len(parsed) == 1
         assert "1" in parsed
-        lat, lon, tract = parsed["1"]
+        lat, lon, tiger_line_id = parsed["1"]
         assert lat == 40.7061
         assert lon == -74.0060
-        assert tract == "123456"
+        assert tiger_line_id == "123456"  # TIGER/Line edge id, not a census tract
 
     def test_parse_census_geocoder_empty_response(self):
         assert parse_census_geocoder_response("") == {}
@@ -121,7 +121,8 @@ class TestGeocoder:
             assert res["rec1"]["precision"] == "rooftop"
             assert res["rec1"]["latitude"] == 40.7061
             assert res["rec1"]["longitude"] == -74.0060
-            assert res["rec1"]["census_tract"] == "123456"
+            assert res["rec1"]["census_tract"] is None  # column 7 of the Census response is a TIGER edge id
+            assert res["rec1"]["tiger_line_id"] == "123456"
 
     def test_census_geocoder_fallback_on_unmatched(self):
         mock_csv = (

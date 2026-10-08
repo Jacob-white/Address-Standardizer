@@ -18,7 +18,7 @@ from address_standardizer.batch import (
 from address_standardizer.geocoder import CensusGeocoder
 
 
-from address_standardizer._memory import peak_rss_kb as _peak_rss_kb  # noqa: E402
+from address_standardizer._memory import current_rss_mb  # noqa: E402
 
 
 class TestChunkGenerator:
@@ -340,14 +340,7 @@ class TestStreamStandardizeCSV:
                 w.writerow([str(i), f"{i % 1000 + 1} Main St", "Suite 100", "Springfield", "IL", "62701", "USA"])
 
         def _get_rss_mb() -> float:
-            try:
-                with open("/proc/self/status") as f_stat:
-                    for line in f_stat:
-                        if line.startswith("VmRSS:"):
-                            return float(line.split()[1]) / 1024.0
-            except Exception:
-                pass
-            return _peak_rss_kb() / 1024.0
+            return current_rss_mb()
 
         mem_before = _get_rss_mb()
 

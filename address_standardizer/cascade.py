@@ -148,7 +148,7 @@ class VerificationCascade:
                         accuracy_radius_meters=off_rec.accuracy_radius_meters,
                         source="OFFLINE_ROOFTOP_INDEX",
                         stage=1,
-                        census_tract=off_rec.parcel_id,
+                        census_tract=off_rec.census_tract,
                     )
 
         # Stage 2: Census TIGER Centerline / Batch Geocoder

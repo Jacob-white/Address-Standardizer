@@ -253,7 +253,8 @@ def generate_intl_01_uk(rng: random.Random) -> List[Dict[str, Any]]:
             norm_key = f"{street1_exp}|{street2_exp}|{city_exp}||{postal_exp}|{country_exp}"
             bld_key = f"{street1_exp}||{city_exp}||{postal_exp}|{country_exp}"
             phon_key = f"{st_num}|{st_soundex[st_name]}|{postal_exp}"
-            is_hub = (prem_norm == "CLARENDON HOUSE")
+            # "Clarendon House" in the UK is not the Bermuda offshore hub: a premise name alone is not a hub signal.
+            is_hub = False
 
             expected = {
                 "street1": street1_exp,

@@ -285,3 +285,31 @@ class TestDeliveryIntelligence:
         assert std.is_vacant is True
         assert std.vacant is True
 
+
+
+class TestDeliveryHardening:
+    """Regressions from the whole-codebase review."""
+
+    @staticmethod
+    def _eval(street, city, state, zip_code):
+        from address_standardizer import standardize_address
+        from address_standardizer.delivery import evaluate_delivery_intelligence
+
+        return evaluate_delivery_intelligence(standardize_address(street, None, city, state, zip_code))
+
+    def test_street_names_resembling_brands_are_not_cmra(self):
+        for street in ("123 Davinci Dr", "45 Regusto Rd", "45 Cups Store Ln"):
+            assert self._eval(street, "Albany", "NY", "12207").cmra is False
+
+    def test_real_cmra_brands_still_detected(self):
+        assert self._eval("100 Main St Regus", "Albany", "NY", "12207").cmra is True
+
+    def test_vacantville_is_not_a_vacancy_marker(self):
+        assert self._eval("123 Vacantville Rd", "Albany", "NY", "12207").vacant is False
+
+    def test_zip_that_belongs_to_another_state_is_undeliverable(self):
+        from address_standardizer.delivery import Deliverability
+
+        assert self._eval("123 Main St", "New York", "NY", "90210").deliverability == Deliverability.UNDELIVERABLE
+        assert self._eval("PO Box 12", "New York", "NY", "9021").deliverability == Deliverability.UNDELIVERABLE
+        assert self._eval("123 Main St", "New York", "NY", "10005").deliverability == Deliverability.DELIVERABLE

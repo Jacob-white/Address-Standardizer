@@ -440,7 +440,7 @@ def stream_standardize_csv(
 
         def _handle_chunk_audits(audit_records: List[Dict[str, Any]]):
             for aud in audit_records:
-                ledger.record(StewardshipAuditRecord.from_dict(aud))
+                ledger.ensure_recorded(StewardshipAuditRecord.from_dict(aud))
                 if audit_writer:
                     row_to_write = dict(aud)
                     for k in ("failure_reason_codes", "raw_input_payload", "proposed_standardized_payload", "final_committed_payload"):
@@ -604,7 +604,7 @@ def stream_standardize_jsonl(
 
     def _handle_chunk_audits(audit_records: List[Dict[str, Any]]):
         for aud in audit_records:
-            ledger.record(StewardshipAuditRecord.from_dict(aud))
+            ledger.ensure_recorded(StewardshipAuditRecord.from_dict(aud))
             if audit_writer:
                 row_to_write = dict(aud)
                 for k in ("failure_reason_codes", "raw_input_payload", "proposed_standardized_payload", "final_committed_payload"):

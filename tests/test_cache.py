@@ -109,9 +109,9 @@ class TestSQLiteCache:
         cache.set("str_1", "raw string")
         assert cache.get("str_1") == "raw string"
 
-        # Non-JSON payload handling
+        # Unreadable payloads are treated as a miss (and removed), never returned as a value
         cache._conn.execute("INSERT OR REPLACE INTO l2_address_cache (cache_key, payload) VALUES (?, ?)", ("raw_bad_json", "{bad json"))
-        assert cache.get("raw_bad_json") == "{bad json"
+        assert cache.get("raw_bad_json") is None
 
         # Miss
         assert cache.get("missing_key") is None
@@ -120,7 +120,7 @@ class TestSQLiteCache:
         stats = cache.stats()
         assert stats["size"] >= 4
         assert stats["hits"] >= 4
-        assert stats["misses"] == 1
+        assert stats["misses"] == 2  # the unreadable payload and the missing key
         assert stats["hit_rate"] > 0
 
         # Delete

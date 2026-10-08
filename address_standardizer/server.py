@@ -19,7 +19,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Union
 from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from address_standardizer import __version__
 from address_standardizer._native_dispatch import (
@@ -107,6 +107,36 @@ def _max_batch_size() -> int:
         return max(1, int(os.environ.get("ADDRESS_STANDARDIZER_MAX_BATCH", "10000")))
     except ValueError:
         return 10000
+
+
+def _max_body_bytes() -> int:
+    """Maximum request body size in bytes for /v1/batch (env ADDRESS_STANDARDIZER_MAX_BODY_BYTES, default 16 MiB)."""
+    try:
+        return max(1024, int(os.environ.get("ADDRESS_STANDARDIZER_MAX_BODY_BYTES", str(16 * 1024 * 1024))))
+    except ValueError:
+        return 16 * 1024 * 1024
+
+
+async def _read_body_limited(request: Request) -> bytes:
+    """Read the request body, refusing (413) as soon as it exceeds the configured limit."""
+    limit = _max_body_bytes()
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > limit:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Request body of {declared} bytes exceeds the limit of {limit} bytes.",
+        )
+    chunks: List[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Request body exceeds the limit of {limit} bytes.",
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _batch_too_large(count: int, limit: int) -> HTTPException:
@@ -390,17 +420,14 @@ def create_app() -> FastAPI:
 
         if is_ndjson_req:
             # Handle incoming NDJSON stream
-            body_bytes = await request.body()
+            body_bytes = await _read_body_limited(request)
             body_text = body_bytes.decode("utf-8", errors="replace")
-            ndjson_lines = [ln for ln in body_text.splitlines() if ln.strip()]
+            ndjson_lines = [ln.strip() for ln in body_text.splitlines() if ln.strip()]
             if len(ndjson_lines) > _max_batch_size():
                 raise _batch_too_large(len(ndjson_lines), _max_batch_size())
 
             async def ndjson_generator() -> AsyncIterator[str]:
-                for line in body_text.splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
+                for line in ndjson_lines:
                     try:
                         item = json.loads(line)
                         res = _process_item_to_dict(item)
@@ -411,9 +438,10 @@ def create_app() -> FastAPI:
             return StreamingResponse(ndjson_generator(), media_type="application/x-ndjson")
 
         # Standard JSON body handling
+        raw_body = await _read_body_limited(request)
         try:
-            body = await request.json()
-        except Exception:
+            body = json.loads(raw_body)
+        except (ValueError, RecursionError):
             raise HTTPException(status_code=400, detail="Invalid JSON body")
 
         addresses_list = []
@@ -428,11 +456,26 @@ def create_app() -> FastAPI:
             default_geo = body.get("enable_geocoding", True)
             default_fuzzy = body.get("enable_fuzzy", True)
             default_allow_loc = body.get("allow_locality", False)
+            for flag_name, flag_value in (
+                ("enable_geocoding", default_geo),
+                ("enable_fuzzy", default_fuzzy),
+                ("allow_locality", default_allow_loc),
+            ):
+                if not isinstance(flag_value, bool):
+                    raise HTTPException(status_code=400, detail=f"'{flag_name}' must be a boolean")
         else:
             raise HTTPException(status_code=400, detail="Request body must be an array or object with 'addresses'")
 
+        if not isinstance(addresses_list, list):
+            raise HTTPException(status_code=400, detail="'addresses' must be an array")
         if len(addresses_list) > _max_batch_size():
             raise _batch_too_large(len(addresses_list), _max_batch_size())
+        for index, item in enumerate(addresses_list):
+            if not isinstance(item, (str, dict)):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"addresses[{index}] must be a string or an object, got {type(item).__name__}",
+                )
 
         if is_ndjson_resp:
             async def stream_array_as_ndjson() -> AsyncIterator[str]:
@@ -448,15 +491,19 @@ def create_app() -> FastAPI:
             return StreamingResponse(stream_array_as_ndjson(), media_type="application/x-ndjson")
 
         # Standard JSON array response
-        results = [
-            _process_item_to_dict(
-                item,
-                default_geocoding=default_geo,
-                default_fuzzy=default_fuzzy,
-                default_allow_locality=default_allow_loc,
-            )
-            for item in addresses_list
-        ]
+        results = []
+        for index, item in enumerate(addresses_list):
+            try:
+                results.append(
+                    _process_item_to_dict(
+                        item,
+                        default_geocoding=default_geo,
+                        default_fuzzy=default_fuzzy,
+                        default_allow_locality=default_allow_loc,
+                    )
+                )
+            except ValidationError as exc:
+                raise HTTPException(status_code=400, detail=f"addresses[{index}] has invalid fields: {exc.errors()[0]['loc']}")
         return JSONResponse(results)
 
     @app.post(

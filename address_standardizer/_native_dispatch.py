@@ -7,7 +7,8 @@ Provides runtime capability introspection, testing override hooks, and batch dis
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+import os
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from address_standardizer import _pure_python_core
 from address_standardizer.models import StandardizedAddress
@@ -18,9 +19,51 @@ logger = logging.getLogger(__name__)
 _NATIVE_MODULE: Optional[Any] = None
 _NATIVE_AVAILABLE: bool = False
 _FORCE_PURE_PYTHON: bool = False
+_FORCE_PURE_ENV = "ADDRESS_STANDARDIZER_FORCE_PURE"
+_LOGGED_FAILURES: set = set()
+
+
+def _env_forces_pure() -> bool:
+    """Operator kill switch: ADDRESS_STANDARDIZER_FORCE_PURE=1 disables the native extension."""
+    return os.environ.get(_FORCE_PURE_ENV, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _is_fatal(exc: BaseException) -> bool:
+    """Exceptions that must never be swallowed by native-failure fallbacks."""
+    return isinstance(exc, (KeyboardInterrupt, SystemExit, GeneratorExit))
+
+
+def _note_native_failure(name: str, exc: BaseException) -> None:
+    """Log each distinct native failure once (PyO3 panics surface as BaseException subclasses)."""
+    key = (name, type(exc).__name__)
+    if key not in _LOGGED_FAILURES:
+        _LOGGED_FAILURES.add(key)
+        logger.warning("Native call %s failed (%s: %s); falling back to pure Python.", name, type(exc).__name__, exc)
+
+
+def try_native(name: str, *args: Any, **kwargs: Any) -> Tuple[bool, Any]:
+    """Call `name` on the native module if it is active.
+
+    Returns ``(True, result)`` on success and ``(False, None)`` when the native engine is inactive, lacks the
+    function, or raised (including PyO3 panics, which derive from BaseException). Callers then use pure Python.
+    """
+    if not is_using_native() or _NATIVE_MODULE is None:
+        return False, None
+    func: Optional[Callable[..., Any]] = getattr(_NATIVE_MODULE, name, None)
+    if func is None:
+        return False, None
+    try:
+        return True, func(*args, **kwargs)
+    except BaseException as exc:  # noqa: BLE001 - PanicException is not an Exception subclass
+        if _is_fatal(exc):
+            raise
+        _note_native_failure(name, exc)
+        return False, None
+
 
 def _init_native():
-    global _NATIVE_MODULE, _NATIVE_AVAILABLE
+    global _NATIVE_MODULE, _NATIVE_AVAILABLE, _FORCE_PURE_PYTHON
+    _FORCE_PURE_PYTHON = _env_forces_pure()
     try:
         import _address_standardizer_rs as _native_ext
 
@@ -31,6 +74,12 @@ def _init_native():
         _NATIVE_MODULE = None
         _NATIVE_AVAILABLE = False
         logger.info("Native compiled core unavailable; operating via pure Python fallback.")
+    except BaseException as exc:  # noqa: BLE001 - a broken extension must not break `import address_standardizer`
+        if _is_fatal(exc):
+            raise
+        _NATIVE_MODULE = None
+        _NATIVE_AVAILABLE = False
+        logger.warning("Native extension failed to load (%s: %s); using pure Python.", type(exc).__name__, exc)
 
 
 _init_native()
@@ -102,8 +151,6 @@ def override_engine_for_testing(mock_engine: Optional[Any]) -> None:
 
 def reset_engine() -> None:
     """Reset engine state to system autodetected defaults."""
-    global _FORCE_PURE_PYTHON
-    _FORCE_PURE_PYTHON = False
     _init_native()
 
 
@@ -116,16 +163,17 @@ def standardize_record_dispatch(
     country: Optional[str] = None,
     **kwargs: Any,
 ) -> StandardizedAddress:
-    """Dispatches single record standardization to active engine."""
-    engine = get_active_engine()
-    return engine.standardize_record(
-        street1=street1,
-        street2=street2,
-        city=city,
-        state=state,
-        postal_code=postal_code,
-        country=country,
-        **kwargs,
+    """Dispatches single record standardization to the native engine, falling back to pure Python."""
+    ok, result = try_native(
+        "standardize_record",
+        street1=street1, street2=street2, city=city, state=state,
+        postal_code=postal_code, country=country, **kwargs,
+    )
+    if ok:
+        return result
+    return _pure_python_core.standardize_record(
+        street1=street1, street2=street2, city=city, state=state,
+        postal_code=postal_code, country=country, **kwargs,
     )
 
 
@@ -134,15 +182,17 @@ def standardize_batch_dispatch(
     chunk_size: int = 5000,
     **kwargs: Any,
 ) -> List[StandardizedAddress]:
-    """Dispatches batch standardization to active engine with pre-allocated buffers."""
-    engine = get_active_engine()
-    return engine.standardize_batch(records, chunk_size=chunk_size, **kwargs)
+    """Dispatches batch standardization to the native engine, falling back to pure Python."""
+    ok, result = try_native("standardize_batch", records, chunk_size=chunk_size, **kwargs)
+    if ok:
+        return result
+    return _pure_python_core.standardize_batch(records, chunk_size=chunk_size, **kwargs)
 
 
 def compute_soundex_dispatch(token: str) -> str:
-    """Dispatches Soundex computation to active engine."""
-    engine = get_active_engine()
-    return engine.compute_soundex(token)
+    """Dispatches Soundex computation to the native engine, falling back to pure Python."""
+    ok, result = try_native("compute_soundex", token)
+    return result if ok else _pure_python_core.compute_soundex(token)
 
 
 def generate_phonetic_key_dispatch(
@@ -150,9 +200,11 @@ def generate_phonetic_key_dispatch(
     postal_or_zip: str = "",
     city: str = "",
 ) -> Optional[str]:
-    """Dispatches phonetic blocking key generation to active engine."""
-    engine = get_active_engine()
-    return engine.generate_phonetic_address_key(street1, postal_or_zip=postal_or_zip, city=city)
+    """Dispatches phonetic blocking key generation to the native engine, falling back to pure Python."""
+    ok, result = try_native("generate_phonetic_address_key", street1, postal_or_zip=postal_or_zip, city=city)
+    if ok:
+        return result
+    return _pure_python_core.generate_phonetic_address_key(street1, postal_or_zip=postal_or_zip, city=city)
 
 
 def generate_keys_dispatch(
@@ -165,50 +217,37 @@ def generate_keys_dispatch(
     allow_locality: bool = False,
     **kwargs: Any,
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """Dispatches deterministic entity key generation to active engine."""
-    engine = get_active_engine()
-    return engine.generate_keys(
-        street1=street1,
-        street2=street2,
-        city=city,
-        state=state,
-        postal_code=postal_code,
-        country=country,
-        allow_locality=allow_locality,
-        **kwargs,
+    """Dispatches deterministic entity key generation to the native engine, falling back to pure Python."""
+    call_kwargs = dict(
+        street1=street1, street2=street2, city=city, state=state, postal_code=postal_code,
+        country=country, allow_locality=allow_locality, **kwargs,
     )
+    ok, result = try_native("generate_keys", **call_kwargs)
+    return result if ok else _pure_python_core.generate_keys(**call_kwargs)
 
 
 def canonicalize_suffix_dispatch(suffix: str) -> Optional[str]:
     """Canonicalizes street suffix using Pub 28 standards via native engine or fallback."""
-    if is_using_native() and hasattr(_NATIVE_MODULE, "canonicalize_suffix"):
-        try:
-            return _NATIVE_MODULE.canonicalize_suffix(suffix)
-        except Exception:
-            pass
+    ok, result = try_native("canonicalize_suffix", suffix)
+    if ok:
+        return result
     from address_standardizer.tables import STREET_SUFFIXES
-    clean = suffix.strip().upper()
-    return STREET_SUFFIXES.get(clean)
+    return STREET_SUFFIXES.get(suffix.strip().upper())
 
 
 def canonicalize_directional_dispatch(dir_token: str) -> Optional[str]:
     """Canonicalizes directional indicator (e.g. 'NORTH' -> 'N') via native engine or fallback."""
-    if is_using_native() and hasattr(_NATIVE_MODULE, "canonicalize_directional_py"):
-        try:
-            return _NATIVE_MODULE.canonicalize_directional_py(dir_token)
-        except Exception:
-            pass
+    ok, result = try_native("canonicalize_directional_py", dir_token)
+    if ok:
+        return result
     from address_standardizer.tables import DIRECTIONALS
-    clean = dir_token.strip().upper()
-    return DIRECTIONALS.get(clean)
+    return DIRECTIONALS.get(dir_token.strip().upper())
 
 
 def fast_tokenize_dispatch(text: str) -> List[str]:
     """Performs fast-path tokenization via native engine or fallback."""
-    if is_using_native() and hasattr(_NATIVE_MODULE, "fast_tokenize"):
-        try:
-            return _NATIVE_MODULE.fast_tokenize(text)
-        except Exception:
-            pass
+    ok, result = try_native("fast_tokenize", text)
+    if ok:
+        return result
     import re
     return re.findall(r"[\w#/-]+", text.upper())

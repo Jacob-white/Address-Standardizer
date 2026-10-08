@@ -17,7 +17,7 @@ import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from address_standardizer._memory import peak_rss_kb as _peak_rss_kb  # noqa: E402
+from address_standardizer._memory import current_rss_mb  # noqa: E402
 from address_standardizer import standardize_address, batch_standardize, stream_standardize_jsonl
 from address_standardizer.batch import stream_standardize_csv
 from address_standardizer import _pure_python_core
@@ -25,16 +25,7 @@ from address_standardizer import _pure_python_core
 
 def get_current_rss_mb() -> float:
     """Returns current process Resident Set Size in MB."""
-    try:
-        with open("/proc/self/status", "r") as f:
-            for line in f:
-                if line.startswith("VmRSS:"):
-                    parts = line.split()
-                    return float(parts[1]) / 1024.0
-    except Exception:
-        pass
-    usage_kb = _peak_rss_kb()
-    return usage_kb / 1024.0
+    return current_rss_mb()
 
 
 def test_public_invariants():

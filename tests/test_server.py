@@ -217,3 +217,25 @@ def test_batch_rejects_oversized_requests(client, monkeypatch):
     ok = client.post("/v1/batch", json={"addresses": ["100 Main St, Austin, TX 78701", "350 5th Ave, New York, NY 10118"]})
     assert ok.status_code == 200
     assert len(ok.json()) == 2
+
+
+def test_batch_rejects_malformed_payloads_with_400(client):
+    assert client.post("/v1/batch", json={"addresses": None}).status_code == 400
+    assert client.post("/v1/batch", json={"addresses": "abc"}).status_code == 400
+    assert client.post("/v1/batch", json={"addresses": {"a": 1}}).status_code == 400
+    assert client.post("/v1/batch", json={"addresses": [123]}).status_code == 400
+    assert client.post("/v1/batch", json={"addresses": [None]}).status_code == 400
+    assert client.post("/v1/batch", json={"addresses": ["a"], "enable_fuzzy": "yes"}).status_code == 400
+    assert client.post("/v1/batch", json={"addresses": [{"city": 5}]}).status_code == 400
+    assert client.post("/v1/batch", content="not json", headers={"Content-Type": "application/json"}).status_code == 400
+    assert client.post("/v1/batch", json=42).status_code == 400
+
+
+def test_batch_rejects_oversized_bodies(client, monkeypatch):
+    monkeypatch.setenv("ADDRESS_STANDARDIZER_MAX_BODY_BYTES", "2048")
+    big = {"addresses": ["100 Main St, Austin, TX 78701"] * 200}
+    res = client.post("/v1/batch", json=big)
+    assert res.status_code == 413
+    ndjson = "\n".join('{"address": "100 Main St, Austin, TX 78701"}' for _ in range(200))
+    res = client.post("/v1/batch", content=ndjson, headers={"Content-Type": "application/x-ndjson"})
+    assert res.status_code == 413

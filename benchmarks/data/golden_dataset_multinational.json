@@ -113,7 +113,7 @@
       "phonetic_key": "31|M600|NW1 4NP",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -293,7 +293,7 @@
       "phonetic_key": "73|L535|LS2 9JT",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -473,7 +473,7 @@
       "phonetic_key": "115|K520|B15 2TT",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -653,7 +653,7 @@
       "phonetic_key": "157|S300|BS8 1TH",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -833,7 +833,7 @@
       "phonetic_key": "19|P620|L1 8JQ",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -1013,7 +1013,7 @@
       "phonetic_key": "61|C562|GY1 2YY",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -1193,7 +1193,7 @@
       "phonetic_key": "103|C234|W1A 0AX",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -1373,7 +1373,7 @@
       "phonetic_key": "145|B620|LS1 2TW",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -1553,7 +1553,7 @@
       "phonetic_key": "187|M623|B1 1BB",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -1733,7 +1733,7 @@
       "phonetic_key": "49|M400|BS1 4ST",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -1913,7 +1913,7 @@
       "phonetic_key": "91|M600|NE1 7RU",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -2093,7 +2093,7 @@
       "phonetic_key": "133|L535|JE1 1AA",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -2273,7 +2273,7 @@
       "phonetic_key": "175|K520|EC1A 1BB",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -2453,7 +2453,7 @@
       "phonetic_key": "37|S300|LS6 2AA",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -2633,7 +2633,7 @@
       "phonetic_key": "79|P620|B33 8TH",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -2813,7 +2813,7 @@
       "phonetic_key": "121|C562|G2 8DL",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -2993,7 +2993,7 @@
       "phonetic_key": "163|C234|CF11 9BZ",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -3173,7 +3173,7 @@
       "phonetic_key": "25|B620|JE2 3XX",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -3353,7 +3353,7 @@
       "phonetic_key": "67|M623|SW1A 1AA",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -3533,7 +3533,7 @@
       "phonetic_key": "109|M400|WC2H 9JQ",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -3713,7 +3713,7 @@
       "phonetic_key": "151|M600|M20 2RN",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -3893,7 +3893,7 @@
       "phonetic_key": "13|L535|G1 1XQ",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -4073,7 +4073,7 @@
       "phonetic_key": "55|K520|CF10 1AA",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -4253,7 +4253,7 @@
       "phonetic_key": "97|S300|CB2 1TN",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -4433,7 +4433,7 @@
       "phonetic_key": "139|P620|IM2 4RW",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -4613,7 +4613,7 @@
       "phonetic_key": "181|C562|E1 6AN",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -4793,7 +4793,7 @@
       "phonetic_key": "43|C234|M4 4BF",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -4973,7 +4973,7 @@
       "phonetic_key": "85|B620|EH2 2ER",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -5153,7 +5153,7 @@
       "phonetic_key": "127|M623|BT2 8DN",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -5333,7 +5333,7 @@
       "phonetic_key": "169|M400|OX1 1DP",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -5513,7 +5513,7 @@
       "phonetic_key": "31|M600|IM1 1ZZ",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -5693,7 +5693,7 @@
       "phonetic_key": "73|L535|SE1 7PB",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false
@@ -5873,7 +5873,7 @@
       "phonetic_key": "115|K520|M1 1AA",
       "address_status": "standardized",
       "is_us": false,
-      "is_registered_agent_hub": true,
+      "is_registered_agent_hub": false,
       "dependent_locality": null,
       "building_name": "CLARENDON HOUSE",
       "is_private_residence": false

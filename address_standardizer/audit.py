@@ -10,6 +10,7 @@ with the production PostgreSQL schema defined in Blueprint Section 1.4.3.
 """
 
 import json
+import threading
 import uuid
 import sqlite3
 from dataclasses import dataclass, field
@@ -75,6 +76,11 @@ SQLITE_AUDIT_LEDGER_DDL = """CREATE TABLE IF NOT EXISTS address_stewardship_audi
     reviewed_by TEXT,
     reviewed_at TEXT
 );"""
+
+# Prior versions of a record that a steward override replaced (the ledger itself stays append-only per audit_id).
+SQLITE_AUDIT_HISTORY_DDL = SQLITE_AUDIT_LEDGER_DDL.replace(
+    "address_stewardship_audit_ledger", "address_stewardship_audit_history"
+).replace("audit_id TEXT PRIMARY KEY,", "history_id INTEGER PRIMARY KEY AUTOINCREMENT, audit_id TEXT NOT NULL,", 1)
 
 
 class ActionType:
@@ -211,72 +217,127 @@ class StewardshipAuditLedger:
     Append-only audit ledger manager supporting in-memory queuing and embedded SQLite storage.
     """
 
-    def __init__(self, db_path: Optional[str] = None):
+    def __init__(self, db_path: Optional[str] = None, max_rows: Optional[int] = None):
         import os
         self.db_path = db_path or ":memory:"
         self._pid = os.getpid()
+        # One connection is shared by all threads, so every use of it is serialized by this lock.
+        self._lock = threading.RLock()
+        # A private in-memory ledger would otherwise grow without bound; file-backed ledgers keep everything.
+        if max_rows is None and self.db_path == ":memory:":
+            try:
+                max_rows = int(os.environ.get("ADDRESS_STANDARDIZER_AUDIT_MAX_ROWS", "100000"))
+            except ValueError:
+                max_rows = 100000
+        self._max_rows = max_rows if max_rows and max_rows > 0 else None
+        self._inserts_since_prune = 0
         self._conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._init_db()
 
     def _get_conn(self) -> sqlite3.Connection:
         import os
-        current_pid = os.getpid()
-        if current_pid != self._pid:
-            self._pid = current_pid
-            self._conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
-            self._conn.row_factory = sqlite3.Row
-            self._init_db()
-        return self._conn
+        with self._lock:
+            current_pid = os.getpid()
+            if current_pid != self._pid:
+                self._pid = current_pid
+                self._conn = sqlite3.connect(self.db_path, timeout=30.0, check_same_thread=False)
+                self._conn.row_factory = sqlite3.Row
+                self._init_db()
+            return self._conn
 
     def _init_db(self):
-        with self._conn:
+        with self._lock, self._conn:
             try:
                 self._conn.execute("PRAGMA journal_mode = WAL;")
                 self._conn.execute("PRAGMA busy_timeout = 30000;")
             except Exception:
                 pass
             self._conn.execute(SQLITE_AUDIT_LEDGER_DDL)
+            self._conn.execute(SQLITE_AUDIT_HISTORY_DDL)
 
-    def record(self, audit_record: StewardshipAuditRecord) -> StewardshipAuditRecord:
-        """Appends a new audit record to the ledger."""
-        conn = self._get_conn()
+    def _prune_if_needed(self, conn: sqlite3.Connection) -> None:
+        """Drop the oldest rows of a bounded (in-memory) ledger once it exceeds its cap."""
+        if self._max_rows is None:
+            return
+        self._inserts_since_prune += 1
+        if self._inserts_since_prune < 256:
+            return
+        self._inserts_since_prune = 0
         with conn:
             conn.execute(
-                """
-                INSERT OR REPLACE INTO address_stewardship_audit_ledger (
-                    audit_id, record_id, batch_id, timestamp_utc, agent_or_system_id,
-                    action_type, confidence_score, failure_reason_codes,
-                    normalized_address_key, building_key, phonetic_key,
-                    is_registered_agent_hub, is_private_residence, dpv_confirmation_code,
-                    raw_input_payload, proposed_standardized_payload, final_committed_payload,
-                    steward_commentary, review_status, reviewed_by, reviewed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    audit_record.audit_id,
-                    audit_record.record_id,
-                    audit_record.batch_id,
-                    audit_record.timestamp_utc,
-                    audit_record.agent_or_system_id,
-                    audit_record.action_type,
-                    audit_record.confidence_score,
-                    json.dumps(audit_record.failure_reason_codes),
-                    audit_record.normalized_address_key,
-                    audit_record.building_key,
-                    audit_record.phonetic_key,
-                    1 if audit_record.is_registered_agent_hub else 0,
-                    1 if audit_record.is_private_residence else 0,
-                    audit_record.dpv_confirmation_code,
-                    json.dumps(audit_record.raw_input_payload),
-                    json.dumps(audit_record.proposed_standardized_payload),
-                    json.dumps(audit_record.final_committed_payload),
-                    audit_record.steward_commentary,
-                    audit_record.review_status,
-                    audit_record.reviewed_by,
-                    audit_record.reviewed_at,
-                ),
+                "DELETE FROM address_stewardship_audit_ledger WHERE rowid IN ("
+                "SELECT rowid FROM address_stewardship_audit_ledger ORDER BY timestamp_utc ASC, rowid ASC "
+                "LIMIT max(0, (SELECT count(*) FROM address_stewardship_audit_ledger) - ?))",
+                (self._max_rows,),
             )
+
+    def ensure_recorded(self, audit_record: StewardshipAuditRecord) -> StewardshipAuditRecord:
+        """Idempotent append: record the entry unless a row with the same ``audit_id`` already exists.
+
+        Batch pipelines receive audit records for results the standardizer has already logged; this makes the
+        second pass a no-op instead of an error (and never overwrites the stored row).
+        """
+        with self._lock:
+            if self.get_record(audit_record.audit_id) is None:
+                return self._record_locked(audit_record, False)
+            return audit_record
+
+    def record(self, audit_record: StewardshipAuditRecord, _replace: bool = False) -> StewardshipAuditRecord:
+        """Appends a new audit record to the ledger.
+
+        The ledger is append-only per ``audit_id``: recording an existing id raises ``ValueError`` instead of
+        silently overwriting history. (Steward overrides replace the current row through ``apply_manual_override``,
+        which first copies the prior version to the history table.)
+        """
+        with self._lock:
+            return self._record_locked(audit_record, _replace)
+
+    def _record_locked(self, audit_record: StewardshipAuditRecord, _replace: bool) -> StewardshipAuditRecord:
+        conn = self._get_conn()
+        verb = "INSERT OR REPLACE" if _replace else "INSERT"
+        try:
+            with conn:
+                conn.execute(
+                    f"""
+                    {verb} INTO address_stewardship_audit_ledger (
+                        audit_id, record_id, batch_id, timestamp_utc, agent_or_system_id,
+                        action_type, confidence_score, failure_reason_codes,
+                        normalized_address_key, building_key, phonetic_key,
+                        is_registered_agent_hub, is_private_residence, dpv_confirmation_code,
+                        raw_input_payload, proposed_standardized_payload, final_committed_payload,
+                        steward_commentary, review_status, reviewed_by, reviewed_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        audit_record.audit_id,
+                        audit_record.record_id,
+                        audit_record.batch_id,
+                        audit_record.timestamp_utc,
+                        audit_record.agent_or_system_id,
+                        audit_record.action_type,
+                        audit_record.confidence_score,
+                        json.dumps(audit_record.failure_reason_codes),
+                        audit_record.normalized_address_key,
+                        audit_record.building_key,
+                        audit_record.phonetic_key,
+                        1 if audit_record.is_registered_agent_hub else 0,
+                        1 if audit_record.is_private_residence else 0,
+                        audit_record.dpv_confirmation_code,
+                        json.dumps(audit_record.raw_input_payload),
+                        json.dumps(audit_record.proposed_standardized_payload),
+                        json.dumps(audit_record.final_committed_payload),
+                        audit_record.steward_commentary,
+                        audit_record.review_status,
+                        audit_record.reviewed_by,
+                        audit_record.reviewed_at,
+                    ),
+                )
+        except sqlite3.IntegrityError as exc:
+            raise ValueError(
+                f"Audit record {audit_record.audit_id} already exists; the ledger is append-only"
+            ) from exc
+        self._prune_if_needed(conn)
         return audit_record
 
     def record_standardized_address(
@@ -345,14 +406,15 @@ class StewardshipAuditLedger:
 
     def get_record(self, audit_id: str) -> Optional[StewardshipAuditRecord]:
         """Retrieves a single record by audit_id."""
-        conn = self._get_conn()
-        cur = conn.execute(
-            "SELECT * FROM address_stewardship_audit_ledger WHERE audit_id = ?", (audit_id,)
-        )
-        row = cur.fetchone()
-        if not row:
-            return None
-        return self._row_to_record(row)
+        with self._lock:
+            conn = self._get_conn()
+            cur = conn.execute(
+                "SELECT * FROM address_stewardship_audit_ledger WHERE audit_id = ?", (audit_id,)
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return self._row_to_record(row)
 
     def list_records(
         self,
@@ -376,13 +438,16 @@ class StewardshipAuditLedger:
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
 
-        query += " ORDER BY timestamp_utc DESC"
-        if limit:
+        query += " ORDER BY timestamp_utc DESC, rowid DESC"
+        if limit is not None:
+            if limit < 0:
+                raise ValueError("limit must be >= 0")
             query += " LIMIT ?"
             params.append(limit)
 
-        cur = conn.execute(query, tuple(params))
-        return [self._row_to_record(r) for r in cur.fetchall()]
+        with self._lock:
+            cur = conn.execute(query, tuple(params))
+            return [self._row_to_record(r) for r in cur.fetchall()]
 
     def apply_manual_override(
         self,
@@ -449,7 +514,33 @@ class StewardshipAuditLedger:
             reviewed_by=steward_id,
             reviewed_at=now_utc,
         )
-        return self.record(updated)
+        with self._lock:
+            conn = self._get_conn()
+            with conn:
+                conn.execute(
+                    "INSERT INTO address_stewardship_audit_history ("
+                    "audit_id, record_id, batch_id, timestamp_utc, agent_or_system_id, action_type, confidence_score, "
+                    "failure_reason_codes, normalized_address_key, building_key, phonetic_key, is_registered_agent_hub, "
+                    "is_private_residence, dpv_confirmation_code, raw_input_payload, proposed_standardized_payload, "
+                    "final_committed_payload, steward_commentary, review_status, reviewed_by, reviewed_at) "
+                    "SELECT audit_id, record_id, batch_id, timestamp_utc, agent_or_system_id, action_type, "
+                    "confidence_score, failure_reason_codes, normalized_address_key, building_key, phonetic_key, "
+                    "is_registered_agent_hub, is_private_residence, dpv_confirmation_code, raw_input_payload, "
+                    "proposed_standardized_payload, final_committed_payload, steward_commentary, review_status, "
+                    "reviewed_by, reviewed_at FROM address_stewardship_audit_ledger WHERE audit_id = ?",
+                    (audit_id,),
+                )
+            return self.record(updated, _replace=True)
+
+    def history(self, audit_id: str) -> List[Dict[str, Any]]:
+        """Prior versions of a record replaced by steward overrides, oldest first."""
+        with self._lock:
+            conn = self._get_conn()
+            cur = conn.execute(
+                "SELECT * FROM address_stewardship_audit_history WHERE audit_id = ? ORDER BY history_id ASC",
+                (audit_id,),
+            )
+            return [dict(r) for r in cur.fetchall()]
 
     def export(self, format: str = "dict") -> Union[List[Dict[str, Any]], str]:
         """Exports ledger records in 'dict', 'json', or 'sql' format."""
@@ -462,9 +553,10 @@ class StewardshipAuditLedger:
 
     def clear(self):
         """Clears all records from the ledger."""
-        conn = self._get_conn()
-        with conn:
-            conn.execute("DELETE FROM address_stewardship_audit_ledger")
+        with self._lock:
+            conn = self._get_conn()
+            with conn:
+                conn.execute("DELETE FROM address_stewardship_audit_ledger")
 
     def _row_to_record(self, row: sqlite3.Row) -> StewardshipAuditRecord:
         return StewardshipAuditRecord(

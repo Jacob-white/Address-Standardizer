@@ -93,6 +93,13 @@ class ParcelValidationResult:
         }
 
 
+def _street_names_match(range_name: str, wanted: str) -> bool:
+    """Equal names, or names that differ only by whole trailing words ("MAIN" vs "MAIN ST"); never a bare prefix."""
+    if range_name == wanted:
+        return True
+    return range_name.startswith(wanted + " ") or wanted.startswith(range_name + " ")
+
+
 class OfflineReferenceIndex:
     """
     Embedded SQLite reference index supporting rooftop coordinates resolution,
@@ -183,9 +190,13 @@ class OfflineReferenceIndex:
                     end_latitude REAL NOT NULL,
                     end_longitude REAL NOT NULL,
                     census_tract TEXT,
-                    fips_code TEXT
+                    fips_code TEXT,
+                    parity TEXT NOT NULL DEFAULT 'B'
                 );
             """)
+            existing_cols = {r[1] for r in conn.execute("PRAGMA table_info(street_ranges)").fetchall()}
+            if "parity" not in existing_cols:  # databases created before parity support
+                conn.execute("ALTER TABLE street_ranges ADD COLUMN parity TEXT NOT NULL DEFAULT 'B'")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ranges_zip_st ON street_ranges(postal_code, street_name);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_ranges_state_st ON street_ranges(state, street_name);")
 
@@ -219,7 +230,6 @@ class OfflineReferenceIndex:
     ):
         """Inserts or replaces a rooftop reference record."""
         with self._lock:
-            self._resolve_cache.clear()
             conn = self._get_conn()
             with conn:
                 conn.execute(
@@ -274,10 +284,16 @@ class OfflineReferenceIndex:
         end_longitude: float,
         census_tract: Optional[str] = None,
         fips_code: Optional[str] = None,
+        parity: str = "B",
     ):
-        """Inserts a street edge range for linear interpolation (Census TIGER style)."""
+        """Inserts a street edge range for linear interpolation (Census TIGER style).
+
+        ``parity`` is "O" (odd house numbers only), "E" (even only) or "B" (both sides, the default).
+        """
+        parity = parity.strip().upper()
+        if parity not in ("O", "E", "B"):
+            raise ValueError("parity must be 'O', 'E' or 'B'")
         with self._lock:
-            self._resolve_cache.clear()
             conn = self._get_conn()
             with conn:
                 conn.execute(
@@ -285,8 +301,8 @@ class OfflineReferenceIndex:
                     INSERT INTO street_ranges (
                         street_name, postal_code, state, from_number, to_number,
                         start_latitude, start_longitude, end_latitude, end_longitude,
-                        census_tract, fips_code
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        census_tract, fips_code, parity
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         street_name.strip().upper(),
@@ -300,6 +316,7 @@ class OfflineReferenceIndex:
                         float(end_longitude),
                         census_tract,
                         fips_code,
+                        parity,
                     ),
                 )
 
@@ -331,20 +348,25 @@ class OfflineReferenceIndex:
         norm_st = state.strip().upper()
 
         with self._lock:
+            # Candidate ranges are narrowed by ZIP5 (or state) and side-of-street parity in SQL; the street name is
+            # compared in Python so user text can never act as a LIKE wildcard ('%', '_').
             query = """
                 SELECT * FROM street_ranges
-                WHERE (street_name = ? OR street_name LIKE ? OR ? LIKE street_name || '%')
+                WHERE (parity = 'B' OR (parity = 'O' AND ? % 2 = 1) OR (parity = 'E' AND ? % 2 = 0))
             """
-            params: List[Any] = [clean_st, f"{clean_st}%", clean_st]
-            if zip5:
-                query += " AND postal_code LIKE ?"
-                params.append(f"{zip5}%")
+            params: List[Any] = [street_number, street_number]
+            if len(zip5) == 5 and zip5.isdigit():
+                query += " AND substr(postal_code, 1, 5) = ?"
+                params.append(zip5)
             elif norm_st:
                 query += " AND state = ?"
                 params.append(norm_st)
+            elif zip5:
+                return None  # a partial/garbled ZIP and no state: refuse to guess
+            query += " ORDER BY CASE parity WHEN 'B' THEN 1 ELSE 0 END, range_id"
 
             cur = self._get_conn().execute(query, tuple(params))
-            rows = cur.fetchall()
+            rows = [r for r in cur.fetchall() if _street_names_match(r["street_name"], clean_st)]
             for row in rows:
                 from_num = int(row["from_number"])
                 to_num = int(row["to_number"])
@@ -454,6 +476,9 @@ class OfflineReferenceIndex:
         `PRAGMA data_version` covers commits from other connections/processes, and `id(conn)` covers
         reconnects (e.g. after a fork).
         """
+        if self._db_path == ":memory:":
+            # A private in-memory database can only be changed through this connection.
+            return (id(conn), conn.total_changes, 0)
         return (id(conn), conn.total_changes, conn.execute("PRAGMA data_version").fetchone()[0])
 
     def resolve_coordinates(self, address: Any) -> Optional[RooftopRecord]:
@@ -498,8 +523,8 @@ class OfflineReferenceIndex:
 
             if norm_key:
                 cur = conn.execute(
-                    "SELECT * FROM rooftop_reference WHERE address_key = ? OR building_key = ? LIMIT 1",
-                    (norm_key.strip().upper(), norm_key.strip().upper()),
+                    "SELECT * FROM rooftop_reference WHERE address_key = ? OR building_key = ? ORDER BY (address_key = ?) DESC, address_key LIMIT 1",
+                    (norm_key.strip().upper(), norm_key.strip().upper(), norm_key.strip().upper()),
                 )
                 row = cur.fetchone()
                 if row:
@@ -509,7 +534,7 @@ class OfflineReferenceIndex:
             b_key = getattr(address, "building_key", None)
             if b_key:
                 cur = conn.execute(
-                    "SELECT * FROM rooftop_reference WHERE building_key = ? LIMIT 1",
+                    "SELECT * FROM rooftop_reference WHERE building_key = ? ORDER BY address_key LIMIT 1",
                     (b_key.strip().upper(),),
                 )
                 row = cur.fetchone()
@@ -626,7 +651,7 @@ class OfflineReferenceIndex:
             is_us_target = c_code in ("", "US", "USA", "UNITED STATES")
 
         if fallback_to_centroids and is_us_target:
-            from address_standardizer.geocoder import get_fallback_centroid
+            from address_standardizer.geocoder import get_fallback_centroid_tier
             from address_standardizer.tables import STATE_TO_FIPS, US_STATES, ZIP3_TO_STATE
             post = getattr(address, "postal_code", None)
             st = getattr(address, "state", None)
@@ -636,15 +661,16 @@ class OfflineReferenceIndex:
                     post = m_zip.group(1)
             if not st and post and len(post) >= 3:
                 st = ZIP3_TO_STATE.get(post[:3])
-            coords = get_fallback_centroid(zip5=post, state=st)
+            coords = get_fallback_centroid_tier(zip5=post, state=st)
             if coords:
                 norm_st = US_STATES.get(str(st).upper(), str(st).upper()) if st else None
                 fips = STATE_TO_FIPS.get(norm_st) if norm_st else None
                 return {
                     "latitude": coords[0],
                     "longitude": coords[1],
-                    "precision": "POSTAL_CENTROID" if post else "LOCALITY",
-                    "accuracy_radius_meters": 5000.0,
+                    # A metro ZIP3 centroid is a postal-area point (~8 km); a state centroid is only a locality hint.
+                    "precision": "POSTAL_CENTROID" if coords[2] == "ZIP3" else "LOCALITY",
+                    "accuracy_radius_meters": 8000.0 if coords[2] == "ZIP3" else 100000.0,
                     "census_tract": None,
                     "fips_code": fips,
                 }
@@ -717,6 +743,9 @@ class OfflineReferenceIndex:
         try:
             cur = test_conn.execute("SELECT count(*) FROM rooftop_reference")
             cur.fetchone()
+            # The engine also queries street_ranges; create any other required table/column so a swapped-in
+            # reference database that predates it cannot make later lookups raise.
+            self._init_schema(test_conn)
             if new_db_path != ":memory:":
                 test_conn.execute("PRAGMA journal_mode=WAL;")
         except sqlite3.Error as e:
@@ -726,7 +755,7 @@ class OfflineReferenceIndex:
         # Atomic swap
         with self._lock:
             old_conn = self._conn
-            self._conn = test_conn
+            self._conn = test_conn  # the setter also clears the resolve memo
             self._db_path = new_db_path
             old_conn.close()
 

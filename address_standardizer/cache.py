@@ -12,6 +12,7 @@ Topology:
 import json
 import sqlite3
 import threading
+import time
 from collections import OrderedDict
 from typing import Dict, Any, Optional
 
@@ -26,9 +27,14 @@ def make_cache_key(
     enable_fuzzy: bool = True,
     enable_geocoding: bool = False,
     allow_locality: bool = False,
+    is_vacant: Optional[bool] = None,
     **kwargs: Any,
 ) -> str:
-    """Computes a normalized cache key from input address components."""
+    """Computes a normalized cache key from input address components.
+
+    Field values are escaped so that a separator inside one field cannot make two different addresses collide,
+    and per-call overrides that change the result (``is_vacant``/``vacant``) are part of the key.
+    """
     parts = [
         (str(street1).strip().upper() if street1 is not None else ""),
         (str(street2).strip().upper() if street2 is not None else ""),
@@ -37,6 +43,10 @@ def make_cache_key(
         (str(postal_code).strip().upper() if postal_code is not None else ""),
         (str(country).strip().upper() if country is not None and str(country).strip() else "USA"),
     ]
+    parts = [p.replace("\\", "\\\\").replace("|", "\\|") for p in parts]
+    vacant = is_vacant if is_vacant is not None else kwargs.get("vacant")
+    if vacant is not None:
+        parts.append("VACANT" if vacant else "NOT_VACANT")
     if not enable_fuzzy:
         parts.append("NO_FUZZY")
     if enable_geocoding:
@@ -169,6 +179,8 @@ class SQLiteCache:
             row = cur.fetchone()
             if row:
                 self._hits += 1
+                with conn:  # recency for LRU-style eviction
+                    conn.execute("UPDATE l2_address_cache SET created_at = ? WHERE cache_key = ?", (time.time(), key))
                 try:
                     data = json.loads(row["payload"])
                     if isinstance(data, dict) and data.get("__class__") == "StandardizedAddress":
@@ -269,9 +281,16 @@ class SQLiteCache:
                             std.country_iso3 = data["country_iso3"]
 
                         return std
+                    if isinstance(data, dict) and "__cache_value__" in data:
+                        return data["__cache_value__"]
                     return data
                 except Exception:
-                    return row["payload"]
+                    # A payload that cannot be rebuilt (older schema, truncated write) is a miss, not a value.
+                    self._hits -= 1
+                    self._misses += 1
+                    with conn:
+                        conn.execute("DELETE FROM l2_address_cache WHERE cache_key = ?", (key,))
+                    return None
             self._misses += 1
             return None
 
@@ -288,16 +307,18 @@ class SQLiteCache:
                 if value.spatial_result is not None and hasattr(value.spatial_result, "as_dict"):
                     d["spatial_result_payload"] = value.spatial_result.as_dict()
                 payload_str = json.dumps(d)
-            elif isinstance(value, (dict, list, int, float, bool)):
-                payload_str = json.dumps(value)
             else:
-                payload_str = str(value)
+                # Tag generic values so None / str / int round-trip with their type intact.
+                try:
+                    payload_str = json.dumps({"__cache_value__": value})
+                except (TypeError, ValueError):
+                    payload_str = json.dumps({"__cache_value__": str(value)})
 
             conn = self._get_conn()
             with conn:
                 conn.execute(
-                    "INSERT OR REPLACE INTO l2_address_cache (cache_key, payload, created_at) VALUES (?, ?, strftime('%s', 'now'))",
-                    (key, payload_str),
+                    "INSERT OR REPLACE INTO l2_address_cache (cache_key, payload, created_at) VALUES (?, ?, ?)",
+                    (key, payload_str, time.time()),
                 )
                 if self.max_entries and self.max_entries > 0:
                     cur = conn.execute("SELECT COUNT(*) AS cnt FROM l2_address_cache")

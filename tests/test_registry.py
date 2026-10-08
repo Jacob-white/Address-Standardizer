@@ -1054,3 +1054,50 @@ class TestCorporateRegistry:
 
 
 
+
+
+class TestRegistryHardening:
+    """Regressions from the whole-codebase review: substring matches, fail-open merges, country vetoes."""
+
+    def test_street_patterns_need_token_boundaries(self):
+        from address_standardizer.registry import lookup_corporate_registry as lookup
+
+        assert lookup("1209 N Orange St", "", "Wilmington", "DE", "19801") is not None
+        assert lookup("11209 N Orange St", "", "Wilmington", "DE", "19801") is None
+        assert lookup("2160 Greentree Dr", "", "Dover", "DE", "19904") is None
+
+    def test_state_alone_does_not_confirm_a_hub_when_city_or_zip_contradict(self):
+        from address_standardizer.registry import lookup_corporate_registry as lookup
+
+        assert lookup("1209 N Orange St", "", "Dover", "DE", "19901") is None
+
+    def test_explicit_other_country_vetoes_offshore_hub(self):
+        from address_standardizer.registry import is_registered_agent_hub_address as is_hub
+
+        assert is_hub("2 Church St", city="Hamilton", state="ON", postal_code="L8P 1A1", country="CAN") is False
+
+    def test_po_box_pattern_does_not_match_longer_box_numbers(self):
+        from address_standardizer.registry import lookup_corporate_registry as lookup
+
+        assert lookup("PO Box 3091", city="George Town", country="MYS") is None
+
+    def test_merge_is_refused_at_a_known_hub_even_without_flags(self):
+        from address_standardizer.registry import can_safely_merge_corporate_entities as merge
+
+        addr = {
+            "street1": "1209 N ORANGE ST", "street2": "STE 400", "city": "WILMINGTON", "state": "DE",
+            "postal_code": "19801", "building_key": "1209 N ORANGE ST||WILMINGTON|DE|19801|USA",
+            "normalized_address_key": "k",
+        }
+        ok, reason = merge(addr, dict(addr))
+        assert ok is False
+        assert "CO_LOCATION_ISOLATION_INVARIANT" in reason
+
+    def test_merge_still_allowed_for_ordinary_same_suite_addresses(self):
+        from address_standardizer.registry import can_safely_merge_corporate_entities as merge
+
+        addr = {
+            "street1": "100 MAIN ST", "street2": "STE 5", "city": "AUSTIN", "state": "TX", "postal_code": "78701",
+            "building_key": "100 MAIN ST||AUSTIN|TX|78701|USA", "normalized_address_key": "k",
+        }
+        assert merge(addr, dict(addr))[0] is True

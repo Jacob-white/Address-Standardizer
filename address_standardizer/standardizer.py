@@ -239,12 +239,17 @@ def standardize_address(
     enable_geocoding: bool = False,
     use_cache: bool = True,
     allow_locality: bool = False,
+    finalize: bool = True,
     **kwargs: Any,
 ) -> StandardizedAddress:
     """
     Standardize an address to USPS Pub 28 (for US) or International ISO standard.
     Generates deterministic normalized_address_key, building_key, phonetic_key,
     and flags registered agent hubs and private residences.
+
+    With ``finalize=False`` the confidence score, delivery intelligence, corporate risk and spatial
+    resolution steps (and the result cache) are skipped, which is the fast batch-normalization mode used by
+    ``_pure_python_core``.
     """
     import os
     allow_locality = allow_locality or bool(
@@ -268,7 +273,7 @@ def standardize_address(
 
     cache = get_default_cache()
     cache_key = None
-    if use_cache and cache.is_enabled():
+    if finalize and use_cache and cache.is_enabled():
         cache_key = make_cache_key(
             street1,
             street2,
@@ -279,10 +284,16 @@ def standardize_address(
             enable_fuzzy=enable_fuzzy,
             enable_geocoding=enable_geocoding,
             allow_locality=allow_locality,
+            is_vacant=is_vacant if is_vacant is not None else kwargs.get("vacant"),
         )
         cached = cache.get(cache_key)
         if cached is not None:
             return copy.copy(cached)
+
+    def _finish(std: StandardizedAddress) -> StandardizedAddress:
+        if not finalize:
+            return std
+        return _finalize_standardized_address(std, raw_dict, cache_key, enable_geocoding=enable_geocoding)
 
     # Tier 0: Pre-Flight Sanity, Multiline Bleed Recovery, & Unicode NFKC Normalization
     s1_cand = street1 if street1 is not None else kwargs.get("street")
@@ -386,7 +397,7 @@ def standardize_address(
             rooftop_address=None,
         )
         empty_std.country_iso3 = "USA"
-        return _finalize_standardized_address(empty_std, raw_dict, cache_key, enable_geocoding=enable_geocoding)
+        return _finish(empty_std)
 
     if len(raw_components) == 1 and s1_raw.upper() in ("N/A", "NONE", "NULL", "UNKNOWN", "-", ".", "NO ADDRESS"):
         garbage_std = StandardizedAddress(
@@ -406,7 +417,7 @@ def standardize_address(
             rooftop_address=None,
         )
         garbage_std.country_iso3 = "USA"
-        return _finalize_standardized_address(garbage_std, raw_dict, cache_key, enable_geocoding=enable_geocoding)
+        return _finish(garbage_std)
 
     # Pre-clean legacy baked-in ETL artifacts (e.g. "10005TH UNITED ESTS", "UNITED ESTS")
     s1_raw = RE_LEGACY_CORRUPTIONS.sub("", s1_raw).strip(" ,.-")
@@ -443,7 +454,7 @@ def standardize_address(
         )
         if fast_res is not None:
             fast_res.country_iso3 = country_iso
-            return _finalize_standardized_address(fast_res, raw_dict, cache_key, enable_geocoding=enable_geocoding)
+            return _finish(fast_res)
 
     # Tier 2 & Tier 3: Deterministic Rule Matrix and Statistical CRF Fallback
     if is_us:
@@ -577,7 +588,7 @@ def standardize_address(
             building_name=bldg_name,
         )
         std_us.country_iso3 = country_iso
-        return _finalize_standardized_address(std_us, raw_dict, cache_key, enable_geocoding=enable_geocoding)
+        return _finish(std_us)
     else:
         # International Pipeline
         if state_raw in ("US", "USA"):
@@ -700,4 +711,4 @@ def standardize_address(
             rooftop_address=rooftop_addr,
         )
         std_intl.country_iso3 = country_iso
-        return _finalize_standardized_address(std_intl, raw_dict, cache_key, enable_geocoding=enable_geocoding)
+        return _finish(std_intl)

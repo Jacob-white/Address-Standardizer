@@ -835,3 +835,32 @@ def test_handlers_work_without_main_state(capsys):
     with pytest.raises(SystemExit) as exc:
         cli._cmd_spatial(Namespace(spatial_action=None))
     assert exc.value.code == 1
+
+
+def _run_cli(*argv):
+    import subprocess
+    import sys
+
+    return subprocess.run(
+        [sys.executable, "-m", "address_standardizer.cli", *argv], capture_output=True, text=True, timeout=60
+    )
+
+
+def test_shorthand_not_disabled_by_subcommand_words_inside_an_address():
+    out = _run_cli("--format", "json", "12", "audit", "rd", "Austin", "TX", "78701")
+    assert out.returncode == 0, out.stderr
+    assert '"street1"' in out.stdout
+
+
+def test_shorthand_option_value_equal_to_subcommand_is_not_a_subcommand():
+    # "--country cache" is an (odd) option value, not the cache subcommand.
+    out = _run_cli("--country", "cache", "100", "Main", "St")
+    assert "usage:" not in out.stderr
+
+
+def test_real_subcommands_still_dispatch():
+    out = _run_cli("cache")
+    assert out.returncode == 0, out.stderr
+    assert "l1" in out.stdout.lower() or "size" in out.stdout.lower()
+    out = _run_cli("batch", "--help")
+    assert out.returncode == 0

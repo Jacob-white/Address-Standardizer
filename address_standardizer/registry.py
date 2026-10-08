@@ -43,6 +43,13 @@ COUNTRY_SYNONYMS: Dict[str, List[str]] = {
 }
 
 
+def _contains_token_run(pattern: str, text: str) -> bool:
+    """True if `pattern` occurs in `text` delimited by non-alphanumerics (so '1209 N ORANGE' never matches '11209 N ORANGE')."""
+    if not pattern:
+        return False
+    return re.search(r"(?<![A-Z0-9])" + re.escape(pattern) + r"(?![A-Z0-9])", text) is not None
+
+
 def lookup_corporate_registry(
     street1: str,
     street2: str = "",
@@ -95,7 +102,7 @@ def lookup_corporate_registry(
 
         # 2. Street pattern match
         matched_street = any(
-            _fold_ascii(pat) in combined or _fold_ascii(pat) in norm_st
+            _contains_token_run(_fold_ascii(pat), combined) or _contains_token_run(_fold_ascii(pat), norm_st)
             for pat in entry.street_patterns
         )
         if not matched_street:
@@ -122,6 +129,15 @@ def lookup_corporate_registry(
 
         # 4. Jurisdiction confirmation
         if entry_country == "USA":
+            # An explicit city or ZIP that contradicts the hub rules the entry out; a matching state alone
+            # (e.g. any Delaware address) must not be enough to label a different building as the hub.
+            if entry.city and city_clean:
+                entry_city_fold = _fold_ascii(entry.city)
+                if entry_city_fold not in city_clean and city_clean not in entry_city_fold:
+                    continue
+            if entry.postal_code and zip_digits and not zip_digits.startswith(entry.postal_code[:3]):
+                continue
+
             state_match = False
             if entry.state:
                 if st_norm == entry.state:
@@ -148,6 +164,13 @@ def lookup_corporate_registry(
                 return entry
 
         else:
+            # An explicit country that is a different country vetoes the entry (Hamilton, Ontario is not Bermuda).
+            if norm_c and norm_c not in ("USA", "US", "UNITED STATES"):
+                from address_standardizer.normalization import normalize_country_code
+
+                supplied_iso = normalize_country_code(country, state, postal_code, raw_street=raw_street, city_raw=city)
+                if supplied_iso and supplied_iso != entry_country:
+                    continue
             # International Jurisdiction Confirmation
             # A. Country matching
             country_matched = False
@@ -192,6 +215,14 @@ def lookup_corporate_registry(
                 return entry
 
     return None
+
+
+_HUB_CATEGORIES = (
+    RegistryCategory.COMMERCIAL_REGISTERED_AGENT,
+    RegistryCategory.FORMATION_AGENT,
+    RegistryCategory.OFFSHORE_SECRECY,
+    RegistryCategory.TRUST_FIDUCIARY_COMPANY,
+)
 
 
 def is_registered_agent_hub_address(
@@ -293,6 +324,30 @@ def can_safely_merge_corporate_entities(addr1: Any, addr2: Any) -> Tuple[bool, s
             "CO_LOCATION_ISOLATION_INVARIANT: Both entities share a registered agent / formation hub "
             "building_key. Corporate profile consolidation is strictly prohibited.",
         )
+
+    # Defense in depth: do not trust caller-populated flags alone. An address that was never run through
+    # evaluate_corporate_risk (hand-built or legacy rows) must still be refused at a known hub or mail drop.
+    for addr in (addr1, addr2):
+        known = lookup_corporate_registry(
+            street1=str(_val(addr, "street1", "") or ""),
+            street2=str(_val(addr, "street2", "") or ""),
+            city=str(_val(addr, "city", "") or ""),
+            state=str(_val(addr, "state", "") or ""),
+            postal_code=str(_val(addr, "postal_code", "") or ""),
+            country=str(_val(addr, "country", "") or "USA"),
+        )
+        if known is not None:
+            if known.category in _HUB_CATEGORIES:
+                return (
+                    False,
+                    "CO_LOCATION_ISOLATION_INVARIANT: Address matches a known registered agent / formation hub "
+                    f"({known.provider_name}). Corporate profile consolidation is strictly prohibited.",
+                )
+            return (
+                False,
+                "CO_LOCATION_ISOLATION_INVARIANT: Shared virtual office or CMRA mail drop location. "
+                "Corporate profile consolidation is prohibited without independent EIN or SOS verification.",
+            )
 
     # Check for Virtual Office / Mail Drop
     is_cmra1 = _val(addr1, "is_cmra", False) or _val(addr1, "cmra", False)

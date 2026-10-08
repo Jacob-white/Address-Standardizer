@@ -148,3 +148,16 @@ class TestVerificationCascade:
         assert res is not None
         assert res.stage == 3
         assert res.precision == CascadePrecision.FALLBACK_ZIP3
+
+
+def test_offline_stage_reports_census_tract_not_parcel_id():
+    from address_standardizer.cascade import VerificationCascade
+    from address_standardizer.offline_index import OfflineReferenceIndex
+
+    ix = OfflineReferenceIndex(seed=False)
+    ix.insert_record(
+        "1 MAIN ST|STE 1|NYC|NY|10001|USA", "1 MAIN ST||NYC|NY|10001|USA", "1 MAIN ST", "NYC", "NY", "10001",
+        40.0, -74.0, street2="STE 1", parcel_id="P-1", census_tract="T-1",
+    )
+    res = VerificationCascade(offline_index=ix).resolve(street1="1 MAIN ST", city="NYC", state="NY", postal_code="10001")
+    assert res.census_tract == "T-1"
