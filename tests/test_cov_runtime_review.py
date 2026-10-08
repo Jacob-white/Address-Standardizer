@@ -121,6 +121,14 @@ def test_current_rss_falls_back_to_psutil_when_proc_has_no_vmrss(monkeypatch, tm
 
 
 def test_current_rss_without_proc_or_psutil_uses_peak(monkeypatch):
+    real_open = open
+
+    def no_proc(path, *a, **k):
+        if path == "/proc/self/status":
+            raise OSError("no procfs")  # Linux has /proc; make every platform behave like one without it
+        return real_open(path, *a, **k)
+
+    monkeypatch.setattr("builtins.open", no_proc)
     monkeypatch.setitem(sys.modules, "psutil", None)  # makes `import psutil` raise ImportError
     monkeypatch.setattr(_memory, "peak_rss_kb", lambda: 5120.0)
     assert _memory.current_rss_mb() == 5.0

@@ -64,3 +64,19 @@ def test_rooftop_address_unit_stripping_is_bounded_and_keeps_street_words():
     # a bare building/office word that is not preceded by a street type or comma is part of the name
     assert clean_rooftop_address("100 OFFICE PARK") == "100 OFFICE PARK"
     assert clean_rooftop_address("100 MAIN ST, BUILDING") == "100 MAIN ST"
+
+
+def test_memory_module_imports_without_the_posix_resource_module(monkeypatch):
+    """Windows has no `resource`; the module must still import (covers the fallback on every platform)."""
+    import importlib
+    import sys
+
+    from address_standardizer import _memory
+
+    monkeypatch.setitem(sys.modules, "resource", None)  # `import resource` now raises ImportError
+    try:
+        reloaded = importlib.reload(_memory)
+        assert reloaded.resource is None
+    finally:
+        monkeypatch.undo()
+        importlib.reload(_memory)
