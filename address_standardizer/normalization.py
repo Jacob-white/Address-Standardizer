@@ -238,7 +238,10 @@ def normalize_country_code(
             c_unaccent = unicodedata.normalize("NFKD", p_clean).encode("ASCII", "ignore").decode("utf-8")
             if c_unaccent in GLOBAL_METRO_TO_COUNTRY:
                 return GLOBAL_METRO_TO_COUNTRY[c_unaccent]
-            p_no_num = re.sub(r"\s+\d+.*$", "", p_clean).strip()
+            # Drop everything from the first whitespace-separated token that starts with a digit (linear scan).
+            _tokens = p_clean.split()
+            _cut = next((i for i, tok in enumerate(_tokens) if i > 0 and tok[:1].isdigit()), None)
+            p_no_num = " ".join(_tokens[:_cut]) if _cut is not None else p_clean.strip()
             if p_no_num and p_no_num != p_clean:
                 if p_no_num in GLOBAL_METRO_TO_COUNTRY:
                     return GLOBAL_METRO_TO_COUNTRY[p_no_num]

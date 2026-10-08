@@ -33,6 +33,12 @@ export function isStreamError(record: StandardizeResponse | StreamErrorRecord): 
   return typeof (record as StreamErrorRecord).error === "string" && !("street1" in record);
 }
 
+function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === 47) end--;
+  return url.slice(0, end);
+}
+
 export class AddressStandardizerClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
@@ -40,7 +46,7 @@ export class AddressStandardizerClient {
   private readonly defaultHeaders: Record<string, string>;
 
   constructor(options: ClientOptions = {}) {
-    this.baseUrl = (options.baseUrl || "http://localhost:8000").replace(/\/+$/, "");
+    this.baseUrl = trimTrailingSlashes(options.baseUrl || "http://localhost:8000");
     // 0 (or Infinity) disables the timeout; undefined uses the 10 s default.
     this.timeoutMs = options.timeoutMs ?? 10000;
     this.fetchFn = options.fetch || (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : (null as any));

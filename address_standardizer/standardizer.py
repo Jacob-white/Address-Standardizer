@@ -380,7 +380,13 @@ def standardize_address(
             if cleaned_city_parts:
                 city_in = " ".join(cleaned_city_parts)
 
-    city_in = re.sub(r"\s+(?:OFFICE|BRANCH\s+OFFICE|MAIN\s+OFFICE)$", "", city_in, flags=re.IGNORECASE).strip()
+    _city_words = city_in.split()
+    if len(_city_words) > 1:
+        _tail = [w.upper() for w in _city_words[-3:]]
+        if _tail[-1] == "OFFICE":
+            _drop = 2 if len(_tail) >= 2 and _tail[-2] in ("BRANCH", "MAIN") and len(_city_words) > 2 else 1
+            city_in = " ".join(_city_words[:-_drop])
+    city_in = city_in.strip()
 
     if "\n" in s1_in or "\r" in s1_in:
         s1_lines = [line.strip() for line in re.split(r"[\r\n]+", s1_in) if line.strip()]

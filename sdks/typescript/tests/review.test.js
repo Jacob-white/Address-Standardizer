@@ -44,7 +44,7 @@ const rec = (street) => JSON.stringify({ street1: street, city: "X" }) + "\n";
 
 test("streamBatch handles records split across chunks, CRLF and a final line without a newline", async () => {
   const client = new AddressStandardizerClient({
-    fetch: streamingFetch([rec("A").slice(0, 10), rec("A").slice(10) + rec("B").replace("\n", "\r\n"), rec("C").trim()]),
+    fetch: streamingFetch([rec("A").slice(0, 10), rec("A").slice(10) + rec("B").replace(/\n/g, "\r\n"), rec("C").trim()]),
   });
   const got = [];
   for await (const r of client.streamBatch(["a", "b", "c"])) got.push(r.street1);
