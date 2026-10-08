@@ -84,7 +84,7 @@ pub fn is_native() -> bool {
 /// Describes what the native module really provides.
 #[pyfunction]
 pub fn get_capabilities(py: Python<'_>) -> PyResult<PyObject> {
-    let dict = PyDict::new_bound(py);
+    let dict = PyDict::new(py);
     dict.set_item("engine", "Rust_PyO3")?;
     dict.set_item("is_native", true)?;
     dict.set_item("version", VERSION)?;
