@@ -260,13 +260,14 @@ Address Standardizer provides official client libraries in `sdks/` for communica
 - **`AddressStandardizerClient`**:
   - `constructor(options?: ClientOptions)`: Initializes client with `baseUrl`, `timeoutMs`, custom `fetch`, and persistent headers.
   - `standardize(req: StandardizeRequest): Promise<StandardizeResponse>`: Sends single address for normalization and optional spatial geocoding.
-  - `batch(req: BatchStandardizeRequest): Promise<StandardizeResponse[]>`: Processes up to 1,000 addresses in one request.
-  - `streamBatch(records: StandardizeRequest[], onRecord: (res: StandardizeResponse) => void): Promise<void>`: Reads NDJSON stream without unbounded buffering.
-  - `autocomplete(req: AutocompleteRequest): Promise<AutocompleteSuggestion[]>`: Queries prefix trie with latitude/longitude spatial biasing.
-  - `health(): Promise<HealthResponse>`: Diagnostic ping returning version, cache items, and uptime.
+  - `standardizeBatch(req: BatchStandardizeRequest | (string | StandardizeRequest)[]): Promise<StandardizeResponse[]>`: Processes many addresses in one request.
+  - `streamBatch(addresses: (string | StandardizeRequest)[]): AsyncIterable<StandardizeResponse>`: Async generator (`for await`) that reads the NDJSON stream without unbounded buffering.
+  - `autocomplete(req: AutocompleteRequest | string): Promise<AutocompleteSuggestion[]>`: Queries prefix trie with latitude/longitude spatial biasing.
+  - `health(): Promise<HealthResponse>`: Diagnostic ping returning status, version, engine details, and uptime.
+  - `metrics(format?: "json" | "prometheus"): Promise<any>`: Fetches service metrics.
 - **React Hook & Headless Controller**:
-  - `useAddressAutocomplete(options)`: React hook returning `{ query, setQuery, suggestions, loading, selectedIndex, selectSuggestion }`.
-  - `AutocompleteController`: Framework-agnostic state machine managing debounce timers, cache LRU, and keyboard selection.
+  - `useAddressAutocomplete(options)`: React hook returning `{ query, setQuery, suggestions, isLoading, error, selectedSuggestion, selectSuggestion, clear }`. Pass React via `options.react` (or set `globalThis.React`); without it the hook throws.
+  - `AutocompleteController`: Framework-agnostic state machine managing debounce timers, loading/error state, and the selected suggestion; observe it with `subscribe()`.
 
 ## 2. .NET Client SDK (`AddressStandardizer.Client`)
 - **Package**: `AddressStandardizer.Client` (located in [`sdks/dotnet`](../sdks/dotnet/README.md))
@@ -277,13 +278,15 @@ Address Standardizer provides official client libraries in `sdks/` for communica
   - `AutocompleteAsync(request, cancellationToken)`: Interactive prefix search.
   - `GetHealthAsync(cancellationToken)`: Microservice health check.
 
-## 3. Go Client SDK (`address-standardizer-go`)
-- **Package**: `github.com/jwhite/address-standardizer-go` (located in [`sdks/go`](../sdks/go/README.md))
+## 3. Go Client SDK (`Address-Standardizer/sdks/go`)
+- **Package**: `github.com/Jacob-white/Address-Standardizer/sdks/go` (located in [`sdks/go`](../sdks/go/README.md))
 - **`Client`**:
   - `NewClient(baseURL string, opts ...Option) *Client`: Factory initializing client with custom `http.Client` and timeout options.
-  - `Standardize(ctx context.Context, req StandardizeRequest) (*StandardizeResponse, error)`: Standardizes single address.
-  - `Batch(ctx context.Context, req BatchRequest) ([]StandardizeResponse, error)`: Batch standardization.
+  - `Standardize(ctx context.Context, req StandardizeRequest) (*StandardizedAddress, error)`: Standardizes single address. Optional flags are `*bool` (use `standardizer.Bool(true)`); nil keeps the server default.
+  - `StandardizeBatch(ctx context.Context, req BatchStandardizeRequest) ([]StandardizedAddress, error)`: Batch standardization.
+  - `StreamBatch(ctx context.Context, addresses []string) (<-chan StandardizedAddress, <-chan error)`: Streams NDJSON results.
   - `Autocomplete(ctx context.Context, req AutocompleteRequest) ([]AutocompleteSuggestion, error)`: Prefix suggestion query.
+  - `AutocompleteGet(ctx context.Context, query string, limit int, state string) ([]AutocompleteSuggestion, error)`: GET variant.
   - `Health(ctx context.Context) (*HealthResponse, error)`: Health check.
 
 ---

@@ -19,38 +19,39 @@ dotnet add package AddressStandardizer.Client
 ```csharp
 using AddressStandardizer.Client;
 
-// Initialize client
 using var client = new AddressStandardizerClient("http://localhost:8000");
 
 // Standardize single address
 var result = await client.StandardizeAsync(new StandardizeRequest
 {
     Address = "350 5th Ave, New York, NY 10118",
-    Geocode = true,
+    EnableGeocoding = true,
 });
 
-Console.WriteLine($"Delivery: {result.DeliveryLine1}");
-Console.WriteLine($"City/State/Zip: {result.LastLine}");
+Console.WriteLine($"Street:     {result.Street1}");
+Console.WriteLine($"City:       {result.City}, {result.State} {result.PostalCode}");
+Console.WriteLine($"Confidence: {result.ConfidenceScore}");
+Console.WriteLine($"Lat/Lon:    {result.Latitude}, {result.Longitude}");
 
 // Batch standardization
 var batchResults = await client.StandardizeBatchAsync(new BatchStandardizeRequest
 {
-    Addresses = new List<string>
+    Addresses = new List<object>
     {
         "100 Main St, Austin, TX 78701",
         "200 S Wacker Dr, Chicago, IL 60606",
     },
 });
 
-// Autocomplete prefix suggestions
+// Interactive prefix search
 var suggestions = await client.AutocompleteAsync(new AutocompleteRequest
 {
-    Query = "100 Main",
-    Limit = 5,
+    Query = "350 5th",
+    MaxResults = 5,
 });
 foreach (var s in suggestions)
 {
-    Console.WriteLine($"Suggestion: {s.DisplayText}");
+    Console.WriteLine($"- {s.Text}");
 }
 ```
 

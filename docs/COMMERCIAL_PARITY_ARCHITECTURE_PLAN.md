@@ -89,7 +89,7 @@
 7. [Section 7: Five-Phase Production Roadmap & Governance Guidelines](#section-7-five-phase-production-roadmap--governance-guidelines)
    - 7.1 Actionable 5-Phase Implementation Roadmap (Phases 1 - 5)
    - 7.2 Dependency DAG & Critical Path Analysis
-   - 7.3 Open-Source Governance, Dual-Licensing & Asset Lifecycle
+   - 7.3 Open-Source Governance, MIT Licensing & Asset Lifecycle
 
 ---
 

@@ -7,6 +7,8 @@ import { AddressStandardizerClient } from "./client.js";
 
 export interface UseAddressAutocompleteOptions {
   client?: AddressStandardizerClient;
+  /** The React module (`import React from "react"`). Falls back to `globalThis.React`. */
+  react?: ReactLike;
   minChars?: number;
   debounceMs?: number;
   stateFilter?: string;
@@ -122,7 +124,7 @@ export class AutocompleteController {
   }
 }
 
-interface ReactLike {
+export interface ReactLike {
   useState<T>(initial: T | (() => T)): [T, (val: T | ((prev: T) => T)) => void];
   useRef<T>(initial: T): { current: T };
   useCallback<T extends (...args: any[]) => any>(fn: T, deps: any[]): T;
@@ -133,21 +135,12 @@ interface ReactLike {
  * Requires react in host environment.
  */
 export function useAddressAutocomplete(options: UseAddressAutocompleteOptions = {}): UseAddressAutocompleteReturn {
-  // Try importing React dynamically or accessing global React
-  const React = (globalThis as any).React as ReactLike | undefined;
+  const React = options.react ?? ((globalThis as any).React as ReactLike | undefined);
   if (!React || !React.useState) {
-    // Non-react or mock fallback
-    const controller = new AutocompleteController(options);
-    return {
-      query: controller.query,
-      setQuery: (q: string) => controller.setQuery(q),
-      suggestions: controller.suggestions,
-      isLoading: controller.isLoading,
-      error: controller.error,
-      selectedSuggestion: controller.selectedSuggestion,
-      selectSuggestion: (s) => controller.selectSuggestion(s),
-      clear: () => controller.clear(),
-    };
+    throw new Error(
+      "useAddressAutocomplete requires React: pass it as `useAddressAutocomplete({ react: React })`, " +
+        "or use AutocompleteController for non-React environments."
+    );
   }
 
   const [query, setQueryState] = React.useState("");

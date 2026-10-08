@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	standardizer "github.com/jwhite/address-standardizer-go"
+	standardizer "github.com/Jacob-white/Address-Standardizer/sdks/go"
 )
 
 func TestStandardize(t *testing.T) {

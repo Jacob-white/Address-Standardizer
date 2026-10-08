@@ -10,7 +10,7 @@ Address Standardizer provides official, type-safe client SDKs for integrating th
 | :--- | :--- | :--- | :--- |
 | **TypeScript / JavaScript** | [`@address-standardizer/client`](typescript/) | `sdks/typescript` | Node.js 18+, Modern Browsers, React 18+ |
 | **.NET / C#** | [`AddressStandardizer.Client`](dotnet/) | `sdks/dotnet` | .NET 8.0, .NET Standard 2.0 / C# 12 |
-| **Go** | [`github.com/jwhite/address-standardizer-go`](go/) | `sdks/go` | Go 1.21+ |
+| **Go** | [`github.com/Jacob-white/Address-Standardizer/sdks/go`](go/) | `sdks/go` | Go 1.21+ |
 
 ---
 
@@ -36,24 +36,41 @@ const client = new AddressStandardizerClient({
 
 // Standardize single address
 const result = await client.standardize({
-  address: "1600 Amphitheatre Pkwy, Mountain View, CA 94043",
-  geocode: true,
+  address: "1600 Pennsylvania Ave NW, Washington, DC 20500",
+  enable_geocoding: true,
 });
 
-console.log(result.delivery_line_1);       // "1600 AMPHITHEATRE PKWY"
-console.log(result.spatial?.latitude);     // 37.422
-console.log(result.spatial?.h3_index);     // "8a283082a97ffff"
+console.log(result.street1);          // "1600 PENNSYLVANIA AVE NW"
+console.log(result.latitude);
+console.log(result.confidence_score);
+
+// Batch standardization
+const batch = await client.standardizeBatch({
+  addresses: [
+    "100 Main St, Austin, TX",
+    { street1: "350 5th Ave", city: "New York", state: "NY" },
+  ],
+});
+
+// Stream large batches as NDJSON
+for await (const record of client.streamBatch(["100 Main St, Austin, TX"])) {
+  console.log(record.street1);
+}
 ```
 
 ### React Hook Typeahead Autocomplete
 
 ```tsx
 import React from "react";
-import { useAddressAutocomplete } from "@address-standardizer/client";
+import { useAddressAutocomplete, AddressStandardizerClient } from "@address-standardizer/client";
+
+const client = new AddressStandardizerClient({ baseUrl: "http://localhost:8000" });
 
 export function AddressTypeahead() {
-  const { query, setQuery, suggestions, loading, selectSuggestion } = useAddressAutocomplete({
-    baseUrl: "http://localhost:8000",
+  // Pass React explicitly (or set globalThis.React) so the hook can use its state primitives.
+  const { query, setQuery, suggestions, isLoading, selectSuggestion } = useAddressAutocomplete({
+    react: React,
+    client,
     debounceMs: 150,
   });
 
@@ -64,11 +81,11 @@ export function AddressTypeahead() {
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Start typing an address..."
       />
-      {loading && <span>Loading...</span>}
+      {isLoading && <span>Loading...</span>}
       <ul>
         {suggestions.map((s) => (
-          <li key={s.id} onClick={() => selectSuggestion(s)}>
-            {s.display_text}
+          <li key={s.text} onClick={() => selectSuggestion(s)}>
+            {s.text}
           </li>
         ))}
       </ul>
@@ -98,33 +115,44 @@ using var client = new AddressStandardizerClient("http://localhost:8000");
 var result = await client.StandardizeAsync(new StandardizeRequest
 {
     Address = "350 5th Ave, New York, NY 10118",
-    Geocode = true,
+    EnableGeocoding = true,
 });
 
-Console.WriteLine($"Delivery Line: {result.DeliveryLine1}");
-Console.WriteLine($"Confidence:    {result.ConfidenceScore}");
-Console.WriteLine($"H3 Cell:       {result.SpatialResult?.H3Index}");
+Console.WriteLine($"Street:     {result.Street1}");
+Console.WriteLine($"City:       {result.City}, {result.State} {result.PostalCode}");
+Console.WriteLine($"Confidence: {result.ConfidenceScore}");
+Console.WriteLine($"Lat/Lon:    {result.Latitude}, {result.Longitude}");
+
+// Batch standardization
+var batchResults = await client.StandardizeBatchAsync(new BatchStandardizeRequest
+{
+    Addresses = new List<object>
+    {
+        "100 Main St, Austin, TX 78701",
+        "200 S Wacker Dr, Chicago, IL 60606",
+    },
+});
 
 // Interactive prefix search
 var suggestions = await client.AutocompleteAsync(new AutocompleteRequest
 {
     Query = "350 5th",
-    Limit = 5,
+    MaxResults = 5,
 });
 foreach (var s in suggestions)
 {
-    Console.WriteLine($"- {s.DisplayText}");
+    Console.WriteLine($"- {s.Text}");
 }
 ```
 
 ---
 
-## 3. Go SDK (`address-standardizer-go`)
+## 3. Go SDK (`Address-Standardizer/sdks/go`)
 
 ### Installation
 
 ```bash
-go get github.com/jwhite/address-standardizer-go
+go get github.com/Jacob-white/Address-Standardizer/sdks/go
 ```
 
 ### Usage (Go 1.21+)
@@ -137,36 +165,42 @@ import (
 	"fmt"
 	"log"
 
-	standardizer "github.com/jwhite/address-standardizer-go"
+	standardizer "github.com/Jacob-white/Address-Standardizer/sdks/go"
 )
 
 func main() {
 	ctx := context.Background()
 	client := standardizer.NewClient("http://localhost:8000")
 
-	// Standardize single address
+	// Standardize single address. Flags are optional pointers: leave them nil
+	// to use the server defaults (geocoding and fuzzy matching enabled).
 	result, err := client.Standardize(ctx, standardizer.StandardizeRequest{
-		Address: "100 Main St, Austin, TX 78701",
-		Geocode: true,
+		Address:         "100 Main St, Austin, TX 78701",
+		EnableGeocoding: standardizer.Bool(true),
 	})
 	if err != nil {
 		log.Fatalf("Standardization failed: %v", err)
 	}
 
-	fmt.Printf("Delivery: %s, %s\n", result.DeliveryLine1, result.LastLine)
-	fmt.Printf("Precision: %s\n", result.SpatialResult.Precision)
+	fmt.Printf("Street: %s
+", result.Street1)
+	fmt.Printf("City/State/Zip: %s, %s %s
+", result.City, result.State, result.PostalCode)
+	fmt.Printf("Precision: %s
+", result.Precision)
 
 	// Interactive autocomplete
 	suggestions, err := client.Autocomplete(ctx, standardizer.AutocompleteRequest{
-		Query: "100 Mai",
-		Limit: 5,
+		Query:      "100 Mai",
+		MaxResults: 5,
 	})
 	if err != nil {
 		log.Fatalf("Autocomplete failed: %v", err)
 	}
 
 	for _, s := range suggestions {
-		fmt.Printf("- %s (Score: %.2f)\n", s.DisplayText, s.RelevanceScore)
+		fmt.Printf("- %s
+", s.Text)
 	}
 }
 ```
@@ -178,11 +212,12 @@ func main() {
 ```bash
 # TypeScript / Node.js
 cd sdks/typescript
-npm test
+npm install
+npm test   # builds first via the pretest script
 
 # .NET (requires dotnet SDK)
 cd sdks/dotnet
-dotnet test
+dotnet build   # AddressStandardizerClientTests.cs is a verification helper, not an xUnit suite
 
 # Go (requires Go toolchain)
 cd sdks/go

@@ -53,3 +53,5 @@ htmlcov/
 
 # Rust / Cargo build artifacts
 target/
+
+node_modules/

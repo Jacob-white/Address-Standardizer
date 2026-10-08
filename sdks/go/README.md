@@ -9,7 +9,7 @@ Owned and maintained by **HobbyHabbit LLC** under the **MIT License**.
 ## Installation
 
 ```bash
-go get github.com/jwhite/address-standardizer-go
+go get github.com/Jacob-white/Address-Standardizer/sdks/go
 ```
 
 ---
@@ -24,37 +24,42 @@ import (
 	"fmt"
 	"log"
 
-	standardizer "github.com/jwhite/address-standardizer-go"
+	standardizer "github.com/Jacob-white/Address-Standardizer/sdks/go"
 )
 
 func main() {
 	ctx := context.Background()
 	client := standardizer.NewClient("http://localhost:8000")
 
-	// Standardize single address
-	res, err := client.Standardize(ctx, standardizer.StandardizeRequest{
-		Address: "1600 Pennsylvania Ave NW, Washington, DC 20500",
-		Geocode: true,
+	// Standardize single address. Flags are optional pointers: leave them nil
+	// to use the server defaults (geocoding and fuzzy matching enabled).
+	result, err := client.Standardize(ctx, standardizer.StandardizeRequest{
+		Address:         "100 Main St, Austin, TX 78701",
+		EnableGeocoding: standardizer.Bool(true),
 	})
 	if err != nil {
 		log.Fatalf("Standardization failed: %v", err)
 	}
 
-	fmt.Println("Delivery:", res.DeliveryLine1)
-	fmt.Println("City/State/Zip:", res.LastLine)
-	fmt.Println("Confidence:", res.ConfidenceScore)
+	fmt.Printf("Street: %s
+", result.Street1)
+	fmt.Printf("City/State/Zip: %s, %s %s
+", result.City, result.State, result.PostalCode)
+	fmt.Printf("Precision: %s
+", result.Precision)
 
 	// Interactive autocomplete
 	suggestions, err := client.Autocomplete(ctx, standardizer.AutocompleteRequest{
-		Query: "1600 Penn",
-		Limit: 5,
+		Query:      "100 Mai",
+		MaxResults: 5,
 	})
 	if err != nil {
 		log.Fatalf("Autocomplete failed: %v", err)
 	}
 
 	for _, s := range suggestions {
-		fmt.Printf("- %s (Score: %.2f)\n", s.DisplayText, s.RelevanceScore)
+		fmt.Printf("- %s
+", s.Text)
 	}
 }
 ```

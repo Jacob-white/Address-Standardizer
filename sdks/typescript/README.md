@@ -18,10 +18,10 @@ pnpm add @address-standardizer/client
 
 ## Features
 
-- **Full TypeScript Type Safety**: Complete typings for `StandardizedAddress`, `SpatialResolutionResult`, `DeliveryIntelligence`, `CorporateRiskEvaluation`, and `AutocompleteSuggestion`.
+- **Full TypeScript Type Safety**: Complete typings for `StandardizeRequest`, `StandardizeResponse`, `BatchStandardizeRequest`, `AutocompleteRequest`, and `AutocompleteSuggestion`.
 - **Zero Heavy Dependencies**: Native `fetch` with configurable timeout and `AbortController` cancellation.
-- **Headless Autocomplete Controller**: State machine managing debouncing, active selection index, query caching, and keyboard navigation.
-- **React Hooks**: Turnkey `useAddressAutocomplete` hook with reactive updates.
+- **Headless Autocomplete Controller**: State machine managing debouncing, loading/error state, and the selected suggestion.
+- **React Hooks**: Turnkey `useAddressAutocomplete` hook (pass React in via the `react` option).
 - **High-Throughput Streaming**: `streamBatch()` for reading NDJSON streams without buffering large responses in memory.
 
 ---
@@ -36,23 +36,28 @@ const client = new AddressStandardizerClient({
   timeoutMs: 5000,
 });
 
-// Single address
-const res = await client.standardize({
+// Standardize single address
+const result = await client.standardize({
   address: "1600 Pennsylvania Ave NW, Washington, DC 20500",
-  geocode: true,
+  enable_geocoding: true,
 });
 
-console.log(res.delivery_line_1);       // "1600 PENNSYLVANIA AVE NW"
-console.log(res.spatial?.latitude);     // 38.8977
-console.log(res.confidence_score);      // 1.0
+console.log(result.street1);          // "1600 PENNSYLVANIA AVE NW"
+console.log(result.latitude);
+console.log(result.confidence_score);
 
-// Batch requests
-const batch = await client.batch({
-  records: [
-    { address: "100 Main St, Austin, TX" },
-    { address: "350 5th Ave, New York, NY" },
+// Batch standardization
+const batch = await client.standardizeBatch({
+  addresses: [
+    "100 Main St, Austin, TX",
+    { street1: "350 5th Ave", city: "New York", state: "NY" },
   ],
 });
+
+// Stream large batches as NDJSON
+for await (const record of client.streamBatch(["100 Main St, Austin, TX"])) {
+  console.log(record.street1);
+}
 ```
 
 ---
@@ -61,27 +66,30 @@ const batch = await client.batch({
 
 ```tsx
 import React from "react";
-import { useAddressAutocomplete } from "@address-standardizer/client";
+import { useAddressAutocomplete, AddressStandardizerClient } from "@address-standardizer/client";
 
-export function AddressSearch() {
-  const { query, setQuery, suggestions, loading, selectSuggestion } = useAddressAutocomplete({
-    baseUrl: "http://localhost:8000",
-    debounceMs: 200,
+const client = new AddressStandardizerClient({ baseUrl: "http://localhost:8000" });
+
+export function AddressTypeahead() {
+  // Pass React explicitly (or set globalThis.React) so the hook can use its state primitives.
+  const { query, setQuery, suggestions, isLoading, selectSuggestion } = useAddressAutocomplete({
+    react: React,
+    client,
+    debounceMs: 150,
   });
 
   return (
-    <div className="address-search">
+    <div>
       <input
-        type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Enter address..."
+        placeholder="Start typing an address..."
       />
-      {loading && <div className="spinner">Searching...</div>}
-      <ul className="suggestions">
-        {suggestions.map((item) => (
-          <li key={item.id} onClick={() => selectSuggestion(item)}>
-            {item.display_text}
+      {isLoading && <span>Loading...</span>}
+      <ul>
+        {suggestions.map((s) => (
+          <li key={s.text} onClick={() => selectSuggestion(s)}>
+            {s.text}
           </li>
         ))}
       </ul>
@@ -89,6 +97,8 @@ export function AddressSearch() {
   );
 }
 ```
+
+Outside React, use the headless `AutocompleteController` (`subscribe`, `setQuery`, `selectSuggestion`, `clear`).
 
 ---
 

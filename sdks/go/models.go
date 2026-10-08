@@ -9,10 +9,10 @@ type StandardizeRequest struct {
 	State           string `json:"state,omitempty"`
 	PostalCode      string `json:"postal_code,omitempty"`
 	Country         string `json:"country,omitempty"`
-	EnableGeocoding bool   `json:"enable_geocoding"`
-	EnableFuzzy     bool   `json:"enable_fuzzy"`
-	AllowLocality   bool   `json:"allow_locality"`
-	IncludeMetadata bool   `json:"include_metadata"`
+	EnableGeocoding *bool  `json:"enable_geocoding,omitempty"`
+	EnableFuzzy     *bool  `json:"enable_fuzzy,omitempty"`
+	AllowLocality   *bool  `json:"allow_locality,omitempty"`
+	IncludeMetadata *bool  `json:"include_metadata,omitempty"`
 }
 
 // StandardizedAddress represents an ISO / USPS Pub 28 standardized address.
@@ -55,9 +55,9 @@ type StandardizedAddress struct {
 // BatchStandardizeRequest contains a list of address items to standardize.
 type BatchStandardizeRequest struct {
 	Addresses       []interface{} `json:"addresses"`
-	EnableGeocoding bool          `json:"enable_geocoding"`
-	EnableFuzzy     bool          `json:"enable_fuzzy"`
-	AllowLocality   bool          `json:"allow_locality"`
+	EnableGeocoding *bool         `json:"enable_geocoding,omitempty"`
+	EnableFuzzy     *bool         `json:"enable_fuzzy,omitempty"`
+	AllowLocality   *bool         `json:"allow_locality,omitempty"`
 }
 
 // AutocompleteRequest represents a typeahead query with optional proximity bias.
@@ -98,3 +98,7 @@ type HealthResponse struct {
 	Engine        map[string]interface{} `json:"engine"`
 	UptimeSeconds float64                `json:"uptime_seconds"`
 }
+
+// Bool returns a pointer to v, for setting optional request flags such as
+// EnableGeocoding. A nil flag is omitted so the server default applies.
+func Bool(v bool) *bool { return &v }

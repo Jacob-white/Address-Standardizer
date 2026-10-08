@@ -256,7 +256,7 @@ import { AddressStandardizerClient } from "@address-standardizer/client";
 
 const client = new AddressStandardizerClient({ baseUrl: "http://localhost:8000" });
 const result = await client.standardize({ address: "1600 Pennsylvania Ave NW, Washington, DC" });
-console.log(result.delivery_line_1, result.last_line);
+console.log(result.street1, result.city, result.state, result.postal_code);
 ```
 
 ### .NET / C#
@@ -265,12 +265,13 @@ using AddressStandardizer.Client;
 
 using var client = new AddressStandardizerClient("http://localhost:8000");
 var result = await client.StandardizeAsync("1600 Pennsylvania Ave NW, Washington, DC");
-Console.WriteLine(result.DeliveryLine1);
+Console.WriteLine($"{result.Street1}, {result.City}, {result.State} {result.PostalCode}");
 ```
 
 ### Go
 ```go
 client := standardizer.NewClient("http://localhost:8000")
+// Optional flags (EnableGeocoding, EnableFuzzy, ...) are *bool: nil keeps the server default.
 result, err := client.Standardize(ctx, standardizer.StandardizeRequest{Address: "1600 Pennsylvania Ave NW"})
 ```
 
