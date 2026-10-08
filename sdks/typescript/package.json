@@ -27,5 +27,16 @@
     "react"
   ],
   "author": "HobbyHabbit LLC <support@hobbyhabbit.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
 }

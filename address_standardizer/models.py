@@ -20,11 +20,14 @@ class SpatialResolutionResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> Dict[str, Any]:
+        # An unresolved lookup has no location: report null instead of the (0, 0) "Null Island" placeholder so
+        # consumers that only test `latitude is not None` do not treat it as a real point.
+        unresolved = self.precision == "UNRESOLVED"
         return {
-            "latitude": self.latitude,
-            "longitude": self.longitude,
+            "latitude": None if unresolved else self.latitude,
+            "longitude": None if unresolved else self.longitude,
             "precision": self.precision,
-            "accuracy_radius_meters": self.accuracy_radius_meters,
+            "accuracy_radius_meters": None if unresolved else self.accuracy_radius_meters,
             "stage": self.stage,
             "source": self.source,
             "h3_res10": self.h3_res10,
@@ -473,10 +476,11 @@ class StandardizedAddress:
             d["secondary_prompt_required"] = self.secondary_prompt_required
             d["prompt_message"] = self.prompt_message
             d["suggested_secondary_units"] = list(self.suggested_secondary_units)
-            d["latitude"] = self.latitude
-            d["longitude"] = self.longitude
+            unresolved = self.precision == "UNRESOLVED"
+            d["latitude"] = None if unresolved else self.latitude
+            d["longitude"] = None if unresolved else self.longitude
             d["precision"] = self.precision
-            d["accuracy_radius_meters"] = self.accuracy_radius_meters
+            d["accuracy_radius_meters"] = None if unresolved else self.accuracy_radius_meters
             d["census_tract"] = self.census_tract
             d["fips_code"] = self.fips_code
             if self.spatial_result is not None:

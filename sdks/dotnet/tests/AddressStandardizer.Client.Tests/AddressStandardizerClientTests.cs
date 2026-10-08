@@ -127,14 +127,10 @@ namespace AddressStandardizer.Client.Tests
         }
 
         /// <summary>Runs against a live server when ADDRESS_STANDARDIZER_URL is set (CI starts one).</summary>
-        [Fact]
+        [LiveServerFact]
         public async Task LiveServer_StandardizeBatchStreamAndHealth()
         {
-            var url = Environment.GetEnvironmentVariable("ADDRESS_STANDARDIZER_URL");
-            if (string.IsNullOrEmpty(url))
-            {
-                return;
-            }
+            var url = Environment.GetEnvironmentVariable("ADDRESS_STANDARDIZER_URL")!;
 
             using var client = new AddressStandardizerClient(url);
 

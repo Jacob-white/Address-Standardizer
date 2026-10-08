@@ -28,30 +28,30 @@ export interface StandardizeResponse {
   postal_code: string;
   country: string;
   country_iso3: string;
-  normalized_address_key?: string;
-  building_key?: string;
-  phonetic_key?: string;
+  normalized_address_key?: string | null;
+  building_key?: string | null;
+  phonetic_key?: string | null;
   address_status: string;
   is_us: boolean;
   is_private_residence: boolean;
   is_registered_agent_hub: boolean;
-  deliverability?: Deliverability | string;
-  latitude?: number;
-  longitude?: number;
-  precision?: string;
-  accuracy_radius_meters?: number;
-  census_tract?: string;
-  fips_code?: string;
-  confidence_score?: number;
-  routing_tier?: string;
-  rdi?: string;
-  cmra?: boolean;
-  vacant?: boolean;
-  dpv_footnotes?: string[];
-  corporate_risk_score?: number;
-  corporate_risk_flags?: string[];
-  rooftop_address?: string;
-  full_rooftop_address?: string;
+  deliverability?: Deliverability | string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  precision?: string | null;
+  accuracy_radius_meters?: number | null;
+  census_tract?: string | null;
+  fips_code?: string | null;
+  confidence_score?: number | null;
+  routing_tier?: string | null;
+  rdi?: string | null;
+  cmra?: boolean | null;
+  vacant?: boolean | null;
+  dpv_footnotes?: string[] | null;
+  corporate_risk_score?: number | null;
+  corporate_risk_flags?: string[] | null;
+  rooftop_address?: string | null;
+  full_rooftop_address?: string | null;
   [key: string]: any;
 }
 
@@ -80,10 +80,10 @@ export interface AutocompleteSuggestion {
   postal_code: string;
   secondary_prompt_required: boolean;
   suggested_secondary_units: string[];
-  prompt_message?: string;
-  latitude?: number;
-  longitude?: number;
-  distance_meters?: number;
+  prompt_message?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  distance_meters?: number | null;
 }
 
 export interface AutocompleteResponse {
@@ -103,4 +103,18 @@ export interface ClientOptions {
   timeoutMs?: number;
   fetch?: typeof fetch;
   headers?: Record<string, string>;
+}
+
+/** Per-call options accepted by every client method. */
+export interface RequestOptions {
+  /** Abort the call (and any stream) from the caller's side. */
+  signal?: AbortSignal;
+  /** Override the client timeout for this call. For streams this is an inactivity timeout. 0 disables it. */
+  timeoutMs?: number;
+}
+
+/** A record of an NDJSON batch stream the server could not standardize. */
+export interface StreamErrorRecord {
+  error: string;
+  index: number;
 }

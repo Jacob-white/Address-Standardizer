@@ -25,23 +25,23 @@ namespace AddressStandardizer.Client
         public string? PostalCode { get; set; }
 
         [JsonPropertyName("country")]
-        public string? Country { get; set; } = "USA";
+        public string? Country { get; set; }
 
         [JsonPropertyName("enable_geocoding")]
-        public bool EnableGeocoding { get; set; } = true;
+        public bool? EnableGeocoding { get; set; }
 
         [JsonPropertyName("enable_fuzzy")]
-        public bool EnableFuzzy { get; set; } = true;
+        public bool? EnableFuzzy { get; set; }
 
         [JsonPropertyName("allow_locality")]
-        public bool AllowLocality { get; set; } = false;
+        public bool? AllowLocality { get; set; }
 
         /// <summary>Replace a US state that contradicts the ZIP with the ZIP's state. Null uses the server default (false).</summary>
         [JsonPropertyName("correct_state_from_zip")]
         public bool? CorrectStateFromZip { get; set; }
 
         [JsonPropertyName("include_metadata")]
-        public bool IncludeMetadata { get; set; } = true;
+        public bool? IncludeMetadata { get; set; }
     }
 
     public class StandardizedAddress
@@ -146,13 +146,13 @@ namespace AddressStandardizer.Client
         public List<object> Addresses { get; set; } = new List<object>();
 
         [JsonPropertyName("enable_geocoding")]
-        public bool EnableGeocoding { get; set; } = true;
+        public bool? EnableGeocoding { get; set; }
 
         [JsonPropertyName("enable_fuzzy")]
-        public bool EnableFuzzy { get; set; } = true;
+        public bool? EnableFuzzy { get; set; }
 
         [JsonPropertyName("allow_locality")]
-        public bool AllowLocality { get; set; } = false;
+        public bool? AllowLocality { get; set; }
 
         /// <summary>Replace a US state that contradicts the ZIP with the ZIP's state. Null uses the server default (false).</summary>
         [JsonPropertyName("correct_state_from_zip")]

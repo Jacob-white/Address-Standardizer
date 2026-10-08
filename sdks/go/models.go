@@ -43,8 +43,8 @@ type StandardizedAddress struct {
 	ConfidenceScore      *float64               `json:"confidence_score"`
 	RoutingTier          string                 `json:"routing_tier"`
 	RDI                  string                 `json:"rdi"`
-	CMRA                 bool                   `json:"cmra"`
-	Vacant               bool                   `json:"vacant"`
+	CMRA                 *bool                  `json:"cmra"`
+	Vacant               *bool                  `json:"vacant"`
 	DPVFootnotes         []string               `json:"dpv_footnotes"`
 	CorporateRiskScore   *float64               `json:"corporate_risk_score"`
 	CorporateRiskFlags   []string               `json:"corporate_risk_flags"`

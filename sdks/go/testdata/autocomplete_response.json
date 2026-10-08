@@ -1,0 +1,23 @@
+{
+  "count": 1,
+  "suggestions": [
+    {
+      "city": "NEW YORK",
+      "distance_meters": null,
+      "latitude": 40.7061,
+      "longitude": -74.006,
+      "postal_code": "10005",
+      "prompt_message": "Requires Suite / Apartment Number",
+      "secondary_prompt_required": true,
+      "state": "NY",
+      "street_line": "100 WALL ST",
+      "suggested_secondary_units": [
+        "STE 400",
+        "STE 800",
+        "FL 12",
+        "FL 20"
+      ],
+      "text": "100 WALL ST, NEW YORK, NY 10005"
+    }
+  ]
+}
