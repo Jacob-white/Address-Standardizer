@@ -228,6 +228,8 @@ go test -v ./...
 
 ## 🚀 Releasing
 
+One-time account setup (PyPI, npm, NuGet, GitHub environment) is listed in **[docs/RELEASING.md](../docs/RELEASING.md)**.
+
 - **Python, npm, NuGet:** bump the version in `pyproject.toml`, `address_standardizer/__init__.py`, `sdks/typescript/package.json` and `sdks/dotnet/AddressStandardizer.Client.csproj` (`python scripts/check_versions.py` verifies they match), then push a `vX.Y.Z` tag. `.github/workflows/release.yml` runs CI and publishes after approval of the `release` environment.
 - **Go:** Go modules at v2+ must carry a `/vN` path suffix, so the Go SDK is versioned independently from `v1`. Release it by pushing a `sdks/go/v1.Y.Z` tag.
 

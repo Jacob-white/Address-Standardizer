@@ -19,6 +19,17 @@ from address_standardizer.cache import (
     configure_cache,
     get_cache_stats,
 )
+from address_standardizer.cli_formatting import (  # noqa: F401
+    _emit_cli_output,
+    _format_csv_header,
+    _format_csv_row,
+    _format_postal_table_header,
+    _format_postal_table_row,
+    _format_postal_text,
+    _format_table_header,
+    _format_table_row,
+    _format_text_address,
+)
 from address_standardizer.cascade import resolve_verification_cascade
 from address_standardizer.geocoder import CensusGeocoder
 from address_standardizer.spatial import (
@@ -27,100 +38,6 @@ from address_standardizer.spatial import (
     resolve_spatial_coordinates,
 )
 from address_standardizer.standardizer import standardize_address
-
-
-def _emit_cli_output(text: str) -> None:
-    """Emit formatted CLI result text to stdout.
-
-    Note: In a CLI application, emitting the parsed result (including addresses
-    and coordinates) to standard output is the primary user-facing function.
-    We route through this helper using sys.stdout.writelines and suppression
-    annotations to prevent static analysis tools from misclassifying standard
-    CLI pipeline output as unencrypted logging sinks.
-    """
-    # codeql[py/clear-text-logging-sensitive-data]
-    sys.stdout.writelines([str(text), "\n"])
-
-
-def _format_text_address(data: Dict[str, Any]) -> str:
-    lines = [
-        "STANDARDIZED ADDRESS",
-        "====================",
-        f"Street 1:              {data.get('street1', '')}",
-        f"Street 2:              {data.get('street2', '')}",
-        f"Rooftop Address:       {data.get('rooftop_address', '')}",
-        f"City:                  {data.get('city', '')}",
-        f"State:                 {data.get('state', '')}",
-        f"Postal Code:           {data.get('postal_code', '')}",
-        f"Country:               {data.get('country', '')} (ISO3: {data.get('country_iso3', data.get('country', ''))})",
-        f"Address Key:           {data.get('normalized_address_key', '')}",
-        f"Building Key:          {data.get('building_key', '')}",
-        f"Phonetic Key:          {data.get('phonetic_key', '')}",
-        f"Status:                {data.get('address_status', '')}",
-        f"Is US Address:         {data.get('is_us', True)}",
-        f"Private Residence:     {data.get('is_private_residence', False)}",
-        f"Registered Agent Hub:  {data.get('is_registered_agent_hub', False)}",
-    ]
-    if data.get("dependent_locality"):
-        lines.append(f"Dependent Locality:    {data['dependent_locality']}")
-    if data.get("building_name"):
-        lines.append(f"Building Name:         {data['building_name']}")
-    lat_val = data.get("latitude")
-    lon_val = data.get("longitude")
-    if lat_val is not None and str(lat_val) != "" and lon_val is not None and str(lon_val) != "":
-        prec = data.get("spatial_precision") or data.get("geocode_precision", "UNKNOWN")
-        stage = ""
-        if isinstance(data.get("spatial_result"), dict) and data["spatial_result"].get("stage"):
-            stage = f", Stage {data['spatial_result']['stage']}"
-        elif data.get("cascade_stage"):
-            stage = f", Stage {data['cascade_stage']}"
-        lines.append(f"Coordinates:           {lat_val}, {lon_val} ({prec}{stage})")
-    if "confidence_score" in data and data["confidence_score"] is not None:
-        lines.append(f"Confidence Score:      {data['confidence_score']} (Tier: {data.get('routing_tier', '')})")
-    return "\n".join(lines)
-
-
-def _format_table_header() -> str:
-    hdr = f"{'Street 1':<25} | {'Street 2':<12} | {'City':<18} | {'State':<5} | {'Postal Code':<11} | {'Status':<14} | {'Confidence':<10}"
-    sep = "-" * len(hdr)
-    return f"{hdr}\n{sep}"
-
-
-def _format_table_row(data: Dict[str, Any]) -> str:
-    st1 = str(data.get("street1") or "")[:25]
-    st2 = str(data.get("street2") or "")[:12]
-    city = str(data.get("city") or "")[:18]
-    state = str(data.get("state") or "")[:5]
-    post = str(data.get("postal_code") or "")[:11]
-    status = str(data.get("address_status") or "")[:14]
-    conf_val = data.get("confidence_score")
-    conf = f"{conf_val:.4f}" if isinstance(conf_val, float) else (str(conf_val) if conf_val is not None else "")
-    return f"{st1:<25} | {st2:<12} | {city:<18} | {state:<5} | {post:<11} | {status:<14} | {conf:<10}"
-
-
-def _format_csv_header() -> str:
-    return "street1,street2,city,state,postal_code,country,address_status,confidence_score,normalized_address_key"
-
-
-def _format_csv_row(data: Dict[str, Any]) -> str:
-    import csv
-    import io
-    out = io.StringIO()
-    writer = csv.writer(out)
-    conf_val = data.get("confidence_score")
-    conf = f"{conf_val:.4f}" if isinstance(conf_val, float) else (str(conf_val) if conf_val is not None else "")
-    writer.writerow([
-        data.get("street1") or "",
-        data.get("street2") or "",
-        data.get("city") or "",
-        data.get("state") or "",
-        data.get("postal_code") or "",
-        data.get("country") or "",
-        data.get("address_status") or "",
-        conf,
-        data.get("normalized_address_key") or "",
-    ])
-    return out.getvalue().rstrip("\r\n")
 
 
 def _has_stdin_data() -> bool:
@@ -151,36 +68,6 @@ def _has_stdin_data() -> bool:
         except Exception:
             return False
     return False
-
-
-def _format_postal_text(res: Dict[str, Any]) -> str:
-    lines = [
-        "POSTAL CODE VALIDATION",
-        "======================",
-        f"Validity:              {res.get('is_valid', False)}",
-        f"Country:               {res.get('country', '')}",
-        f"Postal Code:           {res.get('postal_code', '')}",
-        f"Formatted Code:        {res.get('formatted_code') or ''}",
-        f"Non-Postal Country:    {res.get('is_non_postal_country', False)}",
-        f"Reason:                {res.get('reason', '')}",
-    ]
-    return "\n".join(lines)
-
-
-def _format_postal_table_header() -> str:
-    hdr = f"{'Postal Code':<15} | {'Country':<7} | {'Valid':<5} | {'Formatted Code':<15} | {'Non-Postal':<10} | {'Reason'}"
-    sep = "-" * len(hdr)
-    return f"{hdr}\n{sep}"
-
-
-def _format_postal_table_row(res: Dict[str, Any]) -> str:
-    pc = str(res.get("postal_code") or "")[:15]
-    c = str(res.get("country") or "")[:7]
-    v = str(bool(res.get("is_valid")))[:5]
-    fc = str(res.get("formatted_code") or "")[:15]
-    np = str(bool(res.get("is_non_postal_country")))[:10]
-    r = str(res.get("reason") or "")
-    return f"{pc:<15} | {c:<7} | {v:<5} | {fc:<15} | {np:<10} | {r}"
 
 
 def _execute_postal_validation(
@@ -349,6 +236,555 @@ def _process_piped_stream(
             _emit_cli_output(json.dumps(data))
 
 
+def _cmd_parse(args: argparse.Namespace) -> None:
+    """Handler for the `parse` subcommand."""
+    if args.no_cache:
+        configure_cache(enabled=False)
+
+    if args.address == ["-"] or (not args.address and not args.street1 and _has_stdin_data()):
+        _process_piped_stream(
+            sys.stdin,
+            format_type=args.format,
+            country=args.country,
+            enable_geocoding=args.enable_geocoding,
+            confidence=args.confidence,
+        )
+        return
+
+    st1 = args.street1
+    if not st1 and args.address:
+        st1 = " ".join(args.address)
+    res = standardize_address(
+        street1=st1,
+        street2=args.street2,
+        city=args.city,
+        state=args.state,
+        postal_code=args.postal_code,
+        country=args.country,
+    )
+    data = res.as_dict()
+    if res.dependent_locality:
+        data["dependent_locality"] = res.dependent_locality
+    if res.building_name:
+        data["building_name"] = res.building_name
+    data["country_iso3"] = getattr(res, "country_iso3", None) or res.country or ""
+
+    if args.enable_geocoding:
+        engine_to_close = None
+        if args.spatial_db:
+            engine = SpatialEngine(db_path=args.spatial_db)
+            engine_to_close = engine
+            sp_res = engine.resolve(res)
+        else:
+            sp_res = resolve_spatial_coordinates(res)
+        if sp_res:
+            data["latitude"] = sp_res.latitude
+            data["longitude"] = sp_res.longitude
+            data["spatial_precision"] = sp_res.precision
+            data["geocode_precision"] = sp_res.precision
+            data["spatial_source"] = sp_res.source
+            data["accuracy_radius_meters"] = sp_res.accuracy_radius_meters
+            data["h3_r10_index"] = sp_res.h3_res10
+            data["spatial_result"] = sp_res.as_dict()
+            res.spatial_result = sp_res
+        if engine_to_close:
+            engine_to_close.close()
+
+    if args.confidence:
+        data["confidence_score"] = res.confidence_score
+        data["routing_tier"] = res.routing_tier
+        data["failure_reason_codes"] = res.failure_reason_codes
+
+    if args.audit:
+        if not res.audit_record:
+            raw_dict = {
+                "street1": st1,
+                "street2": args.street2,
+                "city": args.city,
+                "state": args.state,
+                "postal_code": args.postal_code,
+                "country": args.country,
+            }
+            from address_standardizer.confidence import compute_confidence_score
+            conf = compute_confidence_score(res, raw_input=raw_dict)
+            res.audit_record = get_audit_ledger().record_standardized_address(
+                res, conf, raw_input=raw_dict
+            )
+        if res.audit_record:
+            data["audit_record"] = res.audit_record.as_dict()
+
+    if args.geocode and res.is_us and res.street1:
+        geocoder = CensusGeocoder()
+        geo_res = geocoder.geocode_batch([("1", res.street1, res.city, res.state, res.postal_code)])
+        if "1" in geo_res:
+            data["latitude"] = geo_res["1"]["latitude"]
+            data["longitude"] = geo_res["1"]["longitude"]
+            data["geocode_precision"] = geo_res["1"]["precision"]
+
+    if args.cascade and res.is_us:
+        casc = resolve_verification_cascade(
+            street1=res.street1,
+            street2=res.street2,
+            city=res.city,
+            state=res.state,
+            postal_code=res.postal_code,
+            country=res.country,
+            normalized_address_key=res.normalized_address_key,
+            census_geocoder=CensusGeocoder(),
+        )
+        if casc:
+            data["latitude"] = casc.latitude
+            data["longitude"] = casc.longitude
+            data["geocode_precision"] = casc.precision
+            data["accuracy_radius_meters"] = casc.accuracy_radius_meters
+            data["cascade_source"] = casc.source
+            data["cascade_stage"] = casc.stage
+
+    if args.format == "upu":
+        _emit_cli_output(res.format_upu())
+    elif args.format == "text":
+        # codeql[py/clear-text-logging-sensitive-data]
+        _emit_cli_output(_format_text_address(data))
+    elif args.format == "table":
+        # codeql[py/clear-text-logging-sensitive-data]
+        _emit_cli_output(_format_table_header())
+        _emit_cli_output(_format_table_row(data))
+    elif args.format == "csv":
+        # codeql[py/clear-text-logging-sensitive-data]
+        _emit_cli_output(_format_csv_header())
+        _emit_cli_output(_format_csv_row(data))
+    else:
+        # codeql[py/clear-text-logging-sensitive-data]
+        _emit_cli_output(json.dumps(data, indent=2))
+
+
+def _cmd_validate_postal(args: argparse.Namespace) -> None:
+    """Handler for the `validate-postal` subcommand."""
+    if args.code_or_text == ["-"] or (not args.code_or_text and _has_stdin_data()):
+        if args.format == "table":
+            _emit_cli_output(_format_postal_table_header())
+        for line in sys.stdin:
+            line_str = line.strip()
+            if not line_str:
+                continue
+            res = _execute_postal_validation(line_str, args.country)
+            if args.format == "text":
+                _emit_cli_output(_format_postal_text(res))
+            elif args.format == "table":
+                _emit_cli_output(_format_postal_table_row(res))
+            else:
+                _emit_cli_output(json.dumps(res))
+        return
+
+    if args.code_or_text:
+        input_str = " ".join(args.code_or_text).strip()
+        res = _execute_postal_validation(input_str, args.country)
+        if args.format == "text":
+            _emit_cli_output(_format_postal_text(res))
+        elif args.format == "table":
+            _emit_cli_output(_format_postal_table_header())
+            _emit_cli_output(_format_postal_table_row(res))
+        else:
+            _emit_cli_output(json.dumps(res, indent=2))
+        return
+
+    _SUBPARSERS["validate-postal"].print_help()
+    sys.exit(1)
+
+
+def _cmd_batch(args: argparse.Namespace) -> None:
+    """Handler for the `batch` subcommand."""
+    if args.no_cache:
+        configure_cache(enabled=False)
+
+    mapping_dict = None
+    if getattr(args, "mapping", None):
+        m_str = args.mapping.strip()
+        if m_str.startswith("{"):
+            mapping_dict = json.loads(m_str)
+        elif os.path.isfile(m_str):
+            with open(m_str, "r", encoding="utf-8") as mf:
+                mapping_dict = json.load(mf)
+        else:
+            mapping_dict = json.loads(m_str)
+
+    fmt = getattr(args, "format", "auto").lower()
+    if fmt == "auto":
+        in_lower = args.input_csv.lower()
+        out_lower = args.output_csv.lower()
+        if in_lower.endswith(".jsonl") or in_lower.endswith(".ndjson") or out_lower.endswith(".jsonl") or out_lower.endswith(".ndjson"):
+            fmt = "jsonl"
+        elif in_lower.endswith(".json") or out_lower.endswith(".json"):
+            fmt = "json"
+        else:
+            fmt = "csv"
+
+    geocoder = CensusGeocoder() if args.geocode else None
+
+    if fmt in ("jsonl", "ndjson"):
+        from address_standardizer.batch import stream_standardize_jsonl
+        total = stream_standardize_jsonl(
+            input_path=args.input_csv,
+            output_path=args.output_csv,
+            chunk_size=args.chunk_size,
+            max_workers=args.workers,
+            street_col=args.street_col,
+            street2_col=args.street2_col,
+            city_col=args.city_col,
+            state_col=args.state_col,
+            zip_col=args.zip_col,
+            country_col=args.country_col,
+            mapping=mapping_dict,
+            geocode=args.geocode,
+            geocoder=geocoder,
+            include_confidence=args.confidence,
+            audit_csv_path=args.audit_csv,
+            enable_geocoding=args.enable_geocoding,
+            spatial_db=args.spatial_db,
+            include_intl=args.include_intl,
+            country=args.country,
+        )
+    elif fmt == "json":
+        from address_standardizer.batch import stream_standardize_json
+        total = stream_standardize_json(
+            input_path=args.input_csv,
+            output_path=args.output_csv,
+            chunk_size=args.chunk_size,
+            max_workers=args.workers,
+            street_col=args.street_col,
+            street2_col=args.street2_col,
+            city_col=args.city_col,
+            state_col=args.state_col,
+            zip_col=args.zip_col,
+            country_col=args.country_col,
+            mapping=mapping_dict,
+            geocode=args.geocode,
+            geocoder=geocoder,
+            include_confidence=args.confidence,
+            audit_csv_path=args.audit_csv,
+            enable_geocoding=args.enable_geocoding,
+            spatial_db=args.spatial_db,
+            include_intl=args.include_intl,
+            country=args.country,
+        )
+    else:
+        total = stream_standardize_csv(
+            input_path=args.input_csv,
+            output_path=args.output_csv,
+            chunk_size=args.chunk_size,
+            max_workers=args.workers,
+            street_col=args.street_col,
+            street2_col=args.street2_col,
+            city_col=args.city_col,
+            state_col=args.state_col,
+            zip_col=args.zip_col,
+            country_col=args.country_col,
+            mapping=mapping_dict,
+            geocode=args.geocode,
+            geocoder=geocoder,
+            include_confidence=args.confidence,
+            audit_csv_path=args.audit_csv,
+            enable_geocoding=args.enable_geocoding,
+            spatial_db=args.spatial_db,
+            include_intl=args.include_intl,
+            country=args.country,
+        )
+    _emit_cli_output(f"Standardized {total} record(s) -> {args.output_csv}")
+    if args.audit_csv:
+        _emit_cli_output(f"Wrote audit record(s) -> {args.audit_csv}")
+
+
+def _cmd_benchmark(args: argparse.Namespace) -> None:
+    """Handler for the `benchmark` subcommand."""
+    try:
+        from benchmarks.run_benchmarks import print_report, run_all_benchmarks
+    except ImportError:
+        import importlib.util
+        bench_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "benchmarks", "run_benchmarks.py"))
+        spec = importlib.util.spec_from_file_location("benchmarks.run_benchmarks", bench_path)
+        if spec and spec.loader:
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            run_all_benchmarks = getattr(mod, "run_all_benchmarks")
+            print_report = getattr(mod, "print_report")
+        else:
+            raise ImportError(f"Cannot load benchmarks from {bench_path}")
+
+    results = run_all_benchmarks(dataset_path=args.dataset, iterations=args.iterations)
+    if args.format == "json":
+        _emit_cli_output(json.dumps(results, indent=2))
+    else:
+        print_report(results)
+
+
+def _cmd_spatial(args: argparse.Namespace) -> None:
+    """Handler for the `spatial` subcommand."""
+    if not args.spatial_action:
+        _SUBPARSERS["spatial"].print_help()
+        sys.exit(1)
+
+    if args.spatial_action == "build":
+        from address_standardizer.spatial.ingestion import (
+            OpenAddressesIngestor,
+            TigerLineIngestor,
+            OsmBuildingIngestor,
+        )
+        oa_path = getattr(args, "openaddresses_path", None)
+        tg_path = getattr(args, "tiger_path", None)
+        osm_path = getattr(args, "osm_path", None)
+
+        if oa_path and not os.path.exists(oa_path):
+            _emit_cli_output(f"Error: OpenAddresses file not found: {oa_path}")
+            sys.exit(1)
+        if tg_path and not os.path.exists(tg_path):
+            _emit_cli_output(f"Error: TIGER file not found: {tg_path}")
+            sys.exit(1)
+        if osm_path and not os.path.exists(osm_path):
+            _emit_cli_output(f"Error: OSM file not found: {osm_path}")
+            sys.exit(1)
+
+        output_path = args.output_db or "data/spatial_index.db"
+        out_dir = os.path.dirname(output_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+
+        engine = SpatialEngine(db_path=output_path, seed=True)
+        pts_added = 0
+        segs_added = 0
+        osm_added = 0
+
+        if oa_path:
+            oa = OpenAddressesIngestor(engine)
+            pts_added = oa.ingest_csv(oa_path)
+        if tg_path:
+            tg = TigerLineIngestor(engine)
+            segs_added = tg.ingest_csv(tg_path)
+        if osm_path:
+            osm = OsmBuildingIngestor(engine)
+            osm_added = osm.ingest_geojson(osm_path)
+
+        total_points = engine.count()
+        _emit_cli_output(f"Spatial SQLite index built successfully: {output_path}")
+        _emit_cli_output(f"Total spatial points: {total_points}")
+        if pts_added:
+            _emit_cli_output(f"Ingested OpenAddresses points: {pts_added}")
+        if segs_added:
+            _emit_cli_output(f"Ingested TIGER segments: {segs_added}")
+        if osm_added:
+            _emit_cli_output(f"Ingested OSM building features: {osm_added}")
+        engine.close()
+        return
+
+    engine = SpatialEngine(db_path=args.spatial_db) if args.spatial_db else get_default_spatial_engine()
+    engine_to_close = engine if args.spatial_db else None
+    try:
+        if args.spatial_action == "lookup":
+            addr_input = args.explicit_address or (" ".join(args.address) if args.address else None)
+            if addr_input:
+                std_addr = standardize_address(street1=addr_input)
+                sp_res = engine.resolve(std_addr)
+                if args.format == "text":
+                    res_lines = [
+                        "SPATIAL RESOLUTION RESULT",
+                        "=========================",
+                        f"Status:                {sp_res.precision}",
+                        f"Latitude:              {sp_res.latitude}",
+                        f"Longitude:             {sp_res.longitude}",
+                        f"Accuracy Radius (m):   {sp_res.accuracy_radius_meters}",
+                        f"Cascade Stage:         {sp_res.stage}",
+                        f"Source:                {sp_res.source}",
+                        f"H3 Res10:              {sp_res.h3_res10}",
+                        f"Parcel ID:             {sp_res.parcel_id or 'None'}",
+                    ]
+                    # codeql[py/clear-text-logging-sensitive-data]
+                    _emit_cli_output("\n".join(res_lines))
+                else:
+                    # codeql[py/clear-text-logging-sensitive-data]
+                    _emit_cli_output(json.dumps([sp_res.as_dict()], indent=2))
+            elif args.bbox:
+                try:
+                    sep = "," if "," in args.bbox else None
+                    parts = [float(x.strip()) for x in (args.bbox.split(",") if sep else args.bbox.split())]
+                except ValueError:
+                    parts = []
+                if len(parts) != 4:
+                    sys.stderr.write("Error: --bbox requires 4 values: min_lon,min_lat,max_lon,max_lat\n")
+                    sys.exit(2)
+                min_lon, min_lat, max_lon, max_lat = parts
+                results = engine.query_bounding_box(min_lon, min_lat, max_lon, max_lat, limit=args.limit)
+                if args.format == "text":
+                    lines = [f"Found {len(results)} spatial point(s) in bounding box:"]
+                    for i, r in enumerate(results, 1):
+                        lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
+                    # codeql[py/clear-text-logging-sensitive-data]
+                    _emit_cli_output("\n".join(lines))
+                else:
+                    # codeql[py/clear-text-logging-sensitive-data]
+                    _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
+            elif (
+                args.min_lat is not None
+                and args.min_lon is not None
+                and args.max_lat is not None
+                and args.max_lon is not None
+            ):
+                results = engine.query_bounding_box(
+                    args.min_lon, args.min_lat, args.max_lon, args.max_lat, limit=args.limit
+                )
+                if args.format == "text":
+                    lines = [f"Found {len(results)} spatial point(s) in bounding box:"]
+                    for i, r in enumerate(results, 1):
+                        lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
+                    # codeql[py/clear-text-logging-sensitive-data]
+                    _emit_cli_output("\n".join(lines))
+                else:
+                    # codeql[py/clear-text-logging-sensitive-data]
+                    _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
+            elif args.lat is not None and args.lon is not None:
+                results = engine.query_radius(
+                    lon=args.lon, lat=args.lat, radius_meters=args.radius, limit=args.limit
+                )
+                if args.format == "text":
+                    lines = [f"Found {len(results)} spatial point(s) within {args.radius:.1f}m:"]
+                    for i, r in enumerate(results, 1):
+                        lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
+                    # codeql[py/clear-text-logging-sensitive-data]
+                    _emit_cli_output("\n".join(lines))
+                else:
+                    # codeql[py/clear-text-logging-sensitive-data]
+                    _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
+            else:
+                sys.stderr.write(
+                    "Error: spatial lookup requires address, coordinates (--lat and --lon), or bounding box (--min-lat, --min-lon, --max-lat, --max-lon or --bbox).\n"
+                )
+                sys.exit(2)
+        elif args.spatial_action in ("info", "stats"):
+            with engine._lock:
+                pts_count = engine.count()
+                cur = engine._conn.execute("SELECT count(*) FROM street_segments")
+                seg_count = cur.fetchone()[0]
+                cur = engine._conn.execute("SELECT count(*) FROM postal_centroids")
+                post_count = cur.fetchone()[0]
+                cur = engine._conn.execute("SELECT count(*) FROM municipal_centroids")
+                muni_count = cur.fetchone()[0]
+
+            stats = {
+                "database_path": engine._db_path,
+                "total_spatial_points": pts_count,
+                "street_segments_count": seg_count,
+                "postal_centroids_count": post_count,
+                "municipal_centroids_count": muni_count,
+                "rtree_index_enabled": True,
+                "memory_pragmas": {
+                    "journal_mode": "WAL",
+                    "cache_size_kb": 64000,
+                    "mmap_size_mb": 256,
+                    "temp_store": "MEMORY",
+                },
+            }
+            if args.format == "json":
+                _emit_cli_output(json.dumps(stats, indent=2))
+            else:
+                _emit_cli_output(
+                    "SPATIAL DATABASE DIAGNOSTICS & INDEX STATISTICS\n"
+                    "================================================\n"
+                    f"Database Path:             {stats['database_path']}\n"
+                    f"Indexed Spatial Points:    {stats['total_spatial_points']:,}\n"
+                    f"Street Segments:           {stats['street_segments_count']:,}\n"
+                    f"Postal Centroids:          {stats['postal_centroids_count']:,}\n"
+                    f"Municipal Centroids:       {stats['municipal_centroids_count']:,}\n"
+                    f"R*Tree Index Enabled:      {stats['rtree_index_enabled']}\n"
+                    "Pragmas:                   WAL, cache_size=-64000, mmap_size=256MB"
+                )
+    finally:
+        if engine_to_close:
+            engine_to_close.close()
+
+
+def _cmd_audit(args: argparse.Namespace) -> None:
+    """Handler for the `audit` subcommand."""
+    ledger = get_audit_ledger()
+    if args.clear:
+        ledger.clear()
+        _emit_cli_output("Audit ledger cleared.")
+        return
+
+    records = ledger.list_records(review_status=args.status)
+    if args.export == "sql":
+        _emit_cli_output(ledger.export(format="sql"))
+    elif args.export == "dict":
+        lines = [f"Audit ledger contains {len(records)} record(s):"]
+        for r in records[:50]:
+            lines.append(f"[{r.review_status}] {r.action_type} - {r.record_id} ({r.confidence_score:.4f})")
+        _emit_cli_output("\n".join(lines))
+    else:
+        _emit_cli_output(json.dumps([r.as_dict() for r in records], indent=2))
+
+
+def _cmd_cache(args: argparse.Namespace) -> None:
+    """Handler for the `cache` subcommand."""
+    if args.clear:
+        clear_cache()
+        _emit_cli_output("Cache cleared.")
+    else:
+        stats = get_cache_stats()
+        _emit_cli_output(json.dumps(stats, indent=2))
+
+
+def _cmd_autocomplete(args: argparse.Namespace) -> None:
+    """Handler for the `autocomplete` subcommand."""
+    from address_standardizer.autocomplete import autocomplete_address
+    suggestions = autocomplete_address(
+        query=args.query,
+        max_results=args.limit,
+        state_filter=args.state,
+    )
+    if args.format == "json":
+        _emit_cli_output(json.dumps([s.as_dict() for s in suggestions], indent=2))
+    else:
+        if not suggestions:
+            _emit_cli_output("No suggestions found.")
+        lines = []
+        for i, s in enumerate(suggestions, 1):
+            sec_notice = f" [Secondary Unit Required: {', '.join(s.suggested_secondary_units)}]" if s.secondary_prompt_required else ""
+            lines.append(f"{i}. {s.text}{sec_notice}")
+        if lines:
+            _emit_cli_output("\n".join(lines))
+
+
+def _cmd_serve(args: argparse.Namespace) -> None:
+    """Handler for the `serve` subcommand."""
+    try:
+        import uvicorn
+    except ImportError:
+        sys.stderr.write(
+            "Error: uvicorn is required to run the server daemon. Install with `pip install uvicorn`.\n"
+        )
+        sys.exit(1)
+    uvicorn.run(
+        "address_standardizer.server:app",
+        host=args.host,
+        port=args.port,
+        workers=args.workers,
+        reload=args.reload,
+    )
+
+
+# Subparsers needed by handlers to print contextual help; populated by main().
+_SUBPARSERS: Dict[str, argparse.ArgumentParser] = {}
+
+_COMMAND_HANDLERS = {
+    "parse": _cmd_parse,
+    "validate-postal": _cmd_validate_postal,
+    "batch": _cmd_batch,
+    "benchmark": _cmd_benchmark,
+    "spatial": _cmd_spatial,
+    "audit": _cmd_audit,
+    "cache": _cmd_cache,
+    "autocomplete": _cmd_autocomplete,
+    "serve": _cmd_serve,
+}
+
+
 def main():
     _known_subcommands = {
         "parse", "batch", "benchmark", "spatial", "audit", "cache", "autocomplete", "validate-postal"
@@ -449,6 +885,7 @@ def main():
 
     # Command: spatial
     spatial_parser = subparsers.add_parser("spatial", help="Offline SQLite R*Tree spatial engine lookup and diagnostics")
+    _SUBPARSERS["spatial"] = spatial_parser
     spatial_sub = spatial_parser.add_subparsers(dest="spatial_action", help="Spatial action")
 
     # spatial build
@@ -508,6 +945,7 @@ def main():
         "validate-postal",
         help="Validate or extract international postal codes across 249 ISO-3166-1 jurisdictions",
     )
+    _SUBPARSERS["validate-postal"] = postal_parser
     postal_parser.add_argument(
         "code_or_text",
         nargs="*",
@@ -560,520 +998,9 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    if args.command == "parse":
-        if args.no_cache:
-            configure_cache(enabled=False)
-
-        if args.address == ["-"] or (not args.address and not args.street1 and _has_stdin_data()):
-            _process_piped_stream(
-                sys.stdin,
-                format_type=args.format,
-                country=args.country,
-                enable_geocoding=args.enable_geocoding,
-                confidence=args.confidence,
-            )
-            return
-
-        st1 = args.street1
-        if not st1 and args.address:
-            st1 = " ".join(args.address)
-        res = standardize_address(
-            street1=st1,
-            street2=args.street2,
-            city=args.city,
-            state=args.state,
-            postal_code=args.postal_code,
-            country=args.country,
-        )
-        data = res.as_dict()
-        if res.dependent_locality:
-            data["dependent_locality"] = res.dependent_locality
-        if res.building_name:
-            data["building_name"] = res.building_name
-        data["country_iso3"] = getattr(res, "country_iso3", None) or res.country or ""
-
-        if args.enable_geocoding:
-            engine_to_close = None
-            if args.spatial_db:
-                engine = SpatialEngine(db_path=args.spatial_db)
-                engine_to_close = engine
-                sp_res = engine.resolve(res)
-            else:
-                sp_res = resolve_spatial_coordinates(res)
-            if sp_res:
-                data["latitude"] = sp_res.latitude
-                data["longitude"] = sp_res.longitude
-                data["spatial_precision"] = sp_res.precision
-                data["geocode_precision"] = sp_res.precision
-                data["spatial_source"] = sp_res.source
-                data["accuracy_radius_meters"] = sp_res.accuracy_radius_meters
-                data["h3_r10_index"] = sp_res.h3_res10
-                data["spatial_result"] = sp_res.as_dict()
-                res.spatial_result = sp_res
-            if engine_to_close:
-                engine_to_close.close()
-
-        if args.confidence:
-            data["confidence_score"] = res.confidence_score
-            data["routing_tier"] = res.routing_tier
-            data["failure_reason_codes"] = res.failure_reason_codes
-
-        if args.audit:
-            if not res.audit_record:
-                raw_dict = {
-                    "street1": st1,
-                    "street2": args.street2,
-                    "city": args.city,
-                    "state": args.state,
-                    "postal_code": args.postal_code,
-                    "country": args.country,
-                }
-                from address_standardizer.confidence import compute_confidence_score
-                conf = compute_confidence_score(res, raw_input=raw_dict)
-                res.audit_record = get_audit_ledger().record_standardized_address(
-                    res, conf, raw_input=raw_dict
-                )
-            if res.audit_record:
-                data["audit_record"] = res.audit_record.as_dict()
-
-        if args.geocode and res.is_us and res.street1:
-            geocoder = CensusGeocoder()
-            geo_res = geocoder.geocode_batch([("1", res.street1, res.city, res.state, res.postal_code)])
-            if "1" in geo_res:
-                data["latitude"] = geo_res["1"]["latitude"]
-                data["longitude"] = geo_res["1"]["longitude"]
-                data["geocode_precision"] = geo_res["1"]["precision"]
-
-        if args.cascade and res.is_us:
-            casc = resolve_verification_cascade(
-                street1=res.street1,
-                street2=res.street2,
-                city=res.city,
-                state=res.state,
-                postal_code=res.postal_code,
-                country=res.country,
-                normalized_address_key=res.normalized_address_key,
-                census_geocoder=CensusGeocoder(),
-            )
-            if casc:
-                data["latitude"] = casc.latitude
-                data["longitude"] = casc.longitude
-                data["geocode_precision"] = casc.precision
-                data["accuracy_radius_meters"] = casc.accuracy_radius_meters
-                data["cascade_source"] = casc.source
-                data["cascade_stage"] = casc.stage
-
-        if args.format == "upu":
-            _emit_cli_output(res.format_upu())
-        elif args.format == "text":
-            # codeql[py/clear-text-logging-sensitive-data]
-            _emit_cli_output(_format_text_address(data))
-        elif args.format == "table":
-            # codeql[py/clear-text-logging-sensitive-data]
-            _emit_cli_output(_format_table_header())
-            _emit_cli_output(_format_table_row(data))
-        elif args.format == "csv":
-            # codeql[py/clear-text-logging-sensitive-data]
-            _emit_cli_output(_format_csv_header())
-            _emit_cli_output(_format_csv_row(data))
-        else:
-            # codeql[py/clear-text-logging-sensitive-data]
-            _emit_cli_output(json.dumps(data, indent=2))
-
-    elif args.command == "validate-postal":
-        if args.code_or_text == ["-"] or (not args.code_or_text and _has_stdin_data()):
-            if args.format == "table":
-                _emit_cli_output(_format_postal_table_header())
-            for line in sys.stdin:
-                line_str = line.strip()
-                if not line_str:
-                    continue
-                res = _execute_postal_validation(line_str, args.country)
-                if args.format == "text":
-                    _emit_cli_output(_format_postal_text(res))
-                elif args.format == "table":
-                    _emit_cli_output(_format_postal_table_row(res))
-                else:
-                    _emit_cli_output(json.dumps(res))
-            return
-
-        if args.code_or_text:
-            input_str = " ".join(args.code_or_text).strip()
-            res = _execute_postal_validation(input_str, args.country)
-            if args.format == "text":
-                _emit_cli_output(_format_postal_text(res))
-            elif args.format == "table":
-                _emit_cli_output(_format_postal_table_header())
-                _emit_cli_output(_format_postal_table_row(res))
-            else:
-                _emit_cli_output(json.dumps(res, indent=2))
-            return
-
-        postal_parser.print_help()
-        sys.exit(1)
-
-    elif args.command == "batch":
-        if args.no_cache:
-            configure_cache(enabled=False)
-
-        mapping_dict = None
-        if getattr(args, "mapping", None):
-            m_str = args.mapping.strip()
-            if m_str.startswith("{"):
-                mapping_dict = json.loads(m_str)
-            elif os.path.isfile(m_str):
-                with open(m_str, "r", encoding="utf-8") as mf:
-                    mapping_dict = json.load(mf)
-            else:
-                mapping_dict = json.loads(m_str)
-
-        fmt = getattr(args, "format", "auto").lower()
-        if fmt == "auto":
-            in_lower = args.input_csv.lower()
-            out_lower = args.output_csv.lower()
-            if in_lower.endswith(".jsonl") or in_lower.endswith(".ndjson") or out_lower.endswith(".jsonl") or out_lower.endswith(".ndjson"):
-                fmt = "jsonl"
-            elif in_lower.endswith(".json") or out_lower.endswith(".json"):
-                fmt = "json"
-            else:
-                fmt = "csv"
-
-        geocoder = CensusGeocoder() if args.geocode else None
-
-        if fmt in ("jsonl", "ndjson"):
-            from address_standardizer.batch import stream_standardize_jsonl
-            total = stream_standardize_jsonl(
-                input_path=args.input_csv,
-                output_path=args.output_csv,
-                chunk_size=args.chunk_size,
-                max_workers=args.workers,
-                street_col=args.street_col,
-                street2_col=args.street2_col,
-                city_col=args.city_col,
-                state_col=args.state_col,
-                zip_col=args.zip_col,
-                country_col=args.country_col,
-                mapping=mapping_dict,
-                geocode=args.geocode,
-                geocoder=geocoder,
-                include_confidence=args.confidence,
-                audit_csv_path=args.audit_csv,
-                enable_geocoding=args.enable_geocoding,
-                spatial_db=args.spatial_db,
-                include_intl=args.include_intl,
-                country=args.country,
-            )
-        elif fmt == "json":
-            from address_standardizer.batch import stream_standardize_json
-            total = stream_standardize_json(
-                input_path=args.input_csv,
-                output_path=args.output_csv,
-                chunk_size=args.chunk_size,
-                max_workers=args.workers,
-                street_col=args.street_col,
-                street2_col=args.street2_col,
-                city_col=args.city_col,
-                state_col=args.state_col,
-                zip_col=args.zip_col,
-                country_col=args.country_col,
-                mapping=mapping_dict,
-                geocode=args.geocode,
-                geocoder=geocoder,
-                include_confidence=args.confidence,
-                audit_csv_path=args.audit_csv,
-                enable_geocoding=args.enable_geocoding,
-                spatial_db=args.spatial_db,
-                include_intl=args.include_intl,
-                country=args.country,
-            )
-        else:
-            total = stream_standardize_csv(
-                input_path=args.input_csv,
-                output_path=args.output_csv,
-                chunk_size=args.chunk_size,
-                max_workers=args.workers,
-                street_col=args.street_col,
-                street2_col=args.street2_col,
-                city_col=args.city_col,
-                state_col=args.state_col,
-                zip_col=args.zip_col,
-                country_col=args.country_col,
-                mapping=mapping_dict,
-                geocode=args.geocode,
-                geocoder=geocoder,
-                include_confidence=args.confidence,
-                audit_csv_path=args.audit_csv,
-                enable_geocoding=args.enable_geocoding,
-                spatial_db=args.spatial_db,
-                include_intl=args.include_intl,
-                country=args.country,
-            )
-        _emit_cli_output(f"Standardized {total} record(s) -> {args.output_csv}")
-        if args.audit_csv:
-            _emit_cli_output(f"Wrote audit record(s) -> {args.audit_csv}")
-
-    elif args.command == "benchmark":
-        try:
-            from benchmarks.run_benchmarks import print_report, run_all_benchmarks
-        except ImportError:
-            import importlib.util
-            bench_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "benchmarks", "run_benchmarks.py"))
-            spec = importlib.util.spec_from_file_location("benchmarks.run_benchmarks", bench_path)
-            if spec and spec.loader:
-                mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(mod)
-                run_all_benchmarks = getattr(mod, "run_all_benchmarks")
-                print_report = getattr(mod, "print_report")
-            else:
-                raise ImportError(f"Cannot load benchmarks from {bench_path}")
-
-        results = run_all_benchmarks(dataset_path=args.dataset, iterations=args.iterations)
-        if args.format == "json":
-            _emit_cli_output(json.dumps(results, indent=2))
-        else:
-            print_report(results)
-
-    elif args.command == "spatial":
-        if not args.spatial_action:
-            spatial_parser.print_help()
-            sys.exit(1)
-
-        if args.spatial_action == "build":
-            from address_standardizer.spatial.ingestion import (
-                OpenAddressesIngestor,
-                TigerLineIngestor,
-                OsmBuildingIngestor,
-            )
-            oa_path = getattr(args, "openaddresses_path", None)
-            tg_path = getattr(args, "tiger_path", None)
-            osm_path = getattr(args, "osm_path", None)
-
-            if oa_path and not os.path.exists(oa_path):
-                _emit_cli_output(f"Error: OpenAddresses file not found: {oa_path}")
-                sys.exit(1)
-            if tg_path and not os.path.exists(tg_path):
-                _emit_cli_output(f"Error: TIGER file not found: {tg_path}")
-                sys.exit(1)
-            if osm_path and not os.path.exists(osm_path):
-                _emit_cli_output(f"Error: OSM file not found: {osm_path}")
-                sys.exit(1)
-
-            output_path = args.output_db or "data/spatial_index.db"
-            out_dir = os.path.dirname(output_path)
-            if out_dir:
-                os.makedirs(out_dir, exist_ok=True)
-
-            engine = SpatialEngine(db_path=output_path, seed=True)
-            pts_added = 0
-            segs_added = 0
-            osm_added = 0
-
-            if oa_path:
-                oa = OpenAddressesIngestor(engine)
-                pts_added = oa.ingest_csv(oa_path)
-            if tg_path:
-                tg = TigerLineIngestor(engine)
-                segs_added = tg.ingest_csv(tg_path)
-            if osm_path:
-                osm = OsmBuildingIngestor(engine)
-                osm_added = osm.ingest_geojson(osm_path)
-
-            total_points = engine.count()
-            _emit_cli_output(f"Spatial SQLite index built successfully: {output_path}")
-            _emit_cli_output(f"Total spatial points: {total_points}")
-            if pts_added:
-                _emit_cli_output(f"Ingested OpenAddresses points: {pts_added}")
-            if segs_added:
-                _emit_cli_output(f"Ingested TIGER segments: {segs_added}")
-            if osm_added:
-                _emit_cli_output(f"Ingested OSM building features: {osm_added}")
-            engine.close()
-            return
-
-        engine = SpatialEngine(db_path=args.spatial_db) if args.spatial_db else get_default_spatial_engine()
-        engine_to_close = engine if args.spatial_db else None
-        try:
-            if args.spatial_action == "lookup":
-                addr_input = args.explicit_address or (" ".join(args.address) if args.address else None)
-                if addr_input:
-                    std_addr = standardize_address(street1=addr_input)
-                    sp_res = engine.resolve(std_addr)
-                    if args.format == "text":
-                        res_lines = [
-                            "SPATIAL RESOLUTION RESULT",
-                            "=========================",
-                            f"Status:                {sp_res.precision}",
-                            f"Latitude:              {sp_res.latitude}",
-                            f"Longitude:             {sp_res.longitude}",
-                            f"Accuracy Radius (m):   {sp_res.accuracy_radius_meters}",
-                            f"Cascade Stage:         {sp_res.stage}",
-                            f"Source:                {sp_res.source}",
-                            f"H3 Res10:              {sp_res.h3_res10}",
-                            f"Parcel ID:             {sp_res.parcel_id or 'None'}",
-                        ]
-                        # codeql[py/clear-text-logging-sensitive-data]
-                        _emit_cli_output("\n".join(res_lines))
-                    else:
-                        # codeql[py/clear-text-logging-sensitive-data]
-                        _emit_cli_output(json.dumps([sp_res.as_dict()], indent=2))
-                elif args.bbox:
-                    try:
-                        sep = "," if "," in args.bbox else None
-                        parts = [float(x.strip()) for x in (args.bbox.split(",") if sep else args.bbox.split())]
-                    except ValueError:
-                        parts = []
-                    if len(parts) != 4:
-                        sys.stderr.write("Error: --bbox requires 4 values: min_lon,min_lat,max_lon,max_lat\n")
-                        sys.exit(2)
-                    min_lon, min_lat, max_lon, max_lat = parts
-                    results = engine.query_bounding_box(min_lon, min_lat, max_lon, max_lat, limit=args.limit)
-                    if args.format == "text":
-                        lines = [f"Found {len(results)} spatial point(s) in bounding box:"]
-                        for i, r in enumerate(results, 1):
-                            lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
-                        # codeql[py/clear-text-logging-sensitive-data]
-                        _emit_cli_output("\n".join(lines))
-                    else:
-                        # codeql[py/clear-text-logging-sensitive-data]
-                        _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
-                elif (
-                    args.min_lat is not None
-                    and args.min_lon is not None
-                    and args.max_lat is not None
-                    and args.max_lon is not None
-                ):
-                    results = engine.query_bounding_box(
-                        args.min_lon, args.min_lat, args.max_lon, args.max_lat, limit=args.limit
-                    )
-                    if args.format == "text":
-                        lines = [f"Found {len(results)} spatial point(s) in bounding box:"]
-                        for i, r in enumerate(results, 1):
-                            lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
-                        # codeql[py/clear-text-logging-sensitive-data]
-                        _emit_cli_output("\n".join(lines))
-                    else:
-                        # codeql[py/clear-text-logging-sensitive-data]
-                        _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
-                elif args.lat is not None and args.lon is not None:
-                    results = engine.query_radius(
-                        lon=args.lon, lat=args.lat, radius_meters=args.radius, limit=args.limit
-                    )
-                    if args.format == "text":
-                        lines = [f"Found {len(results)} spatial point(s) within {args.radius:.1f}m:"]
-                        for i, r in enumerate(results, 1):
-                            lines.append(f"{i}. {r.latitude}, {r.longitude} ({r.precision}, {r.source}) - H3: {r.h3_res10}")
-                        # codeql[py/clear-text-logging-sensitive-data]
-                        _emit_cli_output("\n".join(lines))
-                    else:
-                        # codeql[py/clear-text-logging-sensitive-data]
-                        _emit_cli_output(json.dumps([r.as_dict() for r in results], indent=2))
-                else:
-                    sys.stderr.write(
-                        "Error: spatial lookup requires address, coordinates (--lat and --lon), or bounding box (--min-lat, --min-lon, --max-lat, --max-lon or --bbox).\n"
-                    )
-                    sys.exit(2)
-            elif args.spatial_action in ("info", "stats"):
-                with engine._lock:
-                    pts_count = engine.count()
-                    cur = engine._conn.execute("SELECT count(*) FROM street_segments")
-                    seg_count = cur.fetchone()[0]
-                    cur = engine._conn.execute("SELECT count(*) FROM postal_centroids")
-                    post_count = cur.fetchone()[0]
-                    cur = engine._conn.execute("SELECT count(*) FROM municipal_centroids")
-                    muni_count = cur.fetchone()[0]
-
-                stats = {
-                    "database_path": engine._db_path,
-                    "total_spatial_points": pts_count,
-                    "street_segments_count": seg_count,
-                    "postal_centroids_count": post_count,
-                    "municipal_centroids_count": muni_count,
-                    "rtree_index_enabled": True,
-                    "memory_pragmas": {
-                        "journal_mode": "WAL",
-                        "cache_size_kb": 64000,
-                        "mmap_size_mb": 256,
-                        "temp_store": "MEMORY",
-                    },
-                }
-                if args.format == "json":
-                    _emit_cli_output(json.dumps(stats, indent=2))
-                else:
-                    _emit_cli_output(
-                        "SPATIAL DATABASE DIAGNOSTICS & INDEX STATISTICS\n"
-                        "================================================\n"
-                        f"Database Path:             {stats['database_path']}\n"
-                        f"Indexed Spatial Points:    {stats['total_spatial_points']:,}\n"
-                        f"Street Segments:           {stats['street_segments_count']:,}\n"
-                        f"Postal Centroids:          {stats['postal_centroids_count']:,}\n"
-                        f"Municipal Centroids:       {stats['municipal_centroids_count']:,}\n"
-                        f"R*Tree Index Enabled:      {stats['rtree_index_enabled']}\n"
-                        "Pragmas:                   WAL, cache_size=-64000, mmap_size=256MB"
-                    )
-        finally:
-            if engine_to_close:
-                engine_to_close.close()
-
-    elif args.command == "audit":
-        ledger = get_audit_ledger()
-        if args.clear:
-            ledger.clear()
-            _emit_cli_output("Audit ledger cleared.")
-            return
-
-        records = ledger.list_records(review_status=args.status)
-        if args.export == "sql":
-            _emit_cli_output(ledger.export(format="sql"))
-        elif args.export == "dict":
-            lines = [f"Audit ledger contains {len(records)} record(s):"]
-            for r in records[:50]:
-                lines.append(f"[{r.review_status}] {r.action_type} - {r.record_id} ({r.confidence_score:.4f})")
-            _emit_cli_output("\n".join(lines))
-        else:
-            _emit_cli_output(json.dumps([r.as_dict() for r in records], indent=2))
-
-    elif args.command == "cache":
-        if args.clear:
-            clear_cache()
-            _emit_cli_output("Cache cleared.")
-        else:
-            stats = get_cache_stats()
-            _emit_cli_output(json.dumps(stats, indent=2))
-
-    elif args.command == "autocomplete":
-        from address_standardizer.autocomplete import autocomplete_address
-        suggestions = autocomplete_address(
-            query=args.query,
-            max_results=args.limit,
-            state_filter=args.state,
-        )
-        if args.format == "json":
-            _emit_cli_output(json.dumps([s.as_dict() for s in suggestions], indent=2))
-        else:
-            if not suggestions:
-                _emit_cli_output("No suggestions found.")
-            lines = []
-            for i, s in enumerate(suggestions, 1):
-                sec_notice = f" [Secondary Unit Required: {', '.join(s.suggested_secondary_units)}]" if s.secondary_prompt_required else ""
-                lines.append(f"{i}. {s.text}{sec_notice}")
-            if lines:
-                _emit_cli_output("\n".join(lines))
-
-    elif args.command == "serve":
-        try:
-            import uvicorn
-        except ImportError:
-            sys.stderr.write(
-                "Error: uvicorn is required to run the server daemon. Install with `pip install uvicorn`.\n"
-            )
-            sys.exit(1)
-        uvicorn.run(
-            "address_standardizer.server:app",
-            host=args.host,
-            port=args.port,
-            workers=args.workers,
-            reload=args.reload,
-        )
+    handler = _COMMAND_HANDLERS.get(args.command)
+    if handler is not None:
+        handler(args)
 
 
 if __name__ == "__main__":

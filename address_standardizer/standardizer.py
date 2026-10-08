@@ -611,8 +611,13 @@ def standardize_address(
 
         if is_invalid_thoroughfare(norm_s1):
             if norm_s1:
-                norm_s2 = f"{norm_s1} {norm_s2}".strip() if norm_s2 else norm_s1
-                norm_s1 = ""
+                if norm_s2.startswith("PO BOX "):
+                    # A bare unit plus a PO box ("PO Box 450, Suite 400"): the box is the delivery line and
+                    # the unit stays secondary, matching the US pipeline.
+                    norm_s1, norm_s2 = norm_s2, _standardize_secondary_unit(norm_s1)
+                else:
+                    norm_s2 = f"{norm_s1} {norm_s2}".strip() if norm_s2 else norm_s1
+                    norm_s1 = ""
 
         # If thoroughfare (street1) is empty but secondary delivery line / PO Box exists, promote it
         if not norm_s1 and norm_s2:

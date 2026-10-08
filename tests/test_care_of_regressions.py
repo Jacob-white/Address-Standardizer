@@ -60,3 +60,11 @@ def test_care_of_result_is_independent_of_hash_seed():
         env = {**os.environ, "PYTHONHASHSEED": seed}
         outputs.add(subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True).stdout)
     assert len(outputs) == 1
+
+
+def test_canadian_po_box_with_suite_matches_us_behavior():
+    """'PO Box 450, Suite 400' used to parse_failed for Canada (unit swallowed the PO box)."""
+    can = standardize_address("PO Box 450, Suite 400, Winnipeg, MB R3C 3Z3, Canada")
+    assert (can.street1, can.street2, can.address_status) == ("PO BOX 450", "STE 400", "standardized")
+    us = standardize_address("PO Box 450, Suite 400, Austin, TX 78701")
+    assert (us.street1, us.street2) == (can.street1, can.street2)
