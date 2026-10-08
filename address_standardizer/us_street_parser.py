@@ -71,6 +71,7 @@ from address_standardizer.secondary_units import (  # noqa: E402
     _pre_normalize_address_string,  # noqa: F401
     _standardize_secondary_unit,  # noqa: F401
     _split_international_secondary_unit,  # noqa: F401
+    _words_to_number,
 )
 
 
@@ -274,9 +275,30 @@ class USStreetParseResult(tuple):
         return inst
 
 
+_RE_ORDINAL_FLOOR = re.compile(
+    r"(?<![A-Za-z0-9])(?P<ord>[A-Za-z]+)\s+(?:FL|FLR|FLOOR)\b\.?(?!\s*[#\d])", re.IGNORECASE
+)
+
+
+def _ordinal_floor_to_unit(match: "re.Match[str]") -> str:
+    nxt = match.string[match.end():].split(None, 1)
+    if nxt and nxt[0].strip(".,").upper() in STREET_SUFFIXES:
+        return match.group(0)  # "100 Fifth Floor Rd": Floor is part of the street name
+    word = match.group("ord").upper()
+    if word[0].isdigit():
+        return f"FL {int(word[:-2])}"
+    value = _words_to_number([word])
+    return f"FL {value}" if value > 0 else match.group(0)
+
+
+_RE_NUMBERED_STREET = re.compile(r"^\d+[A-Za-z]?\s+[A-Za-z]")
+
+
 def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
     """Parse address string using usaddress with rule-based fallback and USPS Pub 28 mapping."""
     clean_input = _pre_normalize_address_string(address_str)
+    # "Third Fl" / "3rd Floor" is a unit, not a place name + the state FL: rewrite to "FL 3" before the CRF sees it.
+    clean_input = _RE_ORDINAL_FLOOR.sub(_ordinal_floor_to_unit, clean_input)
 
     # Check for Puerto Rico Urbanization prefix
     urb_prefix = ""
@@ -816,6 +838,9 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
 
     if st1 and st2 and re.sub(r"[^\w]", "", st1.upper()) == re.sub(r"[^\w]", "", st2.upper()):
         st2 = ""
+    if st1 and st2 and st2.upper().startswith(st1.upper() + " "):
+        # The premise name ended up in both lines ("ACME" / "ACME STE 500"): the unit is what follows it.
+        st2 = _standardize_secondary_unit(st2[len(st1):].strip())
 
     # Ultimate fallback to rule-based parser if empty
     if not st1 and not st2 and not (p_city or p_state or p_zip):
@@ -871,6 +896,24 @@ def _parse_us_address_components(street1_raw: str, street2_raw: str = "", enable
         combined_st2 = _standardize_secondary_unit(combined_st2)
         st1 = re.sub(r"[\s,.\-#;:]+$", "", st1).strip()
         return USStreetParseResult(st1, combined_st2, True, p_city, p_state, p_zip, building_name=getattr(parse_res, "building_name", None))
+
+    # Two physical street lines ("100 Main St" / "200 Oak Ave"): parse each on its own. Merging them into one string
+    # produced garbage such as "100 MAIN ST 200TH OAK AVE". Street1 stays the primary address; the second street
+    # address is kept (normalised) in street2 rather than guessed at or dropped.
+    if s1_clean and s2_clean and _RE_NUMBERED_STREET.match(s1_clean) and _RE_NUMBERED_STREET.match(s2_clean):
+        first_word = s2_clean.split()[1].strip(".,#").upper() if len(s2_clean.split()) > 1 else ""
+        if first_word not in SECONDARY_UNITS and first_word not in SECONDARY_UNITS.values():
+            p1 = _parse_us_street_tokens(s1_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+            p2 = _parse_us_street_tokens(s2_clean, enable_fuzzy=enable_fuzzy, city_raw=city_raw)
+            p2_words = set(p2[0].upper().split()[1:])
+            has_suffix = bool(p2_words & set(STREET_SUFFIXES.values()))  # a real street ("OAK AVE"), not "3 FL"/"5 OAK"
+            if p1[0] and p2[0] and has_suffix:
+                second = f"{p2[0]} {p2[1]}".strip() if p2[1] else p2[0]
+                st2_dual = f"{p1[1]} {second}".strip() if p1[1] else second
+                return USStreetParseResult(
+                    re.sub(r"[\s,.\-#;:]+$", "", p1[0]).strip(), st2_dual, True, p1[3], p1[4], p1[5],
+                    building_name=getattr(p1, "building_name", None),
+                )
 
     # Puerto Rico Highway Mile/Kilometer Markers (e.g. "PR #2 KM 82 HM. 2", "PR-2 KM 82.2", "CARR 167 KM 15")
     m_pr_hwy = RE_PR_HIGHWAY.match(s1_clean)

@@ -52,6 +52,77 @@ def _pre_normalize_address_string(text: str) -> str:
     return text
 
 
+_ONES = {
+    "ONE": 1, "TWO": 2, "THREE": 3, "FOUR": 4, "FIVE": 5, "SIX": 6, "SEVEN": 7, "EIGHT": 8, "NINE": 9, "TEN": 10,
+    "ELEVEN": 11, "TWELVE": 12, "THIRTEEN": 13, "FOURTEEN": 14, "FIFTEEN": 15, "SIXTEEN": 16, "SEVENTEEN": 17,
+    "EIGHTEEN": 18, "NINETEEN": 19,
+}
+_TENS = {"TWENTY": 20, "THIRTY": 30, "FORTY": 40, "FIFTY": 50, "SIXTY": 60, "SEVENTY": 70, "EIGHTY": 80, "NINETY": 90}
+_ORDINAL_ONES = {
+    "FIRST": 1, "SECOND": 2, "THIRD": 3, "FOURTH": 4, "FIFTH": 5, "SIXTH": 6, "SEVENTH": 7, "EIGHTH": 8, "NINTH": 9,
+    "TENTH": 10, "ELEVENTH": 11, "TWELFTH": 12, "THIRTEENTH": 13, "FOURTEENTH": 14, "FIFTEENTH": 15,
+    "SIXTEENTH": 16, "SEVENTEENTH": 17, "EIGHTEENTH": 18, "NINETEENTH": 19,
+}
+_ORDINAL_TENS = {
+    "TWENTIETH": 20, "THIRTIETH": 30, "FORTIETH": 40, "FIFTIETH": 50, "SIXTIETH": 60, "SEVENTIETH": 70,
+    "EIGHTIETH": 80, "NINETIETH": 90,
+}
+_NUMBER_WORDS = set(_ONES) | set(_TENS) | set(_ORDINAL_ONES) | set(_ORDINAL_TENS) | {"HUNDRED"}
+_UNIT_DESIGNATORS = {"STE", "SUITE", "SUIT", "APARTMENT", "APPT", "APT", "UNIT", "RM", "ROOM", "BLDG", "DEPT", "FL", "SPC", "LOT", "TRLR", "PH"}
+
+
+def _words_to_number(words: list) -> int:
+    """Value of a number-word run ("FIVE HUNDRED", "TWENTY FIRST", "SECOND"); -1 if it is not a valid number."""
+    total, current, seen = 0, 0, False
+    for w in words:
+        if w in _ONES:
+            current += _ONES[w]
+        elif w in _ORDINAL_ONES:
+            current += _ORDINAL_ONES[w]
+        elif w in _TENS:
+            current += _TENS[w]
+        elif w in _ORDINAL_TENS:
+            current += _ORDINAL_TENS[w]
+        elif w == "HUNDRED":
+            if current == 0:
+                return -1
+            current *= 100
+        else:
+            return -1
+        seen = True
+    total += current
+    return total if seen and total > 0 else -1
+
+
+def _numberize_unit_words(tokens: list) -> list:
+    """Replace number words next to a unit designator or FL with digits ("SECOND FL" -> "2 FL", "STE FIVE HUNDRED" -> "STE 500")."""
+    # Split "TWENTY-FIRST" style hyphenation into separate words first.
+    flat: list = []
+    for tok in tokens:
+        parts = tok.split("-")
+        if len(parts) > 1 and all(p in _NUMBER_WORDS for p in parts):
+            flat.extend(parts)
+        else:
+            flat.append(tok)
+    out: list = []
+    i = 0
+    while i < len(flat):
+        if flat[i] in _NUMBER_WORDS:
+            j = i
+            while j < len(flat) and flat[j] in _NUMBER_WORDS:
+                j += 1
+            prev_tok = flat[i - 1] if i > 0 else ""
+            next_tok = flat[j] if j < len(flat) else ""
+            value = _words_to_number(flat[i:j])
+            if value > 0 and (prev_tok in _UNIT_DESIGNATORS or next_tok in ("FL", "FLOOR", "FLR")):
+                out.append(str(value))
+                i = j
+                continue
+        out.append(flat[i])
+        i += 1
+    return out
+
+
 def _standardize_secondary_unit(sec: str) -> str:
     """Standardizes secondary units according to USPS Pub 28, deduplicates repeated tokens, and enforces FL <num>."""
     if not sec:
@@ -80,6 +151,8 @@ def _standardize_secondary_unit(sec: str) -> str:
             tokens.append("APT")
         else:
             tokens.append(t)
+
+    tokens = _numberize_unit_words(tokens)
 
     # Token-level repeat deduplication
     for rlen in range(1, len(tokens) // 2 + 1):
@@ -131,6 +204,8 @@ def _standardize_secondary_unit(sec: str) -> str:
     res = " ".join(tokens)
     # Strip any STE or SUITE prepended to FL, APT, UNIT, DEPT, PH
     res = re.sub(r"^(?:STE|SUITE)\s+(FL|APT|UNIT|DEPT|PH)\b", r"\1", res)
+    # "No. 5" / "Number 5" / "Num 5" is the same thing as "#5": a bare unit identifier (USPS form here: STE <id>).
+    res = re.sub(r"^(?:STE\s+)?(?:NO|NUM|NUMBER)\s+(?=[A-Z0-9\-]*\d|[A-Z]$)([A-Z0-9\-]+)$", r"STE \1", res)
     return res
 
 

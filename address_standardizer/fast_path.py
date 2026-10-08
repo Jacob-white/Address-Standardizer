@@ -83,6 +83,9 @@ def _normalize_fast_sec_unit(sec_raw: str) -> Optional[str]:
     from address_standardizer.standardizer import _standardize_secondary_unit
     matches = list(RE_SEC_UNIT.finditer(sec_clean))
     if matches:
+        # Text before the first unit ("200 OAK AVE APT 3") is not a unit: extracting only the unit would silently drop it.
+        if re.search(r"[A-Z]", sec_clean[:matches[0].start()]):
+            return None
         sec_parts = []
         for m in matches:
             if m.group(1):
@@ -97,6 +100,8 @@ def _normalize_fast_sec_unit(sec_raw: str) -> Optional[str]:
                 sec_parts.append(f"{stype} {sval}".strip())
         res = " ".join(sec_parts).strip()
         return _standardize_secondary_unit(res)
+    if re.match(r"^\d+[A-Z]?\s+[A-Z]{2,}", sec_clean) and not re.search(r"\b(?:FL|FLR|FLOOR)\b", sec_clean):
+        return None  # "5 OAK": a street fragment, not a unit; the full parser decides
     res = _standardize_secondary_unit(sec_clean)
     if res and res != sec_clean:
         return res

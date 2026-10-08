@@ -4,7 +4,7 @@ Open items from the whole-codebase review. The review's other findings are fixed
 
 ## Spatial and autocomplete
 
-- [x] H3 fallback (`spatial/h3_indexer.py`) is not real H3: label/namespace it, or require the `h3` package; validate coordinates; add known-vector tests when `h3` is present.
+- [x] H3 fallback (`spatial/h3_indexer.py`) was not real H3: removed; `h3` is now a required dependency and the wrapper only returns real H3 values; validate coordinates; add known-vector tests when `h3` is present.
 - [x] `autocomplete.py`: exclude records without coordinates when a radius is given.
 - [x] `autocomplete.py`: dedupe in `connect_reference_index`.
 - [x] `autocomplete.py`: clamp the haversine intermediate value to [0, 1].

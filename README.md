@@ -73,7 +73,7 @@ A standalone multi-national address standardization, offline spatial geocoding, 
 - **Offline Spatial Geocoding (no network calls):**
   - Zero external network or cloud API calls on the offline path (the `--geocode` flag, which uses the US Census API, is separate and opt-in).
   - SQLite `R*Tree` virtual tables for indexed bounding-box lookups. The built-in index is only a tiny sample (a handful of points plus postal and municipal centroids); build a real database from your own data with `spatial build`.
-  - Uber H3 resolution 10 cell identifiers via the `h3` package (installed by the `dev` extra, or `pip install h3`). Without `h3`, an approximate, **non-interoperable** grid-bucket fallback is used and H3 distance/k-ring operations raise `NotImplementedError`; check `address_standardizer.spatial.h3_indexer.h3_backend()`.
+  - Uber H3 resolution 10 cell identifiers from the real `h3` library (a required dependency, so identifiers are interoperable with other H3 tools; invalid or out-of-range coordinates raise `ValueError` rather than being clamped).
   - 4-stage resolution cascade: `CONFIRMED_ROOFTOP` (1) &rarr; `RANGE_INTERPOLATED` (2) &rarr; `POSTAL_CENTROID` (3) &rarr; `MUNICIPAL_CENTROID` (4), else `UNRESOLVED`.
   - ETL ingestion for OpenAddresses (CSV), TIGER street segments (CSV), and OpenStreetMap building features (GeoJSON).
 - **Pure-Python Core with an Optional Native Module:**
@@ -143,14 +143,13 @@ Optional extras (declared in `pyproject.toml`):
 | :--- | :--- |
 | `server` | `fastapi`, `uvicorn`, `pydantic`, `httpx` for `address-standardizer serve` |
 | `ml` | `usaddress` (CRF-based US parser) |
-| `arrow` | `pyarrow`, `polars`, `duckdb` for `address_standardizer.arrow` (`standardize_arrow`, `standardize_polars`, `register_duckdb_udfs`) |
+| `arrow` | `pyarrow`, `polars`, `duckdb`, `numpy` for `address_standardizer.arrow` (`standardize_arrow`, `standardize_polars`, `register_duckdb_udfs`) |
 | `benchmark` | `psutil` for memory measurements |
-| `dev` | `pytest`, `pytest-cov`, `ruff`, `hypothesis`, `usaddress`, `h3` |
+| `dev` | `pytest`, `pytest-cov`, `ruff`, `hypothesis`, `usaddress` |
 
 ```bash
 pip install -e ".[ml]"          # or ".[arrow]", ".[benchmark]"
-pip install -e ".[dev]"         # development & testing (includes real H3 cells)
-pip install h3                  # real H3 cell ids without the dev extra
+pip install -e ".[dev]"         # development & testing
 ```
 
 Optional native module (Soundex only; requires a Rust toolchain and `pip install maturin`):
@@ -163,7 +162,7 @@ maturin develop --release
 
 ## Python API Quickstart
 
-All outputs below were produced by running the snippets against the current code (Python 3.13, with `h3` installed). See the [Quickstart](docs/quickstart.md) and [API Reference](docs/api_reference.md) for more.
+All outputs below were produced by running the snippets against the current code (Python 3.13). See the [Quickstart](docs/quickstart.md) and [API Reference](docs/api_reference.md) for more.
 
 ### 1. Domestic US Address Standardization
 ```python
@@ -323,7 +322,7 @@ print(r2.precision, r2.accuracy_radius_meters)   # POSTAL_CENTROID 8000.0
 a = standardize_address("100 Wall Street, Suite 400, New York, NY 10005", enable_geocoding=True)
 print(a.spatial_result.precision)      # "CONFIRMED_ROOFTOP"
 
-# Direct lat/lng to H3 resolution 10 (real H3 when the `h3` package is installed)
+# Direct lat/lng to H3 resolution 10 (real H3 cell ids from the `h3` package)
 print(lat_lng_to_h3(40.7061, -74.006, resolution=10))   # "8a2a1072885ffff"
 ```
 

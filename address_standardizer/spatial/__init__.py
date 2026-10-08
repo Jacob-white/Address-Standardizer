@@ -17,10 +17,8 @@ from address_standardizer.spatial.h3_indexer import (
     int_to_h3,
     is_valid_h3,
     k_ring,
-    h3_backend,
     h3_distance,
     h3_to_parent,
-    has_compiled_h3,
 )
 from address_standardizer.spatial.ingestion import (
     snap_coordinate,
@@ -41,10 +39,8 @@ __all__ = [
     "int_to_h3",
     "is_valid_h3",
     "k_ring",
-    "h3_backend",
     "h3_distance",
     "h3_to_parent",
-    "has_compiled_h3",
     "snap_coordinate",
     "calculate_polygon_centroid",
     "OpenAddressesIngestor",

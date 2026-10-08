@@ -41,3 +41,28 @@ def test_jsonl_output_uses_real_booleans(tmp_path):
     row = json.loads(dst.read_text().splitlines()[0])
     assert row["is_registered_agent_hub"] is False
     assert row["is_private_residence"] is False
+
+
+def test_text_format_omits_rooftop_line_when_unknown():
+    from address_standardizer.cli_formatting import _format_text_address
+
+    assert "Rooftop Address" not in _format_text_address({"street1": "1 A ST"})
+    assert "Rooftop Address:       1 A ST" in _format_text_address({"street1": "1 A ST", "rooftop_address": "1 A ST"})
+
+
+def test_server_rejects_non_object_ndjson_lines_and_counts_addresses():
+    import pytest
+
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from address_standardizer.server import create_app
+
+    client = TestClient(create_app())
+    body = '"100 Wall St, New York, NY 10005"\n[1]\n{"street1": "1 Main St", "city": "Austin", "state": "TX"}\n'
+    resp = client.post("/v1/batch", content=body, headers={"content-type": "application/x-ndjson"})
+    lines = [json.loads(ln) for ln in resp.text.strip().split("\n")]
+    assert lines[1] == {"error": "invalid record", "index": 1}
+    assert lines[0]["street1"] == "100 WALL ST"
+    metrics = client.get("/metrics").json()
+    assert metrics["total_addresses_processed"] >= 3

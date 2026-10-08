@@ -87,6 +87,7 @@ from address_standardizer.secondary_units import (  # noqa: E402
     _pre_normalize_address_string,  # noqa: F401
     _standardize_secondary_unit,  # noqa: F401
     _split_international_secondary_unit,  # noqa: F401
+    _numberize_unit_words,
 )
 
 
@@ -361,6 +362,12 @@ def standardize_address(
     s1_cand = street1 if street1 is not None else kwargs.get("street")
     s1_in = str(s1_cand).strip() if s1_cand is not None else ""
     s2_in = str(street2).strip() if street2 is not None else ""
+    if s2_in:
+        # "Suite Five Hundred" / "Second Floor": number words next to a unit designator become digits up front.
+        _s2_tokens = s2_in.upper().split()
+        _s2_numeric = _numberize_unit_words(_s2_tokens)
+        if _s2_numeric != _s2_tokens:
+            s2_in = " ".join(_s2_numeric)
     city_in = str(city).strip() if city is not None else ""
     state_in = str(state).strip() if state is not None else ""
     postal_in = str(postal_code).strip() if postal_code is not None else ""

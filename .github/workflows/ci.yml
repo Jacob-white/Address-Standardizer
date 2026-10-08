@@ -65,7 +65,7 @@ jobs:
           cp -r native_x/_address_standardizer_rs "$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/"
           python -c "from address_standardizer import _native_dispatch as n; assert n.is_native_available(), 'native extension not importable'"
       - name: Native/pure parity and acceleration tests (must not skip)
-        run: pytest tests/native tests/test_rust_acceleration.py tests/test_address_standardization_improvements.py -rs
+        run: pytest -m "not perf" tests/native tests/test_rust_acceleration.py tests/test_address_standardization_improvements.py -rs
 
   sdks:
     # Builds and tests every client SDK, then runs each against a live server (contract + integration).

@@ -44,7 +44,7 @@ Address Standardizer is owned and maintained by **HobbyHabbit LLC** under the **
 - **Specification**: [`ENTERPRISE_STRATEGIC_TECHNICAL_BLUEPRINT.md`](ENTERPRISE_STRATEGIC_TECHNICAL_BLUEPRINT.md)
 - **Status**: Implemented & Certified (`v2.0.0`)
 - **Key Capabilities**:
-  - **Confidence Scoring & Routing Tiers**: Multi-factor composite confidence scoring (0.0 to 1.0) routing records to `AUTO_PASS` ($\ge 0.85$), `FUZZY_REVIEW` ($0.70 - 0.85$), or `MANUAL_STEWARDSHIP` ($< 0.70$).
+  - **Confidence Scoring & Routing Tiers**: Multi-factor composite confidence scoring (0.0 to 1.0) routing records to `AUTO_PASS` ($\ge 0.95$), `FUZZY_REVIEW` ($0.80 - 0.95$), or `MANUAL_STEWARDSHIP` ($< 0.80$).
   - **Stewardship Audit Ledger**: Structured SQLite audit ledger logging data quality exceptions, parsing failures, and corporate secrecy flags.
   - **Multi-Tier Reference Caching**: L1 in-memory LRU cache + persistent L2 SQLite WAL cache.
   - **Delivery Intelligence**: USPS DPV diagnostic footnotes (`AA`, `BB`, `CC`, `N1`, `M1`) and Residential Delivery Indicator (RDI Commercial vs Residential).

@@ -31,7 +31,6 @@ from address_standardizer.spatial.h3_indexer import (
     int_to_h3,
     k_ring,
     h3_distance,
-    h3_backend,
     h3_to_parent,
     H3_HEX_PATTERN,
 )
@@ -590,11 +589,7 @@ class TestH3ClusteringAndInvariance:
         c3 = lat_lng_to_h3(40.7140, -74.0060, resolution=10)  # a few cells away
 
         assert h3_distance(c1, c2) == 0
-        if h3_backend() == "h3":
-            assert h3_distance(c1, c3) > 0
-        else:
-            with pytest.raises(NotImplementedError):
-                h3_distance(c1, c3)
+        assert h3_distance(c1, c3) > 0
 
 
 # ==============================================================================

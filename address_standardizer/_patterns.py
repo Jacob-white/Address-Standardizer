@@ -100,8 +100,8 @@ RE_MILITARY_UNIT_BOX = re.compile(
 )
 
 # Rural Route & Highway Contract
-RE_RURAL_ROUTE = re.compile(r"\b(RR|RURAL\s+ROUTE)\s*#?\s*(\d+)\b(?:\s*BOX\s*([A-Z0-9\-]+))?", re.IGNORECASE)
-RE_HIGHWAY_CONTRACT = re.compile(r"\b(HC|HIGHWAY\s+CONTRACT)\s*#?\s*(\d+)\b(?:\s*BOX\s*([A-Z0-9\-]+))?", re.IGNORECASE)
+RE_RURAL_ROUTE = re.compile(r"\b(R\.?\s?R\.?|RURAL\s+ROUTE)\s*#?\s*(\d+)\b(?:[ ,\t]*BOX\s*#?\s*([A-Z0-9\-]+))?", re.IGNORECASE)
+RE_HIGHWAY_CONTRACT = re.compile(r"\b(H\.?C\.?|HIGHWAY\s+CONTRACT)\s*#?\s*(\d+)\b(?:[ ,\t]*BOX\s*#?\s*([A-Z0-9\-]+))?", re.IGNORECASE)
 
 # Additional Pre-Compiled Utility Patterns
 RE_CLEAN_ALPHA = re.compile(r"[^A-Z]")

@@ -358,7 +358,7 @@ autocomplete_address(query, max_results=5, state_filter=None, client_lat=None, c
 - `get_default_spatial_engine()` / `resolve_spatial_coordinates(address)`: a process-wide engine. It opens the file named
   by `SPATIAL_DB_PATH`, else `data/spatial_index.db` if it exists, else uses an in-memory seeded database.
 - `lat_lng_to_h3(lat, lng, resolution=10) -> str`. More H3 helpers (`h3_to_int`, `int_to_h3`, `is_valid_h3`, `k_ring`,
-  `h3_distance`, `h3_to_parent`, `h3_backend`, `has_compiled_h3`) and ingestors (`OpenAddressesIngestor`,
+  `h3_distance`, `h3_to_parent`) and ingestors (`OpenAddressesIngestor`,
   `TigerLineIngestor`, `OsmBuildingIngestor`, `build_spatial_database`) are in `address_standardizer.spatial`.
 - `OfflineReferenceIndex`, `get_default_offline_index()`, `resolve_offline_coordinates(address)`,
   `validate_parcel_offline(address)` expose the offline rooftop reference index (`RooftopRecord`, `ParcelValidationResult`).

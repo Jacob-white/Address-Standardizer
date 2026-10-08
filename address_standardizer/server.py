@@ -348,7 +348,8 @@ def _process_item_to_dict(
     elif isinstance(item, StandardizeRequest):
         req = item
     else:
-        req = StandardizeRequest(address=str(item))
+        # Arrays, numbers, null...: reject rather than stringify into a garbage address.
+        raise TypeError(f"batch item must be a string or an object, got {type(item).__name__}")
 
     return _standardize_from_req(req)
 
@@ -398,7 +399,8 @@ def create_app() -> FastAPI:
             metrics.record_request(_route_label(request), 500, time.perf_counter() - start)
             raise
         duration = time.perf_counter() - start
-        metrics.record_request(_route_label(request), response.status_code, duration)
+        count = getattr(request.state, "address_count", 1)
+        metrics.record_request(_route_label(request), response.status_code, duration, address_count=count)
         response.headers["X-Response-Time-Ms"] = f"{duration * 1000.0:.3f}"
         return response
 
@@ -483,6 +485,7 @@ def create_app() -> FastAPI:
             ndjson_lines = [ln.strip() for ln in body_text.split("\n") if ln.strip()]
             if len(ndjson_lines) > _max_batch_size():
                 raise _batch_too_large(len(ndjson_lines), _max_batch_size())
+            request.state.address_count = len(ndjson_lines)
 
             def ndjson_generator() -> Iterator[str]:
                 for index, line in enumerate(ndjson_lines):
@@ -531,6 +534,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="'addresses' must be an array")
         if len(addresses_list) > _max_batch_size():
             raise _batch_too_large(len(addresses_list), _max_batch_size())
+        request.state.address_count = len(addresses_list)
         for index, item in enumerate(addresses_list):
             if not isinstance(item, (str, dict)):
                 raise HTTPException(

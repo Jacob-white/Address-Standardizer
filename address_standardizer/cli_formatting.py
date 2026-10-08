@@ -21,7 +21,6 @@ def _format_text_address(data: Dict[str, Any]) -> str:
         "====================",
         f"Street 1:              {data.get('street1', '')}",
         f"Street 2:              {data.get('street2', '')}",
-        f"Rooftop Address:       {data.get('rooftop_address', '')}",
         f"City:                  {data.get('city', '')}",
         f"State:                 {data.get('state', '')}",
         f"Postal Code:           {data.get('postal_code', '')}",
@@ -34,6 +33,8 @@ def _format_text_address(data: Dict[str, Any]) -> str:
         f"Private Residence:     {data.get('is_private_residence', False)}",
         f"Registered Agent Hub:  {data.get('is_registered_agent_hub', False)}",
     ]
+    if data.get("rooftop_address"):
+        lines.insert(5, f"Rooftop Address:       {data['rooftop_address']}")
     if data.get("dependent_locality"):
         lines.append(f"Dependent Locality:    {data['dependent_locality']}")
     if data.get("building_name"):
