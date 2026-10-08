@@ -4,12 +4,12 @@ Open items from the whole-codebase review. The review's other findings are fixed
 
 ## Spatial and autocomplete
 
-- [ ] H3 fallback (`spatial/h3_indexer.py`) is not real H3: label/namespace it, or require the `h3` package; validate coordinates; add known-vector tests when `h3` is present.
-- [ ] `autocomplete.py`: exclude records without coordinates when a radius is given.
-- [ ] `autocomplete.py`: dedupe in `connect_reference_index`.
-- [ ] `autocomplete.py`: clamp the haversine intermediate value to [0, 1].
-- [ ] `autocomplete.py`: handle negative `max_results`.
-- [ ] `calculate_polygon_centroid`: antimeridian handling; skip empty polygon rings.
+- [x] H3 fallback (`spatial/h3_indexer.py`) is not real H3: label/namespace it, or require the `h3` package; validate coordinates; add known-vector tests when `h3` is present.
+- [x] `autocomplete.py`: exclude records without coordinates when a radius is given.
+- [x] `autocomplete.py`: dedupe in `connect_reference_index`.
+- [x] `autocomplete.py`: clamp the haversine intermediate value to [0, 1].
+- [x] `autocomplete.py`: handle negative `max_results`.
+- [x] `calculate_polygon_centroid`: antimeridian handling; skip empty polygon rings.
 
 ## Tests and benchmarks
 

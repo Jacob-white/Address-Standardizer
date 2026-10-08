@@ -56,3 +56,34 @@ def test_ingestion_skips_bad_rows_and_superscript_digits_without_aborting(engine
         {"LATITUDE": "40.0", "LONGITUDE": "-73.0", "NUMBER": "²", "STREET": "Sup St", "CITY": "X", "REGION": "NY"},
     ]
     assert ingestor.ingest_records(records) == 1
+
+
+def test_polygon_centroid_across_the_antimeridian():
+    from address_standardizer.spatial.ingestion import calculate_polygon_centroid
+
+    ring = [[179.0, 0.0], [-179.0, 0.0], [-179.0, 2.0], [179.0, 2.0], [179.0, 0.0]]
+    lon, lat = calculate_polygon_centroid(ring)
+    assert abs(abs(lon) - 180.0) < 1e-6
+    assert abs(lat - 1.0) < 1e-6
+
+
+def test_polygon_centroid_is_precise_for_small_buildings():
+    from address_standardizer.spatial.ingestion import calculate_polygon_centroid
+
+    d = 0.0001
+    ring = [[-74.0, 40.7], [-74.0 + d, 40.7], [-74.0 + d, 40.7 + d], [-74.0, 40.7 + d], [-74.0, 40.7]]
+    lon, lat = calculate_polygon_centroid(ring)
+    assert abs(lon - (-74.0 + d / 2)) < 1e-6 and abs(lat - (40.7 + d / 2)) < 1e-6
+
+
+def test_osm_ingest_skips_empty_rings_and_malformed_geometry(engine):
+    from address_standardizer.spatial.ingestion import OsmBuildingIngestor
+
+    props = {"addr:housenumber": "1", "addr:street": "A St"}
+    features = [
+        {"geometry": {"type": "Polygon", "coordinates": [[]]}, "properties": props},
+        {"geometry": {"type": "MultiPolygon", "coordinates": [[[]]]}, "properties": props},
+        {"geometry": {"type": "Point", "coordinates": ["x", "y"]}, "properties": props},
+        {"geometry": {"type": "Point", "coordinates": [-73.0, 40.0]}, "properties": props},
+    ]
+    assert OsmBuildingIngestor(engine).ingest_features(features) == 1

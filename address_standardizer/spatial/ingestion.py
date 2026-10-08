@@ -30,6 +30,16 @@ def calculate_polygon_centroid(coordinates: List[List[float]]) -> Tuple[float, f
     n = len(coordinates)
     if n == 0:
         return 0.0, 0.0
+
+    # A ring that crosses the antimeridian jumps by ~360 degrees between vertices: unwrap negative longitudes into
+    # [180, 360) so the planar maths sees a contiguous shape, then wrap the answer back into [-180, 180].
+    lons = [pt[0] for pt in coordinates]
+    if max(lons) - min(lons) > 180.0:
+        shifted = [[pt[0] + 360.0 if pt[0] < 0 else pt[0], pt[1]] for pt in coordinates]
+        lon, lat = calculate_polygon_centroid(shifted)
+        if lon > 180.0:
+            lon = snap_coordinate(lon - 360.0)
+        return lon, lat
     if n < 3:
         avg_x = sum(pt[0] for pt in coordinates) / n
         avg_y = sum(pt[1] for pt in coordinates) / n
@@ -38,10 +48,12 @@ def calculate_polygon_centroid(coordinates: List[List[float]]) -> Tuple[float, f
     area = 0.0
     cx = 0.0
     cy = 0.0
+    # Work relative to the first vertex: absolute lon/lat products lose precision for small buildings.
+    ox, oy = coordinates[0][0], coordinates[0][1]
     for i in range(n):
         j = (i + 1) % n
-        xi, yi = coordinates[i][0], coordinates[i][1]
-        xj, yj = coordinates[j][0], coordinates[j][1]
+        xi, yi = coordinates[i][0] - ox, coordinates[i][1] - oy
+        xj, yj = coordinates[j][0] - ox, coordinates[j][1] - oy
         factor = xi * yj - xj * yi
         area += factor
         cx += (xi + xj) * factor
@@ -54,8 +66,8 @@ def calculate_polygon_centroid(coordinates: List[List[float]]) -> Tuple[float, f
         avg_y = sum(pt[1] for pt in coordinates) / n
         return snap_coordinate(avg_x), snap_coordinate(avg_y)
 
-    cx /= (6.0 * area)
-    cy /= (6.0 * area)
+    cx = cx / (6.0 * area) + ox
+    cy = cy / (6.0 * area) + oy
     return snap_coordinate(cx), snap_coordinate(cy)
 
 
@@ -232,12 +244,15 @@ class OsmBuildingIngestor:
             coords = geom.get("coordinates", [])
 
             lat, lon = None, None
-            if g_type == "Point" and len(coords) >= 2:
-                lon, lat = snap_coordinate(coords[0]), snap_coordinate(coords[1])
-            elif g_type == "Polygon" and coords:
-                lon, lat = calculate_polygon_centroid(coords[0])
-            elif g_type == "MultiPolygon" and coords and coords[0]:
-                lon, lat = calculate_polygon_centroid(coords[0][0])
+            try:
+                if g_type == "Point" and len(coords) >= 2:
+                    lon, lat = snap_coordinate(coords[0]), snap_coordinate(coords[1])
+                elif g_type == "Polygon" and coords and coords[0]:
+                    lon, lat = calculate_polygon_centroid(coords[0])
+                elif g_type == "MultiPolygon" and coords and coords[0] and coords[0][0]:
+                    lon, lat = calculate_polygon_centroid(coords[0][0])
+            except (TypeError, ValueError, IndexError):
+                continue  # malformed geometry: skip the feature, keep ingesting
 
             if lat is None or lon is None or not _valid_coordinate(lat, lon):
                 continue

@@ -1,8 +1,14 @@
 """
-Uber H3 Spatial Hexagonal Clustering Wrapper & Pure-Python Fallback.
-====================================================================
-Computes Resolution 10 (~65m edge length) hexagonal cell identifiers,
-k-ring neighborhood disks, parent hierarchies, and grid distances.
+Uber H3 cell identifiers: wrapper around the ``h3`` package with an approximate fallback.
+=========================================================================================
+With the ``h3`` package installed (``pip install h3``) every function here is real H3 and the identifiers are
+interoperable with other H3 tooling.
+
+Without it, ``lat_lng_to_h3`` falls back to a *stable local grid bucket* that is formatted like an H3 index but is
+**not** H3: the cell ids do not match Uber H3 and must not be exchanged with other systems. It exists only so the
+spatial engine can bucket points when ``h3`` is absent. Operations that need true H3 geometry (``k_ring``,
+``h3_distance``) raise ``NotImplementedError`` in that mode rather than return made-up answers. Use
+``h3_backend()`` to find out which mode is active.
 """
 
 import math
@@ -22,6 +28,22 @@ except ImportError:
 def has_compiled_h3() -> bool:
     """Returns True if the compiled C h3 library is installed."""
     return _HAS_COMPILED_H3
+
+
+def h3_backend() -> str:
+    """``"h3"`` when real H3 is in use, ``"approximate-grid"`` for the non-interoperable fallback."""
+    return "h3" if _HAS_COMPILED_H3 and _h3_lib is not None else "approximate-grid"
+
+
+def _validate_lat_lng(lat: float, lng: float, resolution: int) -> None:
+    if not (math.isfinite(lat) and math.isfinite(lng)):
+        raise ValueError(f"Coordinates must be finite: lat={lat}, lng={lng}")
+    if not -90.0 <= lat <= 90.0:
+        raise ValueError(f"Latitude out of range [-90, 90]: {lat}")
+    if not -180.0 <= lng <= 180.0:
+        raise ValueError(f"Longitude out of range [-180, 180]: {lng}")
+    if not isinstance(resolution, int) or isinstance(resolution, bool) or not 0 <= resolution <= 15:
+        raise ValueError(f"Resolution must be an integer in [0, 15]: {resolution!r}")
 
 
 def _axial_round(q: float, r: float) -> Tuple[int, int]:
@@ -90,8 +112,10 @@ def _pure_python_lat_lng_to_h3(lat: float, lng: float, resolution: int = 10) -> 
 def lat_lng_to_h3(lat: float, lng: float, resolution: int = 10) -> str:
     """
     Encodes (latitude, longitude) into a 15-character lowercase H3 cell index.
-    Defaults to Resolution 10 (~65m hexagon edge length).
+    Defaults to Resolution 10 (~65m hexagon edge length). Raises ``ValueError`` for non-finite or out-of-range input.
+    With the ``h3`` package this is real H3; otherwise see the module docstring (non-interoperable bucket id).
     """
+    _validate_lat_lng(lat, lng, resolution)
     if _HAS_COMPILED_H3 and _h3_lib is not None:
         if hasattr(_h3_lib, "latlng_to_cell"):
             return str(_h3_lib.latlng_to_cell(lat, lng, resolution)).lower()
@@ -140,17 +164,7 @@ def k_ring(h3_index: str, ring_size: int = 1) -> List[str]:
         if hasattr(_h3_lib, "k_ring"):
             return sorted([str(c).lower() for c in _h3_lib.k_ring(clean, ring_size)])
 
-    # Pure Python ring generation via axial offsets
-    val = int(clean, 16)
-    neighbors = {clean}
-    for dq in range(-ring_size, ring_size + 1):
-        for dr in range(-ring_size, ring_size + 1):
-            if max(abs(dq), abs(dr), abs(dq + dr)) <= ring_size:
-                offset_val = val ^ (((abs(dq) & 0x7) << 20) | ((abs(dr) & 0x7) << 17))
-                hex_rep = f"{offset_val:015x}"
-                if is_valid_h3(hex_rep):
-                    neighbors.add(hex_rep)
-    return sorted(list(neighbors))
+    raise NotImplementedError("k_ring needs the 'h3' package (pip install h3); the fallback grid has no real topology")
 
 
 def h3_distance(origin: str, destination: str) -> int:
@@ -168,11 +182,7 @@ def h3_distance(origin: str, destination: str) -> int:
         if hasattr(_h3_lib, "h3_distance"):
             return int(_h3_lib.h3_distance(orig, dest))
 
-    # Pure Python grid distance approximation from index bits
-    v1 = int(orig, 16)
-    v2 = int(dest, 16)
-    diff = abs(v1 - v2)
-    return min(100, max(1, (diff >> 15) % 15))
+    raise NotImplementedError("h3_distance needs the 'h3' package (pip install h3)")
 
 
 def h3_to_parent(h3_index: str, parent_res: int) -> str:

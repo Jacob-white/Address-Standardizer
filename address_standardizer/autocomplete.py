@@ -43,6 +43,21 @@ def damerau_levenshtein_distance(s1: str, s2: str) -> int:
     return len(diff_indices)
 
 
+def _finite_or_none(value: Any) -> Optional[float]:
+    """float(value) when it is a finite number, else None (missing, NaN, inf, or not numeric)."""
+    if value is None:
+        return None
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+def _record_key(rec: Dict[str, Any]) -> Tuple[str, ...]:
+    return (rec["street1"], rec["street2"], rec["city"], rec["state"], rec["postal_code"], rec["country"])
+
+
 def calculate_haversine_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Computes great-circle distance in meters between two lat/lon coordinates."""
     R = 6371000.0
@@ -51,6 +66,7 @@ def calculate_haversine_distance_meters(lat1: float, lon1: float, lat2: float, l
     delta_phi = math.radians(lat2 - lat1)
     delta_lambda = math.radians(lon2 - lon1)
     a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
+    a = min(1.0, max(0.0, a))  # float error can push `a` just outside [0, 1] for antipodal points
     c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
     return R * c
 
@@ -263,6 +279,7 @@ class AutocompleteEngine:
 
     def __init__(self, seed: bool = True):
         self._records: List[Dict[str, Any]] = []
+        self._record_keys: Set[Tuple[str, ...]] = set()
         self._prefix_index: Dict[str, Set[int]] = {}
         if seed:
             for rec in SEED_AUTOCOMPLETE_RECORDS:
@@ -283,6 +300,10 @@ class AutocompleteEngine:
     ) -> int:
         """Indexes a canonical address into the in-memory prefix inverted index."""
         rec_id = len(self._records)
+        lat_f = _finite_or_none(latitude)
+        lon_f = _finite_or_none(longitude)
+        if lat_f is None or lon_f is None or not (-90.0 <= lat_f <= 90.0 and -180.0 <= lon_f <= 180.0):
+            lat_f = lon_f = None
         record = {
             "id": rec_id,
             "street1": street1.strip().upper(),
@@ -293,10 +314,11 @@ class AutocompleteEngine:
             "country": country.strip().upper(),
             "is_multi_unit": is_multi_unit,
             "known_units": list(known_units) if known_units else [],
-            "latitude": float(latitude) if latitude is not None else None,
-            "longitude": float(longitude) if longitude is not None else None,
+            "latitude": lat_f,
+            "longitude": lon_f,
         }
         self._records.append(record)
+        self._record_keys.add(_record_key(record))
 
         # Index all tokens across fields
         units_text = " ".join(record["known_units"])
@@ -332,6 +354,16 @@ class AutocompleteEngine:
             cur = index._conn.execute("SELECT * FROM rooftop_reference")
             rows = cur.fetchall()
             for row in rows:
+                key = (
+                    (row["street1"] or "").strip().upper(),
+                    (row["street2"] or "").strip().upper(),
+                    (row["city"] or "").strip().upper(),
+                    (row["state"] or "").strip().upper(),
+                    (row["postal_code"] or "").strip(),
+                    (row["country"] or "").strip().upper(),
+                )
+                if key in self._record_keys:
+                    continue  # already indexed (e.g. connecting the same reference index twice)
                 known_u = []
                 if row["known_units"]:
                     try:
@@ -347,8 +379,8 @@ class AutocompleteEngine:
                     country=row["country"],
                     is_multi_unit=bool(row["is_multi_unit"]),
                     known_units=known_u,
-                    latitude=float(row["latitude"]),
-                    longitude=float(row["longitude"]),
+                    latitude=row["latitude"],
+                    longitude=row["longitude"],
                 )
                 count += 1
         return count
@@ -378,6 +410,8 @@ class AutocompleteEngine:
         Executes real-time prefix search with typo tolerance and proximity radius biasing.
         Sub-8ms response time.
         """
+        if max_results <= 0:
+            return []
         client_lat = client_lat if client_lat is not None else latitude
         client_lon = client_lon if client_lon is not None else longitude
         if radius_miles is not None and radius_km is None:
@@ -475,7 +509,10 @@ class AutocompleteEngine:
 
             # Geographic proximity distance calculation & filtering
             dist_meters: Optional[float] = None
-            if client_lat is not None and client_lon is not None and rec["latitude"] is not None and rec["longitude"] is not None:
+            has_coords = rec["latitude"] is not None and rec["longitude"] is not None
+            if radius_km is not None and client_lat is not None and client_lon is not None and not has_coords:
+                continue  # cannot be shown to be inside the radius
+            if client_lat is not None and client_lon is not None and has_coords:
                 d_m = calculate_haversine_distance_meters(client_lat, client_lon, rec["latitude"], rec["longitude"])
                 d_km = d_m / 1000.0
                 if radius_km is not None and d_km > radius_km:

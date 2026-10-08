@@ -7,6 +7,7 @@ grid distance, parent hierarchy, bit packing, and pure-Python fallback.
 
 from unittest.mock import MagicMock, patch
 import pytest
+import address_standardizer.spatial.h3_indexer as mod
 
 from address_standardizer.spatial.h3_indexer import (
     has_compiled_h3,
@@ -21,11 +22,18 @@ from address_standardizer.spatial.h3_indexer import (
 )
 
 
+@pytest.fixture
+def fallback(monkeypatch):
+    """Force the approximate-grid fallback even when the real ``h3`` package is installed."""
+    monkeypatch.setattr(mod, "_HAS_COMPILED_H3", False)
+    monkeypatch.setattr(mod, "_h3_lib", None)
+
+
 class TestH3Indexer:
     def test_has_compiled_h3(self):
-        # In current environment, compiled h3 is not installed
         res = has_compiled_h3()
         assert isinstance(res, bool)
+        assert mod.h3_backend() == ("h3" if res else "approximate-grid")
 
     def test_axial_round_branches(self):
         # Case 1: x_diff > y_diff and x_diff > z_diff
@@ -52,25 +60,29 @@ class TestH3Indexer:
             importlib.reload(mod)
             assert mod.has_compiled_h3() is True
 
-        # Reload cleanly back without h3
-        if "h3" in sys.modules:
-            del sys.modules["h3"]
-        mod = importlib.import_module("address_standardizer.spatial.h3_indexer")
+        # A missing package (import raises) selects the fallback; restore the real state afterwards.
+        with patch.dict(sys.modules, {"h3": None}):
+            importlib.reload(mod)
+            assert mod.has_compiled_h3() is False
+            assert mod.h3_backend() == "approximate-grid"
         importlib.reload(mod)
-        assert mod.has_compiled_h3() is False
 
-    def test_lat_lng_to_h3_pure_python(self):
+    def test_lat_lng_to_h3_pure_python(self, fallback):
         # Standard Manhattan coords
         h3_idx = lat_lng_to_h3(40.7061, -74.0060, resolution=10)
         assert len(h3_idx) == 15
         assert is_valid_h3(h3_idx)
 
-        # Clamping / extreme coords
-        h3_north = lat_lng_to_h3(95.0, 190.0, resolution=10)
-        assert is_valid_h3(h3_north)
-
-        h3_south = lat_lng_to_h3(-95.0, -190.0, resolution=10)
-        assert is_valid_h3(h3_south)
+        # Boundary coordinates are accepted; anything outside WGS84 (or non-finite) is rejected, not clamped.
+        assert is_valid_h3(lat_lng_to_h3(90.0, 180.0, resolution=10))
+        assert is_valid_h3(lat_lng_to_h3(-90.0, -180.0, resolution=10))
+        for bad in [(95.0, 0.0), (-95.0, 0.0), (0.0, 190.0), (0.0, -190.0), (float("nan"), 0.0), (0.0, float("inf"))]:
+            with pytest.raises(ValueError):
+                lat_lng_to_h3(*bad)
+        with pytest.raises(ValueError):
+            lat_lng_to_h3(0.0, 0.0, resolution=16)
+        with pytest.raises(ValueError):
+            lat_lng_to_h3(0.0, 0.0, resolution=True)
 
         # Different resolutions
         h3_res8 = lat_lng_to_h3(40.7061, -74.0060, resolution=8)
@@ -121,46 +133,34 @@ class TestH3Indexer:
         with pytest.raises(ValueError, match="Invalid integer representation"):
             int_to_h3(0)  # mode 0
 
-    def test_k_ring_pure_python(self):
+    def test_k_ring_pure_python(self, fallback):
         h3_str = "8a226204db27fff"
 
-        # ring_size <= 0
+        # ring_size <= 0 needs no topology
         assert k_ring(h3_str, 0) == [h3_str]
         assert k_ring(h3_str, -1) == [h3_str]
 
-        # ring_size = 1
-        ring1 = k_ring(h3_str, 1)
-        assert h3_str in ring1
-        assert len(ring1) > 1
-        for cell in ring1:
-            assert is_valid_h3(cell)
+        # The fallback grid has no real neighbours: refuse instead of inventing them.
+        with pytest.raises(NotImplementedError):
+            k_ring(h3_str, 1)
 
-        # ring_size = 2
-        ring2 = k_ring(h3_str, 2)
-        assert len(ring2) >= len(ring1)
-
-        # Invalid index error
         with pytest.raises(ValueError, match="Invalid H3 index"):
             k_ring("invalid", 1)
 
-    def test_h3_distance_pure_python(self):
+    def test_h3_distance_pure_python(self, fallback):
         h3_1 = "8a226204db27fff"
         h3_2 = "8a226204db20fff"
 
-        # Same cell
         assert h3_distance(h3_1, h3_1) == 0
+        with pytest.raises(NotImplementedError):
+            h3_distance(h3_1, h3_2)
 
-        # Different cells
-        dist = h3_distance(h3_1, h3_2)
-        assert dist >= 0
-
-        # Errors
         with pytest.raises(ValueError, match="Invalid H3 cell"):
             h3_distance("bad_origin", h3_1)
         with pytest.raises(ValueError, match="Invalid H3 cell"):
             h3_distance(h3_1, "bad_dest")
 
-    def test_h3_to_parent_pure_python(self):
+    def test_h3_to_parent_pure_python(self, fallback):
         h3_str = "8a226204db27fff"
         p8 = h3_to_parent(h3_str, 8)
         assert is_valid_h3(p8)
@@ -240,3 +240,22 @@ class TestH3Indexer:
             p_leg = h3_to_parent("8a226204db27fff", 8)
             assert p_leg == "88226204dbfffff"
             mock_lib_legacy.h3_to_parent.assert_called_once_with("8a226204db27fff", 8)
+
+
+class TestRealH3KnownVectors:
+    """Vectors from the H3 reference implementation; run whenever the ``h3`` package is installed (dev extra)."""
+
+    h3 = pytest.importorskip("h3")
+
+    def test_known_cells(self):
+        assert lat_lng_to_h3(37.3615593, -122.0553238, 5) == "85283473fffffff"
+        assert lat_lng_to_h3(37.7749, -122.4194, 9) == str(self.h3.latlng_to_cell(37.7749, -122.4194, 9))
+
+    def test_ring_distance_and_parent_use_real_topology(self):
+        cell = lat_lng_to_h3(40.7061, -74.0060, 10)
+        assert len(k_ring(cell, 1)) == 7
+        assert len(k_ring(cell, 2)) == 19
+        neighbour = next(c for c in k_ring(cell, 1) if c != cell)
+        assert h3_distance(cell, neighbour) == 1
+        assert h3_to_parent(cell, 8) == str(self.h3.cell_to_parent(cell, 8))
+        assert mod.h3_backend() == "h3"

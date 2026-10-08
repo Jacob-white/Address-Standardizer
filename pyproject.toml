@@ -55,6 +55,7 @@ dev = [
     "ruff>=0.1.0",
     "usaddress>=0.5.16",
     "hypothesis>=6.100.0",
+    "h3>=4.0.0",
 ]
 
 [project.scripts]
