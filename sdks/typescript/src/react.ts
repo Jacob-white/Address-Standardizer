@@ -109,6 +109,13 @@ export class AutocompleteController {
   public selectSuggestion(suggestion: AutocompleteSuggestion | null): void {
     this.selectedSuggestion = suggestion;
     if (suggestion) {
+      // The query is resolved: drop any pending/in-flight lookup so it cannot reopen stale results.
+      this.requestId++;
+      if (this.timer) {
+        clearTimeout(this.timer);
+        this.timer = null;
+      }
+      this.isLoading = false;
       this.query = suggestion.text;
     }
     this.notify();
@@ -172,6 +179,7 @@ export function useAddressAutocomplete(options: UseAddressAutocompleteOptions = 
     if (newQuery.trim().length < minChars) {
       setSuggestions([]);
       setIsLoading(false);
+      setError(null);
       return;
     }
 
@@ -203,6 +211,13 @@ export function useAddressAutocomplete(options: UseAddressAutocompleteOptions = 
   const selectSuggestion = React.useCallback((s: AutocompleteSuggestion | null) => {
     setSelectedSuggestion(s);
     if (s) {
+      // The query is resolved: drop any pending/in-flight lookup so it cannot reopen stale results.
+      requestIdRef.current++;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      setIsLoading(false);
       setQueryState(s.text);
     }
   }, []);

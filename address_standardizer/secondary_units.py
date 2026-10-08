@@ -6,11 +6,6 @@ import logging
 import re
 from typing import Tuple
 
-try:
-    import usaddress
-except ImportError:
-    usaddress = None
-
 from address_standardizer.tables import (
     DIRECTIONALS,
     STREET_SUFFIXES,

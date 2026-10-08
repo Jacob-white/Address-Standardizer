@@ -19,6 +19,7 @@ from address_standardizer import (
     SpatialResolutionResult,
     standardize_address,
 )
+from address_standardizer._memory import current_rss_mb, peak_rss_kb
 from address_standardizer.spatial.engine import (
     SpatialEngine,
 )
@@ -58,20 +59,7 @@ EXPECTED_14_KEYS = {
 
 def _get_process_rss_mb() -> float:
     """Returns actual resident set size of current process in megabytes."""
-    try:
-        with open("/proc/self/status", "r") as f:
-            for line in f:
-                if line.startswith("VmRSS:"):
-                    return float(line.split()[1]) / 1024.0
-    except (FileNotFoundError, IndexError, ValueError):
-        pass
-    try:
-        import resource
-    except ImportError:  # Windows
-        import psutil
-
-        return psutil.Process().memory_info().rss / (1024.0 * 1024.0)
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    return current_rss_mb()
 
 
 def _get_process_hwm_mb() -> float:
@@ -83,13 +71,7 @@ def _get_process_hwm_mb() -> float:
                     return float(line.split()[1]) / 1024.0
     except (FileNotFoundError, IndexError, ValueError):
         pass
-    try:
-        import resource
-    except ImportError:  # Windows
-        import psutil
-
-        return psutil.Process().memory_info().rss / (1024.0 * 1024.0)
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0
+    return peak_rss_kb() / 1024.0
 
 
 # ==============================================================================

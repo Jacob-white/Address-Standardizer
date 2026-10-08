@@ -7,7 +7,7 @@ name = "address-standardizer"
 version = "3.3.0"
 description = "Universal multi-national address standardization, offline spatial rooftop geocoding, high-throughput acceleration, and cross-border corporate entity resolution."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [
     { name = "HobbyHabbit LLC", email = "support@hobbyhabbit.com" }
@@ -21,10 +21,9 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Text Processing :: General",
     "Topic :: Scientific/Engineering :: GIS",
 ]

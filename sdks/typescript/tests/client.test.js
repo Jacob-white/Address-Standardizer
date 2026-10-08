@@ -274,3 +274,48 @@ test("AutocompleteController - ignores stale responses from superseded queries",
   assert.equal(controller.suggestions[0].text, "FRESH");
   assert.equal(controller.isLoading, false);
 });
+
+test("AutocompleteController - selecting a suggestion discards in-flight lookups", async () => {
+  const makeResponse = (text) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      count: 1,
+      suggestions: [
+        {
+          text,
+          street_line: text,
+          city: "X",
+          state: "NY",
+          postal_code: "10005",
+          secondary_prompt_required: false,
+          suggested_secondary_units: [],
+        },
+      ],
+    }),
+  });
+  const mockFetch = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    return makeResponse("LATE");
+  };
+
+  const client = new AddressStandardizerClient({ fetch: mockFetch });
+  const controller = new AutocompleteController({ client, debounceMs: 1, minChars: 3 });
+
+  controller.setQuery("100 Wall");
+  await new Promise((resolve) => setTimeout(resolve, 10)); // request in flight
+  controller.selectSuggestion({
+    text: "100 WALL ST, NEW YORK, NY 10005",
+    street_line: "100 WALL ST",
+    city: "NEW YORK",
+    state: "NY",
+    postal_code: "10005",
+    secondary_prompt_required: false,
+    suggested_secondary_units: [],
+  });
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  assert.equal(controller.suggestions.length, 0);
+  assert.equal(controller.isLoading, false);
+  assert.equal(controller.query, "100 WALL ST, NEW YORK, NY 10005");
+});

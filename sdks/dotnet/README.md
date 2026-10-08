@@ -55,6 +55,22 @@ foreach (var s in suggestions)
 }
 ```
 
+### Error handling
+
+Non-success responses throw `AddressStandardizerException` (a subclass of `HttpRequestException`) carrying
+`ResponseStatusCode` and the full `ResponseBody`; the exception message holds only the first 512 characters of the body.
+
+```csharp
+try
+{
+    await client.StandardizeAsync("...");
+}
+catch (AddressStandardizerException ex) when (ex.ResponseStatusCode == HttpStatusCode.TooManyRequests)
+{
+    // back off and retry
+}
+```
+
 ---
 
 ## 📄 License & Ownership

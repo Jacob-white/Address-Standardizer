@@ -184,12 +184,9 @@ func main() {
 		log.Fatalf("Standardization failed: %v", err)
 	}
 
-	fmt.Printf("Street: %s
-", result.Street1)
-	fmt.Printf("City/State/Zip: %s, %s %s
-", result.City, result.State, result.PostalCode)
-	fmt.Printf("Precision: %s
-", result.Precision)
+	fmt.Printf("Street: %s\n", result.Street1)
+	fmt.Printf("City/State/Zip: %s, %s %s\n", result.City, result.State, result.PostalCode)
+	fmt.Printf("Precision: %s\n", result.Precision)
 
 	// Interactive autocomplete
 	suggestions, err := client.Autocomplete(ctx, standardizer.AutocompleteRequest{
@@ -201,8 +198,7 @@ func main() {
 	}
 
 	for _, s := range suggestions {
-		fmt.Printf("- %s
-", s.Text)
+		fmt.Printf("- %s\n", s.Text)
 	}
 }
 ```

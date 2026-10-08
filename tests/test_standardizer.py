@@ -1160,17 +1160,21 @@ class TestRuleBasedFallbackAndEdgeCases:
         import sys
         import importlib
         import address_standardizer.standardizer as std_mod
+        import address_standardizer.us_street_parser as parser_mod
         orig = sys.modules.get("usaddress")
         try:
             sys.modules["usaddress"] = None
-            importlib.reload(std_mod)
-            assert std_mod.usaddress is None
+            importlib.reload(parser_mod)
+            assert parser_mod.usaddress is None
             # Standardize an address with usaddress = None
             res = std_mod.standardize_address("100 Main St, New York, NY 10001")
             assert res.street1 == "100 MAIN ST"
         finally:
-            sys.modules["usaddress"] = orig
-            importlib.reload(std_mod)
+            if orig is None:
+                sys.modules.pop("usaddress", None)
+            else:
+                sys.modules["usaddress"] = orig
+            importlib.reload(parser_mod)
 
     def test_international_flat_prefix_and_two_part_comma(self):
         """Verify international flat prefix splitting and two-part comma addresses."""
@@ -1187,7 +1191,7 @@ class TestRuleBasedFallbackAndEdgeCases:
         """Verify usaddress exception handler and reverse anchor branches."""
         from address_standardizer.standardizer import _parse_us_street_tokens
         # usaddress exception triggers lines 522-523
-        with patch("address_standardizer.standardizer.usaddress.parse", side_effect=Exception("CRF failure")):
+        with patch("address_standardizer.us_street_parser.usaddress.parse", side_effect=Exception("CRF failure")):
             st1, st2, ok, city, state, zip_c = _parse_us_street_tokens("100 Main St, New York, NY 10001")
             assert st1 == "100 MAIN ST"
             assert city == "New York"
@@ -1234,7 +1238,7 @@ class TestRuleBasedFallbackAndEdgeCases:
         from address_standardizer.standardizer import _parse_us_street_tokens
 
         # Directional without StreetName (line 620)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("500", "AddressNumber"),
                 ("South", "StreetNamePreDirectional"),
@@ -1244,7 +1248,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "SOUTH" in st1
 
         # Two-token compound ordinal in CRF (lines 644-646)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Twenty", "StreetName"),
@@ -1255,7 +1259,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "21ST" in st1
 
         # Single-token compound ordinal in CRF (line 648)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Twenty-First", "StreetName"),
@@ -1265,7 +1269,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "21ST" in st1
 
         # Route prefix keeps cardinal in CRF, non-route gets ordinal (line 655)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("42", "StreetName"),
@@ -1274,7 +1278,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             st1, st2, ok, _, _, _ = _parse_us_street_tokens("100 42 St")
             assert "42ND" in st1
 
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("County", "StreetName"),
                 ("Road", "StreetName"),
@@ -1285,7 +1289,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "500TH" not in st1
 
         # Fuzzy suffix in CRF (line 668)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Main", "StreetName"),
@@ -1295,7 +1299,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "ST" in st1
 
         # OccupancyIdentifier in SECONDARY_UNITS (line 679)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Main", "StreetName"),
@@ -1307,7 +1311,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "STE" in st2
 
         # OccupancyIdentifier without preceding OccupancyType defaults to STE (line 682)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Main", "StreetName"),
@@ -1318,7 +1322,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "STE 400" in st2
 
         # USPSBoxGroup without physical street (lines 689, 692, 721)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("Route", "USPSBoxGroupType"),
                 ("A", "USPSBoxGroupID"),
@@ -1329,7 +1333,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "ROUTE A BOX 152" in st1
 
         # USPSBoxGroup with physical street (line 723)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Main", "StreetName"),
@@ -1341,7 +1345,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "RR 2" in st2
 
         # Multi-word StateName with terminal state code (lines 727-729)
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Main", "StreetName"),
@@ -1397,7 +1401,7 @@ class TestRuleBasedFallbackAndEdgeCases:
         assert "1000 & 1200 HBR BLVD" in st1
 
         # Line 727: Compound number in CRF parsing
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("1000", "AddressNumber"),
                 ("&", "StreetName"),
@@ -1409,7 +1413,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert st1_crf == "1000 & 1200 HARBOR BLVD"
 
         # Line 780: Hyphenated penthouse in PlaceName
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Main", "StreetName"),
@@ -1421,7 +1425,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert sec_ph == "PH-A"
 
         # Lines 792-802: Saint street salvage when city does not start with ST/SAINT
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("350", "AddressNumber"),
                 ("N", "StreetNamePreDirectional"),
@@ -1432,7 +1436,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert st1_st == "350 N ST PAUL"
 
         # Lines 803-804: Saint city non-salvage when city starts with ST/SAINT
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("100", "AddressNumber"),
                 ("Main", "StreetName"),
@@ -1445,7 +1449,7 @@ class TestRuleBasedFallbackAndEdgeCases:
             assert "ST LOUIS" in city_st_city
 
         # Lines 845-846: Suffix salvage when usaddress tags street suffix as StateName
-        with patch("address_standardizer.standardizer.usaddress.parse") as mock_parse:
+        with patch("address_standardizer.us_street_parser.usaddress.parse") as mock_parse:
             mock_parse.return_value = [
                 ("350", "AddressNumber"),
                 ("N", "StreetNamePreDirectional"),

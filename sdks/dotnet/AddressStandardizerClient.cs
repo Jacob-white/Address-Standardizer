@@ -137,8 +137,13 @@ namespace AddressStandardizer.Client
                 body = response.ReasonPhrase ?? string.Empty;
             }
 
-            throw new HttpRequestException(
-                $"Address Standardizer HTTP {(int)response.StatusCode}: {body}");
+            var snippet = body.Length > AddressStandardizerException.MaxMessageBodyLength
+                ? body.Substring(0, AddressStandardizerException.MaxMessageBodyLength) + "..."
+                : body;
+            throw new AddressStandardizerException(
+                $"Address Standardizer HTTP {(int)response.StatusCode}: {snippet}",
+                response.StatusCode,
+                body);
         }
 
         public void Dispose()

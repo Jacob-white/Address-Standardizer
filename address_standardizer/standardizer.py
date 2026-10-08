@@ -18,11 +18,6 @@ import logging
 import re
 from typing import Optional, Dict, Any
 
-try:  # kept for backward compatibility: the CRF fallback itself lives in us_street_parser.py
-    import usaddress  # noqa: F401
-except ImportError:
-    usaddress = None
-
 from address_standardizer.models import StandardizedAddress, LocalityOnlyStatus
 from address_standardizer.confidence import (
     RoutingTier,
@@ -79,6 +74,7 @@ from address_standardizer.normalization import (  # noqa: E402
     normalize_us_postal_code,  # noqa: F401
     is_registered_agent_hub_address,  # noqa: F401
 )
+from address_standardizer.care_of import has_care_of, strip_care_of  # noqa: E402
 from address_standardizer.secondary_units import (  # noqa: E402
     _pre_normalize_address_string,  # noqa: F401
     _standardize_secondary_unit,  # noqa: F401
@@ -339,112 +335,11 @@ def standardize_address(
     if is_city_noise_in_street1(s1_in, city_in, state_in):
         s1_in = ""
 
-    # Care-Of / Attention Prefix Cleaner
-    # Strips "c/o <Company Name>" segment and legal entity suffixes, preserving physical address parts before or after
-    _CO_STREET_WORDS = {
-        "ST", "STREET", "RD", "ROAD", "AVE", "AVENUE", "BLVD", "BOULEVARD", "DR", "DRIVE", "LN", "LANE", "WAY",
-        "CT", "COURT", "PL", "PLACE", "BOX", "HWY", "HIGHWAY", "PKWY", "PARKWAY", "CIR", "CIRCLE", "SQ", "SQUARE",
-        "BROADWAY", "BOWERY", "PLAZA", "TERRACE", "TRAIL", "ROW", "MEWS",
-    }
-
-    def _strip_care_of(text: str) -> str:
-        if not text:
-            return ""
-        LEGAL_SUFFIXES_CLEAN = {
-            "LLC", "LP", "LLP", "LLLPO", "INC", "CORP", "LTD", "CO", "PLLC", "PC",
-            "SA", "AG", "NV", "BV", "GMBH", "PLC", "FSB", "ESQ", "CPA", "MD", "PA",
-            "NA", "NTSA", "TRUST", "COMPANY", "LIMITED", "INCORPORATED", "CORPORATION",
-            "PARTNERSHIP", "SGIIC", "SL", "SRL", "SARL", "SAS", "SP", "SPA", "PTY",
-            "BHD", "SDN", "KGAA", "SE", "QC", "SC", "EIRL", "SCOP", "JR", "SR", "II", "III", "IV", "LPA", "APC",
-            "GROUP", "DEPARTMENT", "DEPT", "DIVISION", "DIV", "OFFICE", "HOLDINGS", "VENTURES", "CAPITAL",
-            "MANAGEMENT", "PARTNERS", "FINANCIAL", "SERVICES", "SOLUTIONS", "ESTATES", "PROPERTY", "PROPERTIES"
-        }
-        re_street_boundary = re.compile(
-            r"""(?:\b|(?<=[\s,]))(?:
-                # Number followed by street name and thoroughfare suffix
-                (\d+\s+(?:(?:N|S|E|W|NORTH|SOUTH|EAST|WEST|NE|NW|SE|SW)\s+)?[A-Za-z0-9\.\-']+\s+(?:ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|CIR|CIRCLE|PKWY|PARKWAY|HWY|HIGHWAY|TER|TERRACE|TRL|TRAIL|LOOP|WALK|RUN|BLUFF|ROW|ALLEY|ALY|CTR|CENTER|PLAZA|PK|PARK|PW|HY|HW|BL|BLV|WY|AL|GADE|TPKE|TURNPIKE|EXPY|EXPRESSWAY|PIKE|WALKWAY|MEWS|SQ|SQUARE)\b.*) |
-                # Word numbers: ONE WORLD TRADE CENTER, etc.
-                ((?:ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN)\s+(?:WORLD\s+TRADE\s+CENTER|WTC|BROADWAY|BOWERY|PENN\s+PLAZA|[A-Za-z0-9\.\-']+\s+(?:ST|STREET|AVE|AVENUE|BLVD|BOULEVARD|RD|ROAD|DR|DRIVE|LN|LANE|WAY|CT|COURT|PL|PLACE|CIR|CIRCLE|PKWY|PARKWAY|HWY|HIGHWAY|TER|TERRACE|TRL|TRAIL|LOOP|WALK|RUN|BLUFF|ROW|ALLEY|ALY|CTR|CENTER|PLAZA|PK|PARK|PW|HY|HW|BL|BLV|WY|AL|GADE|TPKE|TURNPIKE|EXPY|EXPRESSWAY|PIKE|WALKWAY|MEWS|SQ|SQUARE))\b.*) |
-                # Broadway / Bowery / Embarcadero with digits
-                (\d+\s+(?:(?:N|S|E|W|NORTH|SOUTH|EAST|WEST|NE|NW|SE|SW)\s+)?(?:BROADWAY|BOWERY|THE\s+EMBARCADERO|EMBARCADERO)\b.*) |
-                # PO Box / Postal
-                ((?:P\.?\s*O\.?\s*BOX|POB|POST\s+OFFICE\s+BOX|PSC|CMR|HC|RR)\b.*) |
-                # Spanish thoroughfares
-                ((?:CALLE|AVENIDA|CARR|PASEO|CAMINO|CALZADA)\b.*)
-            )$""",
-            re.IGNORECASE | re.VERBOSE
-        )
-
-        prev = None
-        curr = text
-        while curr != prev:
-            prev = curr
-            # Strip parenthesized or bracketed care-of / attn clauses: (C/O ...) or [C/O ...]
-            curr = re.sub(
-                r"[\(\[](?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[^)\]]*[\)\]]",
-                " ",
-                curr,
-                flags=re.IGNORECASE,
-            ).strip(" ,.-")
-
-            m_co = re.search(r"(?:^|[\s,])(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[:\s\-]*", curr, re.IGNORECASE)
-            if not m_co:
-                break
-
-            prefix = curr[:m_co.start()].strip(" ,.-")
-            after_co = curr[m_co.end():].strip()
-
-            extracted_street = ""
-            m_boundary = re_street_boundary.search(after_co)
-            if m_boundary:
-                extracted_street = m_boundary.group(0).strip(" ,.-")
-            else:
-                for suf in LEGAL_SUFFIXES_CLEAN:
-                    m_suf = re.search(rf"\b{suf}\b[\s,]+([A-Za-z0-9].*)$", after_co, re.IGNORECASE)
-                    if m_suf:
-                        cand_st = m_suf.group(1).strip(" ,.-")
-                        cand_words = [w.upper() for w in re.findall(r"\w+", cand_st)]
-                        if cand_words and all(w in LEGAL_SUFFIXES_CLEAN for w in cand_words):
-                            continue
-                        # The tail after a legal suffix is only a street if it looks like one; otherwise it is
-                        # just the rest of the c/o name (e.g. "C/O CORE PROPERTY P/S", "... GROUP AB").
-                        if not re.search(r"\d", cand_st) and not (set(cand_words) & _CO_STREET_WORDS):
-                            continue
-                        extracted_street = cand_st
-                        break
-
-            if not extracted_street:
-                m_fb = re.search(r"\b(\d+\s+[A-Za-z].*)$", after_co)
-                if m_fb:
-                    extracted_street = m_fb.group(1).strip(" ,.-")
-
-            if prefix and extracted_street:
-                curr = f"{prefix}, {extracted_street}"
-            elif extracted_street:
-                curr = extracted_street
-            elif prefix:
-                curr = prefix
-            else:
-                co_parts = [p.strip() for p in curr.split(",") if p.strip()]
-                rem_co = co_parts[1:]
-                while rem_co and rem_co[0].upper().replace(".", "").replace("&", "").replace(" ", "").strip() in LEGAL_SUFFIXES_CLEAN:
-                    rem_co = rem_co[1:]
-                if len(rem_co) == 1 and not re.search(r"\d", rem_co[0]):
-                    words = set(re.findall(r"\w+", rem_co[0].upper()))
-                    has_street_word = bool(words & {"ST", "STREET", "RD", "ROAD", "AVE", "AVENUE", "BLVD", "BOULEVARD", "DR", "DRIVE", "LN", "LANE", "WAY", "CT", "COURT", "PL", "PLACE", "BOX", "HWY", "HIGHWAY", "PKWY", "PARKWAY", "CIR", "CIRCLE"})
-                    if not has_street_word:
-                        rem_co = []
-                curr = ", ".join(rem_co)
-            curr = curr.strip(" ,.-")
-        return curr
-
-    had_co = bool(
-        re.search(r"[\(\[](?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b", s1_in, re.IGNORECASE)
-        or re.search(r"(?:^|[\s,])(?:C\s*/\s*O|IN\s+CARE\s+OF|ATTN|ATTENTION)\b[:\s\-]*", s1_in, re.IGNORECASE)
-    )
-    s1_in = _strip_care_of(s1_in)
+    # Care-Of / Attention Prefix Cleaner: strips "c/o <company>" segments, keeping any physical street
+    had_co = has_care_of(s1_in)
+    s1_in = strip_care_of(s1_in)
     if s2_in:
-        s2_in = _strip_care_of(s2_in)
+        s2_in = strip_care_of(s2_in)
     if had_co and not s1_in and s2_in:
         s1_in = s2_in
         s2_in = ""

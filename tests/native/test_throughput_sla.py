@@ -18,6 +18,17 @@ from address_standardizer import _pure_python_core
 SLA_SCALE = float(os.environ.get("ADDRESS_STANDARDIZER_SLA_SCALE", "1.0"))
 
 
+def _is_traced() -> bool:
+    """True only while a tracer or coverage measurement is actually running (not merely installed)."""
+    if sys.gettrace() is not None:
+        return True
+    try:
+        import coverage
+    except ImportError:
+        return False
+    return coverage.Coverage.current() is not None
+
+
 @pytest.mark.perf
 class TestThroughputSLA:
     """Verifies that pure Python core processing comfortably exceeds > 2,000 rec/s."""
@@ -49,11 +60,7 @@ class TestThroughputSLA:
         print(f"\n[SLA Benchmark] Pure Python batch throughput (finalize=False): {throughput:.1f} rec/s ({n_records} records in {t_elapsed:.4f}s)")
 
         # Blueprint SLA Requirement: > 2,000 records/sec (adjusted to > 1,000 under coverage tracing)
-        is_traced = (
-            sys.gettrace() is not None
-            or "coverage" in sys.modules
-            or "pytest_cov" in sys.modules
-        )
+        is_traced = _is_traced()
         min_sla = 1000.0 if is_traced else 2000.0
         assert throughput > min_sla * SLA_SCALE, f"Throughput {throughput:.1f} rec/s failed SLA threshold (> {min_sla} rec/s)"
 
@@ -84,10 +91,6 @@ class TestThroughputSLA:
         print(f"\n[SLA Benchmark] Pure Python batch throughput (finalize=True): {throughput:.1f} rec/s ({n_records} records in {t_elapsed:.4f}s)")
 
         # Full pipeline should also comfortably exceed 1,500 rec/s (adjusted to > 1,000 under coverage tracing)
-        is_traced = (
-            sys.gettrace() is not None
-            or "coverage" in sys.modules
-            or "pytest_cov" in sys.modules
-        )
+        is_traced = _is_traced()
         min_sla = 1000.0 if is_traced else 1500.0
         assert throughput > min_sla * SLA_SCALE, f"Throughput {throughput:.1f} rec/s failed SLA threshold (> {min_sla} rec/s)"

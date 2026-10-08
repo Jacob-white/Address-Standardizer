@@ -13,24 +13,11 @@ import sys
 import time
 
 # Ensure project root is in path
-try:
-    import resource
-except ImportError:  # Windows has no `resource` module
-    resource = None
-
-
-def _peak_rss_kb():
-    """Peak resident set size in KB (stdlib `resource` on POSIX, psutil elsewhere)."""
-    if resource is not None:
-        return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    import psutil
-
-    info = psutil.Process().memory_info()
-    return getattr(info, "peak_wset", info.rss) / 1024.0
 
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from address_standardizer._memory import peak_rss_kb as _peak_rss_kb  # noqa: E402
 from address_standardizer import standardize_address, batch_standardize, stream_standardize_jsonl
 from address_standardizer.batch import stream_standardize_csv
 from address_standardizer import _pure_python_core

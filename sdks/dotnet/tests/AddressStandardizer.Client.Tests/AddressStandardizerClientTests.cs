@@ -106,10 +106,24 @@ namespace AddressStandardizer.Client.Tests
         {
             using var client = ClientFor(_ => Json("{\"detail\":\"bad request\"}", HttpStatusCode.BadRequest));
 
-            var ex = await Assert.ThrowsAsync<HttpRequestException>(() => client.StandardizeAsync("x"));
+            var ex = await Assert.ThrowsAsync<AddressStandardizerException>(() => client.StandardizeAsync("x"));
 
+            Assert.Equal(HttpStatusCode.BadRequest, ex.ResponseStatusCode);
+            Assert.Contains("bad request", ex.ResponseBody);
             Assert.Contains("400", ex.Message);
-            Assert.Contains("bad request", ex.Message);
+            Assert.IsAssignableFrom<HttpRequestException>(ex);
+        }
+
+        [Fact]
+        public async Task ErrorResponse_TruncatesLongBodiesInMessage()
+        {
+            var longBody = new string('x', 5000);
+            using var client = ClientFor(_ => Json(longBody, HttpStatusCode.InternalServerError, "text/plain"));
+
+            var ex = await Assert.ThrowsAsync<AddressStandardizerException>(() => client.StandardizeAsync("x"));
+
+            Assert.True(ex.Message.Length < 700);
+            Assert.Equal(5000, ex.ResponseBody.Length);
         }
 
         /// <summary>Runs against a live server when ADDRESS_STANDARDIZER_URL is set (CI starts one).</summary>

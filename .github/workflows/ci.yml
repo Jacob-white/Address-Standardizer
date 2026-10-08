@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python: ["3.9", "3.12"]
+        python: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,6 +25,9 @@ jobs:
       - name: Tests with coverage (excluding absolute-throughput SLA tests)
         run: pytest -m "not perf" --cov --cov-report=term
       - name: Throughput / memory SLA tests (no coverage tracing)
+        # Shared runners are slower and noisier than dev hardware: allow 40% headroom, so a 2x regression still fails.
+        env:
+          ADDRESS_STANDARDIZER_SLA_SCALE: "0.6"
         run: pytest -m perf
 
   rust:
