@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install a pinned Rust toolchain for native acceleration compilation
-ARG RUST_TOOLCHAIN=1.82.0
+ARG RUST_TOOLCHAIN=1.85.0
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain ${RUST_TOOLCHAIN}
 ENV PATH="/root/.cargo/bin:${PATH}"
 

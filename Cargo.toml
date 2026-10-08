@@ -2,7 +2,7 @@
 name = "_address_standardizer_rs"
 version = "3.3.0"
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.83"
 description = "Optional native acceleration module for the Address Standardizer (American Soundex)."
 authors = ["HobbyHabbit LLC <support@hobbyhabbit.com>"]
 license = "MIT"
@@ -15,7 +15,7 @@ name = "_address_standardizer_rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = "0.24"
+pyo3 = "0.29"
 
 [features]
 default = []

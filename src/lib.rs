@@ -83,14 +83,14 @@ pub fn is_native() -> bool {
 
 /// Describes what the native module really provides.
 #[pyfunction]
-pub fn get_capabilities(py: Python<'_>) -> PyResult<PyObject> {
+pub fn get_capabilities(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let dict = PyDict::new(py);
     dict.set_item("engine", "Rust_PyO3")?;
     dict.set_item("is_native", true)?;
     dict.set_item("version", VERSION)?;
     dict.set_item("pure_python", false)?;
     dict.set_item("native_functions", vec!["compute_soundex"])?;
-    Ok(dict.into())
+    Ok(dict)
 }
 
 #[pymodule]
