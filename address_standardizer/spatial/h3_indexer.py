@@ -178,7 +178,10 @@ def h3_distance(origin: str, destination: str) -> int:
 
     if _HAS_COMPILED_H3 and _h3_lib is not None:
         if hasattr(_h3_lib, "grid_distance"):
-            return int(_h3_lib.grid_distance(orig, dest))
+            try:
+                return int(_h3_lib.grid_distance(orig, dest))
+            except Exception as exc:  # h3 raises when the cells are too far apart or span a pentagon
+                raise ValueError(f"H3 grid distance undefined for {origin} -> {destination}: {exc}") from exc
         if hasattr(_h3_lib, "h3_distance"):
             return int(_h3_lib.h3_distance(orig, dest))
 

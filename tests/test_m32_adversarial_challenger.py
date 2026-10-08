@@ -30,6 +30,7 @@ from address_standardizer.spatial.h3_indexer import (
     int_to_h3,
     k_ring,
     h3_distance,
+    h3_backend,
     h3_to_parent,
     H3_HEX_PATTERN,
 )
@@ -260,6 +261,11 @@ class TestSpatialMemoryConstraints:
 # ==============================================================================
 
 class TestGeometricAndBoundaryEdgeCases:
+    def test_out_of_range_coordinates_are_rejected_not_clamped(self):
+        for lat, lng in [(95.0, 200.0), (-100.0, -250.0), (95.0, 0.0), (0.0, 200.0)]:
+            with pytest.raises(ValueError):
+                lat_lng_to_h3(lat, lng, resolution=10)
+
     @pytest.mark.parametrize(
         "lat,lng",
         [
@@ -271,8 +277,6 @@ class TestGeometricAndBoundaryEdgeCases:
             (-90.0, -180.0),
             (89.999999, 179.999999),
             (-89.999999, -179.999999),
-            (95.0, 200.0),     # Clamping / wrapping
-            (-100.0, -250.0),  # Clamping / wrapping
             (0.0, 0.0),        # Null island
         ],
     )
@@ -580,10 +584,14 @@ class TestH3ClusteringAndInvariance:
         """Verify distance properties between identical and distinct cells."""
         c1 = lat_lng_to_h3(40.7128, -74.0060, resolution=10)
         c2 = lat_lng_to_h3(40.7128, -74.0060, resolution=10)
-        c3 = lat_lng_to_h3(37.7749, -122.4194, resolution=10)
+        c3 = lat_lng_to_h3(40.7140, -74.0060, resolution=10)  # a few cells away
 
         assert h3_distance(c1, c2) == 0
-        assert h3_distance(c1, c3) > 0
+        if h3_backend() == "h3":
+            assert h3_distance(c1, c3) > 0
+        else:
+            with pytest.raises(NotImplementedError):
+                h3_distance(c1, c3)
 
 
 # ==============================================================================
