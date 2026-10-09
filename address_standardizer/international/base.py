@@ -72,6 +72,78 @@ def split_single_line_locality(text: str, country_iso: str) -> Optional[Tuple[st
     return None
 
 
+# Unicode hyphens/dashes/minus signs that stand in for "-" in postal codes, house numbers and ranges.
+_DASH_TRANSLATION = {
+    cp: "-" for cp in (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212, 0xFE58, 0xFE63, 0xFF0D)
+}
+
+
+def normalize_dashes(text: str) -> str:
+    """Replace Unicode hyphens, en/em dashes and the minus sign with an ASCII hyphen ("01307–011" -> "01307-011")."""
+    return text.translate(_DASH_TRANSLATION)
+
+
+def _postal_run(run: str, country_iso: str) -> Optional[str]:
+    """Postal code recognised in a short word run: the country's pattern, plus Portugal's space-separated "1150 011"."""
+    from address_standardizer.international.postal import extract_postal_code
+
+    if country_iso in ("PRT", "PT", "PORTUGAL") and re.fullmatch(r"\d{4} \d{3}", run):
+        return run
+    return extract_postal_code(run, country_iso)
+
+
+def _squash(value: str) -> str:
+    return re.sub(r"[\W_]", "", value).upper()
+
+
+_RE_HOUSE_NUMBER_WORD = re.compile(r"^\d+[A-Za-z]?(?:[/-]\d+[A-Za-z]?)?$")
+_LOCALITY_CONNECTORS = frozenset({"DE", "DA", "DO", "DAS", "DOS", "DEL", "DI", "OF", "THE", "LA", "LE", "EL"})
+
+
+def _split_trailing_postal_locality(words: List[str], country_iso: str) -> Optional[Tuple[str, str, str]]:
+    """"Street 12 City POSTCODE" (postal code last): the city is what follows the last house number."""
+    for width in (1, 2):
+        run = words[len(words) - width:]
+        rest = words[:len(words) - width]
+        pc = _postal_run(" ".join(run), country_iso) if len(rest) >= 3 else None
+        if not pc or _squash(pc) != _squash("".join(run)):
+            continue
+        numbers = [i for i, w in enumerate(rest) if _RE_HOUSE_NUMBER_WORD.match(w)]
+        if not numbers or not 1 <= len(rest) - numbers[-1] - 1 <= 3:
+            continue
+        city_words = rest[numbers[-1] + 1:]
+        if city_words[0].upper() in _LOCALITY_CONNECTORS or not re.search(r"[^\W\d_]", " ".join(rest[:numbers[-1]])):
+            continue
+        return " ".join(rest[:numbers[-1] + 1]), " ".join(city_words), " ".join(run)
+    return None
+
+
+def split_commaless_locality(text: str, country_iso: str) -> Optional[Tuple[str, str, str]]:
+    """Split "Street 12 POSTCODE City" (no commas) into (street, city, postal); None when it cannot be done safely.
+
+    The postal code is a one- or two-word run that the country's postal pattern recognises *and* that is followed by
+    a locality of one to four words; the nearest such run to the end of the line wins. Everything before it must hold
+    a letter (a street) so that a lone "Postcode City" is left to the caller.
+    """
+    words = (text or "").split()
+    trailing = _split_trailing_postal_locality(words, country_iso)
+    if trailing is not None:
+        return trailing
+    for start in range(len(words) - 2, 0, -1):
+        for width in (1, 2):
+            run = words[start:start + width]
+            locality = words[start + width:]
+            if len(run) < width or not 1 <= len(locality) <= 4:
+                continue
+            pc = _postal_run(" ".join(run), country_iso)
+            if not pc or _squash(pc) != _squash("".join(run)):
+                continue
+            street = " ".join(words[:start])
+            if re.search(r"[^\W\d_]", street) and re.search(r"[^\W\d_]", " ".join(locality)):
+                return street, " ".join(locality), " ".join(run)
+    return None
+
+
 # Articles/particles that are part of a name and never street types ("Al Olaya", "El Camino").
 NAME_PARTICLES = frozenset({"AL", "EL", "LA", "LE", "LES", "LOS", "LAS", "DE", "DEL", "DER", "DIE", "DAS", "THE"})
 
@@ -281,6 +353,8 @@ class CountryGrammar(abc.ABC):
 
     country_iso3: ClassVar[str]
     supported_countries: ClassVar[Tuple[str, ...]]
+    # Opt-in: a comma-less single line "Street 12 POSTCODE City" is split into street / city / postal code before parsing.
+    split_commaless_line: ClassVar[bool] = False
 
     @abc.abstractmethod
     def parse(self, raw_tokens: List[str], metadata: dict) -> ParsedAddressComponents:
@@ -299,6 +373,10 @@ class CountryGrammar(abc.ABC):
         """Extract (premise_name, street_number, street_name) from thoroughfare line."""
         raise NotImplementedError
 
+    def country_iso_hint(self, country: Optional[str]) -> str:
+        """Country identifier used to look up postal patterns (the caller-supplied country, else the family default)."""
+        return country or self.country_iso3
+
     def standardize(
         self,
         street1: Optional[str] = None,
@@ -310,6 +388,13 @@ class CountryGrammar(abc.ABC):
         raw_street_address: Optional[str] = None,
     ) -> ParsedAddressComponents:
         """Standardize raw address elements into ParsedAddressComponents."""
+        street1, street2, city, state, postal_code = (
+            normalize_dashes(v) if v else v for v in (street1, street2, city, state, postal_code)
+        )
+        if self.split_commaless_line and street1 and not (city or state or postal_code) and "," not in street1:
+            split = split_commaless_locality(street1, self.country_iso_hint(country))
+            if split is not None:
+                street1, city, postal_code = split
         raw_tokens: List[str] = []
         if street1:
             raw_tokens.append(street1)

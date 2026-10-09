@@ -64,6 +64,89 @@ RE_CN_POSTAL = re.compile(r"^\b([0-9]{6})\b")
 RE_KR_POSTAL = re.compile(r"^\b([0-9]{5}|[0-9]{3}-[0-9]{3})\b")
 RE_TW_POSTAL = re.compile(r"^\b([0-9]{3}(?:-?[0-9]{2,3})?)\b")
 
+# A short postal code written before the administrative names: "105 台北市 …", "〒160 新宿区 …"
+RE_CJK_LEADING_POSTAL = re.compile(r"^(?:〒\s*)?(\d{3}(?:-\d{2,4})?)\s+(\S.*)$")
+
+# City-level divisions that are a city on their own when no district follows (Korean metropolitan cities, Taiwanese cities).
+CITY_LEVEL_DIVISIONS = frozenset(
+    {p for p in KR_PROVINCES if p.endswith(("특별시", "광역시", "특별자치시")) or p in (
+        "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종")}
+    | {d for d in TW_DIVISIONS if d.endswith("市")}
+)
+_DISTRICT_SUFFIXES = ("区", "區", "县", "縣", "군", "구", "郡", "町", "村", "鄉", "鎮", "乡", "镇", "旗")
+_ADMIN_SUFFIXES = _DISTRICT_SUFFIXES + ("都", "道", "府", "県", "省", "市", "시")
+
+
+def _is_district_token(token: str) -> bool:
+    """A district/ward/county-level administrative name: no digits, ends in a district suffix."""
+    return not any(ch.isdigit() for ch in token) and token.endswith(_DISTRICT_SUFFIXES)
+
+
+def _is_admin_token(token: str) -> bool:
+    """A prefecture/city/ward-level name (known division or a digit-free token ending in an administrative suffix)."""
+    return (
+        token in KR_PROVINCES or token in JP_PREFECTURES or token in TW_DIVISIONS
+        or token in CN_DIRECT_MUNICIPALITIES
+        or (not any(ch.isdigit() for ch in token) and token.endswith(_ADMIN_SUFFIXES))
+    )
+
+
+# Country names that may trail a native line ("160-0021 新宿区 まねき通り1丁目1-6 Japan"), mapped to the grammar's names.
+_TRAILING_COUNTRIES = {
+    "REPUBLIC OF KOREA": "KOR", "SOUTH KOREA": "KOR", "KOREA": "KOR", "JAPAN": "JPN", "NIPPON": "JPN",
+    "NIHON": "JPN", "TAIWAN": "TWN", "CHINA": "CHN",
+    "日本": "JPN", "台灣": "TWN", "臺灣": "TWN", "台湾": "TWN", "中國": "CHN", "中国": "CHN",
+    "대한민국": "KOR", "한국": "KOR",
+}
+RE_TRAILING_COUNTRY = re.compile(
+    r"(?:^|[\s,、])(" + "|".join(sorted((re.escape(n) for n in _TRAILING_COUNTRIES), key=len, reverse=True)) + r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def strip_trailing_country(text: str) -> Tuple[str, Optional[str]]:
+    """Remove a trailing country name from a native address line; returns (text, ISO-3 of the removed name)."""
+    m = RE_TRAILING_COUNTRY.search(text)
+    if not m:
+        return text, None
+    return text[:m.start()].rstrip(" ,、"), _TRAILING_COUNTRIES[m.group(1).upper()]
+
+
+# Korean district at the start of a token: 시/군/구 after at least two syllables, or one of the one-syllable 구 names.
+# ("압구정로38길" must not read "압구" as a district: the marker character occurs inside the road name.)
+RE_KR_DISTRICT = re.compile(r"^((?:[중동서남북]구)|(?:\S{2,}?[시군구]))\s*(.*)$")
+
+# House-number blocks that end a native street line (digits are already ASCII; dashes are "-", "一" or "ー")
+_JP_DASH = r"[-一ー]"
+RE_JP_CHOME_BLOCK = re.compile(rf"(?<=[^\d\s])(\d+丁目(?:\d+(?:{_JP_DASH}\d+)*(?:番地?(?:\d+号?)?|号)?)?)$")
+RE_JP_DASHED_BLOCK = re.compile(rf"(?<=[^\d\s\-一ー目])(\d+(?:{_JP_DASH}\d+)+)$")
+RE_JP_BAN_BLOCK = re.compile(r"(?<=[^\d\s目])(\d+番地?(?:\d+号?)?)$")
+RE_TW_NUMBER_TAIL = re.compile(r"^(.*[路街段巷弄道])(\d+(?:之\d+)?(?:-\d+)?[號号]?)$")
+RE_KR_NUMBER_TAIL = re.compile(r"^(.*[로길])(\d+(?:-\d+)?)$")
+
+
+def separate_house_number(street: str, country_iso: str) -> str:
+    """Put a space between a native street name and the house-number block glued to it.
+
+    Japan: "まねき通り1丁目1一6" -> "まねき通り 1丁目1一6" (chome-ban-go block kept verbatim, including its dash).
+    Taiwan: "復興北路231巷34" -> "復興北路231巷 34". Korea: "테헤란로152" -> "테헤란로 152".
+    """
+    if country_iso == "JPN":
+        for pattern in (RE_JP_CHOME_BLOCK, RE_JP_DASHED_BLOCK, RE_JP_BAN_BLOCK):
+            m = pattern.search(street)
+            if m:
+                return f"{street[:m.start()]} {street[m.start():]}"
+    elif country_iso == "TWN":
+        m_tw = RE_TW_NUMBER_TAIL.match(street)
+        if m_tw:
+            return f"{m_tw.group(1)} {m_tw.group(2)}"
+    elif country_iso == "KOR":
+        m_kr = RE_KR_NUMBER_TAIL.match(street)
+        if m_kr:
+            return f"{m_kr.group(1)} {m_kr.group(2)}"
+    return street
+
+
 # Unit/Room indicators with non-overlapping patterns
 RE_JP_ROOM = re.compile(r"(\d+(?:[\s\-]+)?(?:号室|室|階室|階|FL?\b))", re.IGNORECASE)
 RE_CN_ROOM = re.compile(r"(\d+(?:[\s\-]+)?(?:室|层|楼|单元|号房))", re.IGNORECASE)
@@ -225,6 +308,11 @@ class CJKGrammar(CountryGrammar):
         unit_number: Optional[str] = None
         building_name: Optional[str] = None
         dep_locality: Optional[str] = None
+        if s1_raw and _is_cjk(s1_raw):
+            # "… 주흥길 78 South Korea": a country name trailing a native line is not part of the street.
+            s1_raw, named_country = strip_trailing_country(s1_raw)
+            if named_country:
+                country_iso = named_country
         street_line = s1_raw
 
         # -------------------------------------------------------------
@@ -279,6 +367,12 @@ class CJKGrammar(CountryGrammar):
                 postal_raw = m_post.group(1)
                 work = work[:m_post.start()] + work[m_post.end():]
                 work = work.strip()
+            elif not postal_raw:
+                # A short leading code ("105 台北市 復興北路231巷34", "〒160 新宿区 ...") followed by an administrative name.
+                m_lead = RE_CJK_LEADING_POSTAL.match(work)
+                if m_lead and _is_admin_token(m_lead.group(2).split()[0]):
+                    postal_raw = m_lead.group(1)
+                    work = m_lead.group(2).strip()
 
             # Separate whitespace-delimited tokens if present (e.g. "東京都港区六本木6-10-1 六本木ヒルズ森タワー 32階")
             w_tokens = work.split()
@@ -294,13 +388,24 @@ class CJKGrammar(CountryGrammar):
                 or any(w_tokens[0] == p for p in TW_DIVISIONS)
                 or w_tokens[0].endswith(("省", "市", "道", "県", "府"))
             )
-            if len(w_tokens) >= 3 and is_div_token:
-                state_raw = w_tokens[0]
-                city_raw = w_tokens[1]
-                idx = 2
-                if idx < len(w_tokens) and any(w_tokens[idx].endswith(s) for s in ("区", "區", "县", "縣", "군", "구")) and len(w_tokens) > 3:
-                    dep_locality = w_tokens[idx]
-                    idx += 1
+            # A city-level division with no district after it ("서울특별시 주흥길 78", "台北市 復興北路231巷34") is the city.
+            city_level = (
+                is_div_token
+                and w_tokens[0] in CITY_LEVEL_DIVISIONS
+                and len(w_tokens) >= 2
+                and not _is_district_token(w_tokens[1])
+            )
+            if city_level or (len(w_tokens) >= 3 and is_div_token):
+                if city_level:
+                    city_raw = w_tokens[0]
+                    idx = 1
+                else:
+                    state_raw = w_tokens[0]
+                    city_raw = w_tokens[1]
+                    idx = 2
+                    if idx < len(w_tokens) and any(w_tokens[idx].endswith(s) for s in ("区", "區", "县", "縣", "군", "구")) and len(w_tokens) > 3:
+                        dep_locality = w_tokens[idx]
+                        idx += 1
                 rem_tokens = w_tokens[idx:]
 
                 # Scan rem_tokens for room / building
@@ -368,7 +473,7 @@ class CJKGrammar(CountryGrammar):
                         state_raw = kr_prov
                         main_block = rest_block
                         break
-                m_kr_city = re.match(r"^(.*?[시군구])\s*(.*)$", main_block)
+                m_kr_city = RE_KR_DISTRICT.match(main_block)
                 if m_kr_city:
                     city_raw = m_kr_city.group(1)
                     street_line = m_kr_city.group(2)
@@ -383,7 +488,7 @@ class CJKGrammar(CountryGrammar):
                         state_raw = tw_div
                         main_block = main_block[len(tw_div):]
                         break
-                m_tw_dist = re.match(r"^(.*?[區鄉鎮市])(.*)$", main_block)
+                m_tw_dist = re.match(r"^(.{1,3}?[區鄉鎮市])(.*)$", main_block)
                 if m_tw_dist:
                     city_raw = m_tw_dist.group(1)
                     street_line = m_tw_dist.group(2)
@@ -391,6 +496,7 @@ class CJKGrammar(CountryGrammar):
                     street_line = main_block
 
             # Process tail tokens for building, room, or trailing postal code
+            street_from_tail = False
             if tail_tokens:
                 for token in tail_tokens:
                     # Korean road name (…로/…길) followed by a short number: that is the building number.
@@ -412,8 +518,20 @@ class CJKGrammar(CountryGrammar):
                         rem_bldg = token[:m_rm.start()] + token[m_rm.end():]
                         if rem_bldg.strip() and not building_name:
                             building_name = rem_bldg.strip()
+                    elif not street_line and not building_name:
+                        # "新宿区 まねき通り1丁目1-6": the municipality token stood alone, so the next token is the street.
+                        street_line = token.strip()
+                        street_from_tail = True
+                    elif street_from_tail and not any(ch.isdigit() for ch in street_line):
+                        # "新宿ゴールデン街 G2通り1丁目1-10": a street name written with a space, number not reached yet.
+                        street_line = f"{street_line} {token.strip()}"
                     elif not building_name:
                         building_name = token.strip()
+
+        # A Korean metropolitan city with no district below it ("서울특별시 주흥길 78", the city already split off as a
+        # state by the caller) is the city, not the state.
+        if country_iso == "KOR" and not city_raw and state_raw in CITY_LEVEL_DIVISIONS:
+            city_raw, state_raw = state_raw, ""
 
         # -------------------------------------------------------------
         # 3. Unit, Room & Building Extractions from street2 or street_line
@@ -448,6 +566,8 @@ class CJKGrammar(CountryGrammar):
         norm_city = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", city_raw).strip())
         norm_state = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", state_raw).strip())
         norm_street = normalize_to_canonical_unicode(full_street.strip()) if full_street else None
+        if norm_street and _is_cjk(norm_street):
+            norm_street = separate_house_number(norm_street, country_iso)
         norm_bldg = normalize_to_canonical_unicode(building_name.strip()) if building_name else None
 
         # If native CJK and st_num is already in norm_street, don't duplicate

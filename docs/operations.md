@@ -232,7 +232,8 @@ only; authentication in the service is defence in depth, not a replacement for n
 
 - Standardization is CPU-bound and runs in the worker threadpool, so one process uses roughly one core effectively
   (Python GIL; the optional Rust extension helps). Scale by **processes**: `uvicorn --workers N` or replicas, about one
-  per core. Per-process state (cache, rate limiter, quota, metrics, tenant ledgers) is **not shared**.
+  per core. Per-process state (cache, rate limiter, quota, metrics, tenant ledgers) is **not shared**; an optional Redis
+  result-cache backend can be shared between workers and nodes (see [Performance and caching](performance.md)).
 - Memory: the result cache is bounded by `CACHE_MAX_SIZE` entries per process; the limiter by `RATE_LIMIT_MAX_BUCKETS`;
   the in-memory audit ledger by `AUDIT_MAX_ROWS`; a batch holds up to `MAX_BODY_BYTES` plus its results in memory, so
   budget `workers x (cache + 3 x MAX_BODY_BYTES)` as a starting point and load-test with your address mix. The

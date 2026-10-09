@@ -97,6 +97,12 @@ cal = Calibrator.load("benchmarks/eval/calibration.json")
 result = compute_confidence_score(std, raw_input=raw, calibrator=cal)   # result.calibrated_score
 ```
 
+Per-field confidences (`standardize_address(..., explain=True)`, see
+[api_reference.md](api_reference.md#explanations-per-field-confidence-and-alternatives)) are heuristic evidence scores and
+are *not* covered by this calibration: the fitted `calibration.json` maps the composite score. A `calibrator=` passed
+to `standardize_address` is applied to each field value, which is only meaningful for a calibrator fitted on
+`(field_score, field_was_correct)` pairs; none ships with the package.
+
 `benchmarks/eval/fit_calibration.py` fits it from evaluation rows (all-fields exact match is the "correct" label),
 reports raw vs calibrated ECE/Brier on a held-out half split by record id, and writes `calibration.json`.
 The raw score is a rule-based heuristic and was never trained to be a probability; see the measured numbers in the

@@ -19,6 +19,7 @@ A standalone multi-national address standardization, offline spatial geocoding, 
 - **[Security Policy & Sandboxing Guide](SECURITY.md)** — Threat model, memory safety, air-gapped spatial execution, FinCEN anti-fraud invariants, and vulnerability disclosure procedures.
 - **[Architectural Specifications Index](docs/README.md)** — Engineering roadmaps and design notes.
 - **[Releasing](docs/RELEASING.md)** — Release process and publishing status.
+- **[Performance and caching](docs/performance.md)** — Profile findings, measured before/after, cache backends (Redis) and what is shared between processes, load-test script.
 - **[Reference data](docs/reference_data.md)** — Optional offline validation of postal code, city and state against GeoNames data (what it checks, what it does not, licenses).
 
 ---
@@ -146,6 +147,8 @@ Optional extras (declared in `pyproject.toml`):
 | `ml` | `usaddress` (CRF-based US parser) |
 | `arrow` | `pyarrow`, `polars`, `duckdb`, `numpy` for `address_standardizer.arrow` (`standardize_arrow`, `standardize_polars`, `register_duckdb_udfs`) |
 | `benchmark` | `psutil` for memory measurements |
+| `redis` | `redis>=5` for the optional shared Redis result-cache backend ([docs/performance.md](docs/performance.md)) |
+| `translit` | `anyascii` for transliterating non-Latin scripts beyond the built-in Cyrillic/Greek (`address_standardizer.transliterate`) |
 | `dev` | `pytest`, `pytest-cov`, `ruff`, `hypothesis`, `usaddress` |
 
 ```bash
@@ -368,6 +371,24 @@ print(res.composite_score)        # 0.988
 print(res.routing_tier)           # "AUTO_PASS"
 print(res.failure_reason_codes)   # []
 ```
+
+#### Explanations, per-field confidence and alternatives (opt-in)
+```python
+std = standardize_address("100 main street suite 200", city="los angelas", state="california",
+                          postal_code="90012", country="USA", explain=True, alternatives=3)
+
+for r in std.explanation:          # ordered change records with stable rule ids
+    print(r["field"], r["rule"], r["before"], "->", r["after"])
+# street2 unit_split  -> STE 200
+# city typo_heal_city los angelas -> LOS ANGELES
+
+std.field_confidence               # {'street1': 0.99, 'city': 0.8, 'state': 0.99, ...}  heuristic, in [0, 1]
+std.alternatives                   # next-best readings: [{'changes': {...}, 'reason': '...', 'score': 0.4}, ...]
+```
+Off by default; a plain call is unchanged and pays nothing. Field confidences are evidence-based heuristics, not
+probabilities, unless you pass a fitted `calibrator`. REST: `include_explanation` and `alternatives` request fields.
+Stewards can work the audit queue in a built-in review page (`GET /review`, off unless auth is configured or
+`ADDRESS_STANDARDIZER_ENABLE_REVIEW_UI=1`). Rule ids and details: [API reference](docs/api_reference.md#explanations-per-field-confidence-and-alternatives).
 
 ### 9. Delivery Intelligence (DPV-style footnotes & RDI)
 ```python
@@ -723,7 +744,7 @@ Single process, pure-Python core (no native module), Windows 11, Python 3.13.5, 
 | Offline spatial lookup on the built-in sample | p50 ~0.02 ms, p99 ~0.05 ms |
 | Autocomplete on the built-in sample | p50 ~0.04 ms, p99 ~0.08 ms |
 
-The built-in benchmark SLA gate targets 2,000 rec/s on mixed input and currently reports FAIL on that row on this machine (the other rows PASS). Treat the mixed-batch figure as the realistic throughput. The spatial and autocomplete figures are for the tiny built-in sample data, not for a full national database. Re-run `address-standardizer benchmark` and the scripts in `benchmarks/` to measure on your hardware.
+The built-in benchmark SLA gate targets 2,000 rec/s on mixed input and currently reports FAIL on that row on this machine (the other rows PASS). Treat the mixed-batch figure as the realistic throughput. The spatial and autocomplete figures are for the tiny built-in sample data, not for a full national database. Re-run `address-standardizer benchmark` and the scripts in `benchmarks/` to measure on your hardware. The cProfile findings, the corporate-registry lookup optimisation (+33% on cold mixed input in a controlled in-process A/B), why no Rust port was done, the Redis cache backend and `scripts/load_test.py` are documented in [docs/performance.md](docs/performance.md).
 
 ---
 

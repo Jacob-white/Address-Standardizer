@@ -39,6 +39,75 @@ RE_EE_HOUSE_NUM = re.compile(
     r"^(.*?)\s+(\d+[A-Za-z0-9\-\/]*(?:\s+[A-Za-z]\b)?)$"
 )
 
+# Countries whose single-line addresses are written "[postcode] City, Street type-name, number" (city first, no marker).
+_CITY_FIRST_COUNTRIES = frozenset({"RUS", "UKR", "BGR", "SRB"})
+
+# Cyrillic street-type words (lower case, trailing dot removed): full words and common abbreviations.
+_CYR_STREET_TYPES = frozenset({
+    "улица", "ул", "проспект", "просп", "пр-т", "пр-кт", "переулок", "пер", "бульвар", "бул", "б-р",
+    "набережная", "наб", "шоссе", "ш", "площадь", "пл", "проезд", "пр-д", "тупик", "аллея", "линия", "тракт",
+    "вулиця", "вул", "провулок", "пров", "площа", "набережна", "узвіз", "шосе", "майдан", "алея", "дорога",
+})
+# First words of two-word city names ("Нижний Новгород", "Кривий Ріг").
+_CYR_CITY_FIRST_WORDS = frozenset({
+    "нижний", "великий", "старый", "новый", "набережные", "верхняя", "нижняя", "кривий", "нова", "нове",
+    "верхній", "нижній", "біла", "великі", "белая",
+})
+# A comma part that is only a house number with its additions: "9", "2а", "42/44", "1-А", "15 с2", "16-18 с1", "3/5 кГ".
+_RE_STANDALONE_HOUSE = re.compile(
+    r"^\d+(?:[/\-]\d+)*(?:[\s\-]?[^\W\d_]{1,2}\.?\d*)?(?:\s+[^\W\d_]{1,6}\.?\s?\d+)*$"
+)
+_RE_LEADING_POSTAL = re.compile(r"^(\d{5,6})[\s,]+(.+)$")
+
+
+def _type_word_index(words: List[str]) -> int:
+    """Index of the first Cyrillic street-type word in ``words`` (case/dot-insensitive), else -1."""
+    for idx, w in enumerate(words):
+        if w.strip(".,;").lower() in _CYR_STREET_TYPES:
+            return idx
+    return -1
+
+
+_RE_TRAILING_HOUSE = re.compile(r"(?:^|\s)\d{1,3}(?:\s?[^\W\d_])?(?:[/\-]\d{1,3})?$")
+
+
+def _is_street_like(part: str) -> bool:
+    """True when a comma-delimited part has a street type word or a trailing house number (so it is no bare city)."""
+    return _type_word_index(part.split()) >= 0 or bool(_RE_TRAILING_HOUSE.search(part))
+
+
+def split_cyrillic_locality(line: str) -> Tuple[str, str, str]:
+    """Split ``"[postcode] City Street-with-type[, number]"`` into (postcode, city, street line).
+
+    The city has no marker: it is the word(s) before the street. A street starts at a leading type word
+    ("улица Ленина 5") or, for type-after streets ("Пречистенская набережная, 9"), one name word before the
+    type. Returns ("", "", line) when no unambiguous split exists (a bare street such as
+    "Пречистенская набережная, 9" keeps everything as the street).
+    """
+    work = line.strip()
+    postal = ""
+    m_pc = _RE_LEADING_POSTAL.match(work)
+    if m_pc:
+        postal, work = m_pc.group(1), m_pc.group(2).strip()
+    words = work.split()
+    t_idx = _type_word_index(words)
+    if t_idx < 0:
+        return postal, "", work
+    # type word followed by the name ("улица Ленина 5") -> everything before it is the city;
+    # type word closing the name ("Тверская улица, 5") -> the single name word before it stays with the street.
+    remainder = " ".join(words[t_idx + 1:]).strip(" ,")
+    name_follows = bool(remainder) and not _RE_STANDALONE_HOUSE.match(remainder)
+    city_len = t_idx if name_follows else t_idx - 1
+    if city_len < 1:
+        return postal, "", work
+    if words[0].strip(",").lower() in _CYR_CITY_FIRST_WORDS and city_len >= 2:
+        city_len = min(city_len, 2)
+    else:
+        city_len = 1
+    city = " ".join(words[:city_len]).strip(" ,")
+    street = " ".join(words[city_len:]).strip()
+    return postal, city, street
+
 
 class EasternEuropeGrammar(CountryGrammar):
     """Regional grammar family for Eastern Europe & Cyrillic jurisdictions."""
@@ -188,7 +257,21 @@ class EasternEuropeGrammar(CountryGrammar):
             if sec_units:
                 unit_number = " ".join(sec_units)
 
-            if len(rem_parts) >= 2:
+            # A trailing bare house number belongs to the street part before it ("Street, 12" is not a city).
+            if len(rem_parts) >= 2 and _RE_STANDALONE_HOUSE.match(rem_parts[-1]):
+                house_part = rem_parts.pop()
+                rem_parts[-1] = f"{rem_parts[-1]}, {house_part}"
+
+            if (
+                len(rem_parts) >= 2
+                and country_iso in _CITY_FIRST_COUNTRIES
+                and not _is_street_like(rem_parts[0])
+                and any(_is_street_like(p) for p in rem_parts[1:])
+            ):
+                # "Москва, Пречистенская набережная, 9": the unmarked first part is the city.
+                city_raw = rem_parts[0]
+                street_line = ", ".join(rem_parts[1:])
+            elif len(rem_parts) >= 2:
                 # Check for "<Postal Code> <City>" OR "<City> <Postal Code>" in last part
                 # e.g. "00-026 Warszawa", "110 00 Praha", "010011 București", "105 63 Αθήνα", "1000 София", "01001 Київ"
                 # OR "София 1000", "Αθήνα 105 63", "Београд 11000"
@@ -220,6 +303,15 @@ class EasternEuropeGrammar(CountryGrammar):
                     street_line = ""
                 else:
                     street_line = rem_parts[0]
+
+        # "[postcode] City Street type-name[, number]" without commas around the city (Russia, Ukraine, ...).
+        if not city_raw and country_iso in _CITY_FIRST_COUNTRIES and street_line:
+            loc_postal, loc_city, loc_street = split_cyrillic_locality(street_line)
+            if loc_postal or loc_city:
+                if loc_postal and not postal_raw:
+                    postal_raw = loc_postal
+                city_raw = loc_city
+                street_line = loc_street
 
         # Handle secondary units in s2_raw or embedded in street_line
         if s2_raw and not unit_number:

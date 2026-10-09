@@ -1,11 +1,11 @@
 """Canada Post Bilingual English/French Address Grammar."""
 
 import re
+import unicodedata
 from typing import ClassVar, Dict, List, Optional, Tuple
 
 from address_standardizer._patterns import (
     RE_CAN_POSTCODE,
-    RE_CAN_PROV_POSTAL,
     RE_COMMA_DOT,
     RE_NON_ALPHANUMERIC,
     RE_PO_BOX,
@@ -19,11 +19,31 @@ from address_standardizer.international.base import (
     ParsedAddressComponents,
     split_intl_secondary_unit,
 )
-from address_standardizer.tables import CANADIAN_PROVINCES, DIRECTIONALS, STREET_SUFFIXES
+from address_standardizer.tables import (
+    CANADIAN_PROVINCE_ABBREVIATIONS,
+    CANADIAN_PROVINCES,
+    DIRECTIONALS,
+    STREET_SUFFIXES,
+)
 
 RE_CAN_POSTCODE_EXACT = re.compile(
     r"^([A-CEGHJ-NPR-TVXY]\d[A-CEGHJ-NPR-TV-Z])\s*(\d[A-CEGHJ-NPR-TV-Z]\d)$",
     re.IGNORECASE,
+)
+
+# "Ontario M4X 1W4" / "ON M4X1W4" / "Québec, H3B 4W8": a province (any form) followed by the postal code.
+RE_CAN_PROV_THEN_POSTAL = re.compile(
+    r"^(.+?)[\s,]+([A-CEGHJ-NPR-TVXY]\d[A-CEGHJ-NPR-TV-Z]\s?\d[A-CEGHJ-NPR-TV-Z]\d)$", re.IGNORECASE
+)
+
+# French / bilingual secondary-unit designators: "app. 4", "appt 12", "bureau 200", "unité 3", "local 101".
+_FR_UNIT_TYPES: Dict[str, str] = {
+    "APP": "APT", "APPT": "APT", "BUREAU": "STE", "BUR": "STE", "UNITE": "UNIT", "LOCAL": "UNIT",
+}
+_FR_UNIT_ALT = "|".join(sorted(list(_FR_UNIT_TYPES) + ["UNITÉ"], key=len, reverse=True))
+RE_CAN_FR_UNIT_WHOLE = re.compile(rf"^({_FR_UNIT_ALT})\.?\s*#?\s*([A-Z0-9][A-Z0-9\-]*)$", re.IGNORECASE)
+RE_CAN_FR_UNIT_TAIL = re.compile(
+    rf"^(.*?\S)(?:\s*,\s*|\s+)({_FR_UNIT_ALT})\.?\s*#?\s*([A-Z0-9][A-Z0-9\-]*)$", re.IGNORECASE
 )
 
 # "PO Box 123 Stn A" / "CP 123 Succ A" / "PO Box 123 RPO Main": the station belongs to the PO box line.
@@ -39,6 +59,7 @@ FRENCH_STREET_TYPES: Dict[str, str] = {
     "BOULEVARD": "BD",
     "BD": "BD",
     "BLVD": "BD",
+    "BOUL": "BD",
     "AVENUE": "AV",
     "AV": "AV",
     "AVE": "AV",
@@ -98,6 +119,26 @@ RURAL_DELIVERY_MODES: Dict[str, str] = {
     "CP": "PO BOX",
     "CASE POSTALE": "PO BOX",
 }
+
+
+def province_code(raw: str) -> Optional[str]:
+    """Two-letter province code for a province name or abbreviation in English or French, else None.
+
+    Accents, dots, hyphens and case are ignored: ``Québec``, ``QUEBEC``, ``P.E.I.``, ``Nouveau-Brunswick``, ``ONT``.
+    """
+    folded = "".join(c for c in unicodedata.normalize("NFKD", raw or "") if not unicodedata.combining(c))
+    key = " ".join(re.sub(r"[^A-Z0-9]+", " ", folded.upper()).split())
+    return CANADIAN_PROVINCES.get(key) or CANADIAN_PROVINCE_ABBREVIATIONS.get(key)
+
+
+def french_unit(text: str) -> Optional[str]:
+    """``"app. 4"`` -> ``"APT 4"``; None when the whole text is not a French-style unit designator."""
+    m = RE_CAN_FR_UNIT_WHOLE.match((text or "").strip())
+    return f"{_FR_UNIT_TYPES[_ascii_upper(m.group(1))]} {m.group(2).upper()}" if m else None
+
+
+def _ascii_upper(text: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", text or "") if not unicodedata.combining(c)).upper()
 
 
 def is_valid_canadian_postal_code(raw_code: str) -> bool:
@@ -217,7 +258,9 @@ class CanadaGrammar(CountryGrammar):
 
             if len(parts_comma) >= 2:
                 last_part = parts_comma[-1].upper()
-                m_prov_post = RE_CAN_PROV_POSTAL.match(last_part)
+                m_prov_post = RE_CAN_PROV_THEN_POSTAL.match(last_part)
+                if m_prov_post and not province_code(m_prov_post.group(1)):
+                    m_prov_post = None
                 m_post = RE_CAN_POSTCODE.match(last_part)
                 if m_prov_post:
                     state_raw = m_prov_post.group(1)
@@ -228,12 +271,12 @@ class CanadaGrammar(CountryGrammar):
                     postal_raw = parts_comma[-1]
                     rest_parts = parts_comma[:-1]
                     # "Street, City, Province, Postal": the part before the postal code is the province
-                    if len(rest_parts) >= 3 and " ".join(rest_parts[-1].upper().split()) in CANADIAN_PROVINCES:
+                    if len(rest_parts) >= 3 and province_code(rest_parts[-1]):
                         state_raw = rest_parts[-1]
                         rest_parts = rest_parts[:-1]
                     city_raw = rest_parts[-1]
                     street_line = ", ".join(rest_parts[:-1])
-                elif len(parts_comma) >= 3 and " ".join(last_part.split()) in CANADIAN_PROVINCES:
+                elif len(parts_comma) >= 3 and province_code(last_part):
                     state_raw = parts_comma[-1]
                     city_raw = parts_comma[-2]
                     street_line = ", ".join(parts_comma[:-2])
@@ -269,6 +312,16 @@ class CanadaGrammar(CountryGrammar):
             po_station_line = f"PO BOX {m_pos.group(2).upper()} STN {m_pos.group(4).strip().upper()}"
             street_line = (m_pos.group(5) or "").strip()
 
+        # French-style units ("app. 4", "bureau 200") that the generic splitter does not know.
+        fr_unit_s2 = french_unit(s2_raw)
+        if fr_unit_s2:
+            s2_raw = fr_unit_s2
+        m_fr_tail = RE_CAN_FR_UNIT_TAIL.match(street_line.strip())
+        if m_fr_tail:
+            street_line = m_fr_tail.group(1)
+            fr_unit = f"{_FR_UNIT_TYPES[_ascii_upper(m_fr_tail.group(2))]} {m_fr_tail.group(3).upper()}"
+            s2_raw = f"{fr_unit} {s2_raw}".strip()
+
         st1_base, st2_base = split_intl_secondary_unit(street_line, s2_raw)
         if st2_base:
             s2_parts = st2_base.split(maxsplit=1)
@@ -289,8 +342,7 @@ class CanadaGrammar(CountryGrammar):
 
         # Normalize Province
         norm_state = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", state_raw).strip().upper())
-        if norm_state in CANADIAN_PROVINCES:
-            norm_state = CANADIAN_PROVINCES[norm_state]
+        norm_state = province_code(norm_state) or norm_state
 
         norm_city = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", city_raw).strip().upper())
         norm_postal = self.normalize_postal_code(postal_raw)

@@ -117,6 +117,47 @@ def merge_num_barrio(rem_parts: List[str]) -> Optional[str]:
     return None
 
 
+# A comma part that is nothing but a house number: "123", "12A", "12/14", "7-9", "Nº 45", "s/n".
+RE_STANDALONE_NUMBER = re.compile(
+    r"^(?:N[º°o]?\.?\s*)?(\d+[A-Za-z]?(?:\s?[/-]\s?\d+[A-Za-z]?)?(?:\s+[A-Za-z]{1,2}\d+)?|S/N)$", re.IGNORECASE
+)
+# A house number glued in front of a locality: "108 São Paulo" (but not "20 de Noviembre", "5 do Sul").
+RE_LEADING_NUMBER_LOCALITY = re.compile(r"^(\d+[A-Za-z]?(?:\s+[A-Za-z]{1,2}\d+)?)\s+(?!(?:de|del|da|do|das|dos|di)\b)([^\W\d_].*)$", re.IGNORECASE)
+# "7 - 9": the dash joins a house-number range, it does not introduce a barrio.
+RE_NUMBER_RANGE_DASH = re.compile(r"(\d[A-Za-z]?)\s+[-–]\s+(\d+[A-Za-z]?)\s*$")
+
+
+def merge_standalone_number(rem_parts: List[str]) -> None:
+    """Fold a comma part that is only a house number into the street part before it (in place).
+
+    "Rua X, 123, Bairro, Cidade" -> ["Rua X 123", "Bairro", "Cidade"]; without it the number would be read as a
+    locality. The street part before must itself not be a bare number.
+    """
+    for idx in range(1, len(rem_parts)):
+        num = RE_STANDALONE_NUMBER.match(rem_parts[idx].strip())
+        if num and not RE_STANDALONE_NUMBER.match(rem_parts[idx - 1].strip()):
+            rem_parts[idx - 1] = f"{rem_parts[idx - 1]} {num.group(1)}"
+            del rem_parts[idx]
+            return
+
+
+def collapse_number_range(street_line: str) -> str:
+    """"Travessa da Queimada 7 - 9" -> "Travessa da Queimada 7-9" (a numeric range, not "number - barrio")."""
+    return RE_NUMBER_RANGE_DASH.sub(r"\1-\2", street_line)
+
+
+def split_number_from_locality(street_line: str, locality: str) -> Tuple[str, str]:
+    """Move a house number that leaked in front of the locality back onto the street line.
+
+    ("Rua Dona Antonia", "108 Sao Paulo") -> ("Rua Dona Antonia 108", "Sao Paulo"); a street line that already ends
+    in a number is left alone.
+    """
+    m = RE_LEADING_NUMBER_LOCALITY.match(locality.strip())
+    if not m or not street_line or re.search(r"\d[A-Za-z]?$", street_line.strip()):
+        return street_line, locality
+    return f"{street_line} {m.group(1)}", m.group(2)
+
+
 def unit_text(text: str) -> str:
     """Upper-cased unit text with punctuation stripped ("Esc. 2" -> "ESC 2")."""
     return " ".join(re.sub(r"[.,;]", " ", text).upper().split())
@@ -202,6 +243,8 @@ def parse_street2_unit(
 class RomanceGrammar(CountryGrammar):
     """Romance and Latin American address grammar with prefix road types and colonias."""
 
+    split_commaless_line: ClassVar[bool] = True
+
     country_iso3: ClassVar[str] = "FRA"
     supported_countries: ClassVar[Tuple[str, ...]] = (
         "FRA",
@@ -225,6 +268,9 @@ class RomanceGrammar(CountryGrammar):
         m_bra = RE_BRA_CEP.match(clean)
         if m_bra:
             return f"{m_bra.group(1)}-{m_bra.group(2)}"
+        m_prt = re.match(r"^(\d{4})[- ](\d{3})$", clean)  # Portugal "1150-011", sometimes written "1150 011"
+        if m_prt:
+            return f"{m_prt.group(1)}-{m_prt.group(2)}"
         return clean
 
     def extract_premise_and_thoroughfare(
@@ -305,7 +351,7 @@ class RomanceGrammar(CountryGrammar):
                     continue
 
                 # Check if entire part is a postal code
-                if RE_BRA_CEP.match(part.strip()) or re.match(r"^\d{5}(?:-\d{3})?$", part.strip()):
+                if RE_BRA_CEP.match(part.strip()) or re.match(r"^(?:\d{5}(?:-\d{3})?|\d{4}[- ]\d{3})$", part.strip()):
                     postal_raw = part.strip()
                     continue
 
@@ -319,6 +365,8 @@ class RomanceGrammar(CountryGrammar):
                     state_raw = m_city_st.group(2).strip()
                     rem_parts = rem_parts[:-1]
 
+            # "Calle Mayor, 12, Madrid": a bare number part belongs to the street, not to a locality.
+            merge_standalone_number(rem_parts)
             if not city_raw and not dep_locality:
                 dep_locality = merge_num_barrio(rem_parts)
 
@@ -327,14 +375,14 @@ class RomanceGrammar(CountryGrammar):
             elif len(rem_parts) >= 3:
                 # e.g. "Av. Insurgentes Sur 1602", "03940 Ciudad de México", "CDMX"
                 # OR "142 Boulevard Saint-Germain", "Quartier Latin", "75006 Paris"
-                m_pc_last = re.match(r"^(\d{5}(?:-\d{3})?)\s+(.*)$", rem_parts[-1])
+                m_pc_last = re.match(r"^(\d{5}(?:-\d{3})?|\d{4}[- ]\d{3})\s+(.*)$", rem_parts[-1])
                 if m_pc_last:
                     postal_raw = m_pc_last.group(1)
                     city_raw = m_pc_last.group(2)
                     street_line = ", ".join(rem_parts[:-1])
                 else:
                     state_raw = rem_parts[-1]
-                    m_pc = re.match(r"^(\d{5}(?:-\d{3})?)\s+(.*)$", rem_parts[-2])
+                    m_pc = re.match(r"^(\d{5}(?:-\d{3})?|\d{4}[- ]\d{3})\s+(.*)$", rem_parts[-2])
                     if m_pc:
                         postal_raw = m_pc.group(1)
                         city_raw = m_pc.group(2)
@@ -343,7 +391,7 @@ class RomanceGrammar(CountryGrammar):
                     street_line = ", ".join(rem_parts[:-2])
             elif len(rem_parts) == 2:
                 # e.g. "Calle Mayor 45", "28013 Madrid"
-                m_pc = re.match(r"^(\d{5}(?:-\d{3})?)\s+(.*)$", rem_parts[1])
+                m_pc = re.match(r"^(\d{5}(?:-\d{3})?|\d{4}[- ]\d{3})\s+(.*)$", rem_parts[1])
                 if m_pc:
                     postal_raw = m_pc.group(1)
                     city_raw = m_pc.group(2)
@@ -372,12 +420,16 @@ class RomanceGrammar(CountryGrammar):
                 # Every part was consumed as colonia / unit / postal code: no street line remains.
                 street_line = ""
 
+            if city_raw:
+                street_line, city_raw = split_number_from_locality(street_line, city_raw)
+
         # Handle secondary units in s2_raw or embedded in street_line
         s2_type: Optional[str] = None
         s2_number: Optional[str] = None
         if s2_raw:
             s2_type, s2_number = parse_street2_unit(s2_raw, RE_ROMANCE_SEC)
 
+        street_line = collapse_number_range(street_line)
         # Check for Brazil " - " separator before split_intl_secondary_unit
         if " - " in street_line:
             p_dash = street_line.split(" - ", 1)

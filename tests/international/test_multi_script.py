@@ -40,7 +40,7 @@ def test_japanese_kanji_preservation_and_ascii_key():
     assert res.postal_code == "106-6108"
     assert res.state == "東京都"
     assert res.city == "港区"
-    assert "六本木6-10-1" in res.street1
+    assert "六本木 6-10-1" in res.street1
     assert res.building_name == "六本木ヒルズ森タワー"
 
     # Keys must be pure ASCII

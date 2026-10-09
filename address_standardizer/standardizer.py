@@ -49,6 +49,7 @@ from address_standardizer.phonetics import (
     generate_phonetic_address_key,
 )
 from address_standardizer.fast_path import fast_path_parse
+from address_standardizer.explain import _RECORDER as _explain_recorder
 from address_standardizer.international import (
     CountryGrammarRegistry,
     fold_to_ascii_key,
@@ -259,6 +260,9 @@ def standardize_address(
     finalize: bool = True,
     correct_state_from_zip: Optional[bool] = None,
     reference_provider: Optional[Any] = None,
+    explain: bool = False,
+    alternatives: int = 0,
+    calibrator: Optional[Any] = None,
     **kwargs: Any,
 ) -> StandardizedAddress:
     """
@@ -278,7 +282,20 @@ def standardize_address(
     ``reference_provider`` (a ``address_standardizer.reference.ReferenceProvider``) additionally validates the result
     against reference data: it is attached as ``std.reference_validation`` and its reason codes are appended to
     ``failure_reason_codes``. The default ``None`` changes nothing and costs nothing.
+
+    ``explain=True`` attaches ``std.explanation`` (ordered change records) and ``std.field_confidence`` (per-field
+    confidence, heuristic unless a fitted ``calibrator`` is passed); ``alternatives=N`` (at most 5) attaches
+    ``std.alternatives`` (next-best readings of an ambiguous input). Both bypass the result cache and are off by default.
     """
+    if explain or alternatives:
+        from address_standardizer.explain import standardize_explained
+
+        return standardize_explained(explain, alternatives, calibrator, dict(
+            street1=street1, street2=street2, city=city, state=state, postal_code=postal_code, country=country,
+            is_vacant=is_vacant, enable_fuzzy=enable_fuzzy, enable_geocoding=enable_geocoding,
+            allow_locality=allow_locality, finalize=finalize, correct_state_from_zip=correct_state_from_zip,
+            reference_provider=reference_provider, **kwargs,
+        ))
     if reference_provider is not None:
         from address_standardizer.reference.validation import apply_reference_validation
 
@@ -289,6 +306,8 @@ def standardize_address(
         )
         return apply_reference_validation(base, reference_provider)
     import os
+
+    _xr = _explain_recorder.get()  # None on every default call; set only inside an explain=True call
 
     # Callers (pandas, CSV readers) pass NaN, floats and bytes; normalize to text once, up front.
     street1 = coerce_text(street1) if street1 is not None else None
@@ -309,6 +328,8 @@ def standardize_address(
                 if was is not None and new_state:
                     street1 = street1[: tail.start("state")] + new_state + street1[tail.end("state"):]
                     state_corrected_from = was
+    if _xr is not None and state_corrected_from is not None:
+        _xr.add("state", state or "", "state_corrected_from_zip", {"from": state_corrected_from, "postal_code": postal_code})
     allow_locality = allow_locality or bool(
         kwargs.get("allow_locality_only")
         or kwargs.get("allow_city_level")
@@ -448,6 +469,8 @@ def standardize_address(
 
     # Municipal Prefix / City Acronym Noise Filter in street1
     if is_city_noise_in_street1(s1_in, city_in, state_in):
+        if _xr is not None:
+            _xr.add("street1", "", "city_noise_removed", {"city": city_in})
         s1_in = ""
 
     # Care-Of / Attention Prefix Cleaner: strips "c/o <company>" segments, keeping any physical street
@@ -457,6 +480,11 @@ def standardize_address(
     if s2_in:
         s2_in, care_of_2 = extract_care_of(s2_in)
     raw_dict["care_of"] = "; ".join(dict.fromkeys(c for c in (care_of_1, care_of_2) if c)) or None
+    if _xr is not None:
+        if care_of_1:
+            _xr.add("street1", s1_in, "care_of_removed", {"care_of": care_of_1})
+        if care_of_2:
+            _xr.add("street2", s2_in, "care_of_removed", {"care_of": care_of_2})
     if had_co and not s1_in and s2_in:
         s1_in = s2_in
         s2_in = ""
@@ -547,8 +575,13 @@ def standardize_address(
             if not (city_raw or state_raw or postal_raw):
                 _script_split = split_script_single_line(s1_raw, country_iso)
                 if _script_split:
+                    if _xr is not None:
+                        _xr.add("street1", _script_split[0], "script_single_line_split",
+                                {"city": _script_split[1], "state": _script_split[2], "postal_code": _script_split[3]})
                     s1_raw, city_raw, state_raw, postal_raw = _script_split
-    is_us = country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
+        if _xr is not None:
+            _xr.country(country_raw, country_iso, state_raw, postal_raw, _script_iso)
+    is_us =country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
 
     # Strip terminal sovereign country before US or international parsing if structured components present
     if city_raw or state_raw or postal_raw:
@@ -569,12 +602,16 @@ def standardize_address(
             enable_fuzzy=enable_fuzzy,
         )
         if fast_res is not None:
+            if _xr is not None:
+                _xr.parse_path = "fast_path"
             fast_res.country_iso3 = country_iso
             return _finish(fast_res)
 
     # Tier 2 & Tier 3: Deterministic Rule Matrix and Statistical CRF Fallback
     if is_us:
         # US Pipeline (USPS Pub 28)
+        if _xr is not None:
+            _xr.parse_path = "us_parser"
         s1_clean = clean_redundant_street_tail(s1_raw, city=city_raw, state=state_raw, postal_code=postal_raw)
         s2_clean = clean_redundant_street_tail(s2_raw, city=city_raw, state=state_raw, postal_code=postal_raw) if s2_raw else s2_raw
         bldg_name = None
@@ -723,6 +760,10 @@ def standardize_address(
             norm_postal = RE_WHITESPACE.sub(" ", postal_raw.strip().upper())
         else:
             grammar = CountryGrammarRegistry.get(country_iso)
+            if _xr is not None:
+                _xr.parse_path = (
+                    "universal_grammar" if type(grammar).__name__ == "UniversalInternationalGrammar" else "country_grammar"
+                )
             parsed = grammar.standardize(
                 street1=s1_raw,
                 street2=s2_raw,

@@ -15,6 +15,26 @@ type StandardizeRequest struct {
 	// CorrectStateFromZip replaces a US state that contradicts the ZIP with the ZIP's state (server default: false).
 	CorrectStateFromZip *bool `json:"correct_state_from_zip,omitempty"`
 	IncludeMetadata     *bool `json:"include_metadata,omitempty"`
+	// IncludeExplanation adds Explanation and FieldConfidence to the response (server default: false).
+	IncludeExplanation *bool `json:"include_explanation,omitempty"`
+	// Alternatives asks for up to this many next-best interpretations (0-5, server default: 0).
+	Alternatives *int `json:"alternatives,omitempty"`
+}
+
+// ExplanationRecord is one change or decision the engine made, with a stable machine-readable Rule id.
+type ExplanationRecord struct {
+	Field  string                 `json:"field"`
+	Before string                 `json:"before"`
+	After  string                 `json:"after"`
+	Rule   string                 `json:"rule"`
+	Detail map[string]interface{} `json:"detail"`
+}
+
+// Alternative is a next-best interpretation of an ambiguous input; Score is a relative plausibility, not a probability.
+type Alternative struct {
+	Changes map[string]string `json:"changes"`
+	Reason  string            `json:"reason"`
+	Score   float64           `json:"score"`
 }
 
 // StandardizedAddress represents an ISO / USPS Pub 28 standardized address.
@@ -51,6 +71,9 @@ type StandardizedAddress struct {
 	CorporateRiskFlags   []string               `json:"corporate_risk_flags"`
 	RooftopAddress       string                 `json:"rooftop_address"`
 	FullRooftopAddress   string                 `json:"full_rooftop_address"`
+	Explanation          []ExplanationRecord    `json:"explanation"`      // only with IncludeExplanation
+	FieldConfidence      map[string]float64     `json:"field_confidence"` // per-field, heuristic; only with IncludeExplanation
+	Alternatives         []Alternative          `json:"alternatives"`     // only with Alternatives >= 1
 	RawStreetAddress     string                 `json:"raw_street_address,omitempty"`
 	Extra                map[string]interface{} `json:"-"`
 }

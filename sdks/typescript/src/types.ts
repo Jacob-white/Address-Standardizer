@@ -18,6 +18,36 @@ export interface StandardizeRequest {
   /** Replace a US state that contradicts the ZIP with the ZIP's state (default false). */
   correct_state_from_zip?: boolean;
   include_metadata?: boolean;
+  /** Add `explanation` and `field_confidence` to the response (default false). */
+  include_explanation?: boolean;
+  /** Add up to this many next-best interpretations as `alternatives` (0-5, default 0). */
+  alternatives?: number;
+}
+
+/** One change or decision the engine made, with a stable machine-readable `rule` id. */
+export interface ExplanationRecord {
+  field: string;
+  before: string;
+  after: string;
+  rule: string;
+  detail: Record<string, any>;
+}
+
+/** Per-field confidence in [0, 1]. Heuristic evidence scores, not probabilities, unless the server applies a calibrator. */
+export interface FieldConfidence {
+  street1: number;
+  street2: number;
+  city: number;
+  state: number;
+  postal_code: number;
+  country: number;
+}
+
+/** A next-best interpretation of an ambiguous input; `score` is a relative plausibility, not a probability. */
+export interface Alternative {
+  changes: Record<string, string>;
+  reason: string;
+  score: number;
 }
 
 export interface StandardizeResponse {
@@ -54,6 +84,12 @@ export interface StandardizeResponse {
   corporate_risk_flags?: string[] | null;
   rooftop_address?: string | null;
   full_rooftop_address?: string | null;
+  /** Only with `include_explanation`. */
+  explanation?: ExplanationRecord[] | null;
+  /** Only with `include_explanation`: per-field confidence in [0, 1] (heuristic, not a probability). */
+  field_confidence?: FieldConfidence | null;
+  /** Only with `alternatives` >= 1. */
+  alternatives?: Alternative[] | null;
   [key: string]: any;
 }
 

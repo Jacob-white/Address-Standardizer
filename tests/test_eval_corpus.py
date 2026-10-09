@@ -197,3 +197,57 @@ def test_committed_sample_is_well_formed_and_licensed():
     assert "ODbL" in data["_meta"]["license"]
     license_text = (EVAL_DIR / "DATA_LICENSE.md").read_text(encoding="utf-8")
     assert "OpenStreetMap contributors" in license_text and "NOT human-reviewed" in license_text
+
+
+def _overlap(a, b):
+    return not (a[2] < b[0] or a[0] > b[2] or a[3] < b[1] or a[1] > b[3])
+
+
+def test_holdout_bboxes_are_disjoint_from_development_bboxes():
+    holdout = {k: c["holdout_bboxes"] for k, c in bc.COUNTRIES.items() if c.get("holdout_bboxes")}
+    assert len(holdout) >= 35
+    for iso2, boxes in holdout.items():
+        for h in boxes:
+            for dev in bc.COUNTRIES[iso2]["bboxes"]:
+                assert not _overlap(h, dev), f"{iso2} holdout box {h} overlaps development box {dev}"
+
+
+def test_build_corpus_holdout_flag_selects_holdout_bboxes_only():
+    seen = []
+
+    def fetcher(query):
+        seen.append(query)
+        return _payload(5)
+
+    cfg = bc.COUNTRIES["US"]
+    bc.build_corpus(["US"], 2, 5, "unused", fetcher=fetcher)
+    dev_queries, seen[:] = list(seen), []
+    bc.build_corpus(["US"], 2, 5, "unused", fetcher=fetcher, holdout=True)
+    assert len(dev_queries) == len(cfg["bboxes"]) and len(seen) == len(cfg["holdout_bboxes"])
+    assert not set(dev_queries) & set(seen)
+    # a holdout-only country has nothing to fetch in the default (development) mode
+    assert bc.build_corpus(["MX"], 2, 5, "unused", fetcher=fetcher) == []
+
+
+def test_committed_holdout_is_well_formed_licensed_and_disjoint_from_sample():
+    data = json.loads((EVAL_DIR / "osm_holdout.json").read_text(encoding="utf-8"))
+    sample = json.loads((EVAL_DIR / "osm_sample.json").read_text(encoding="utf-8"))
+    recs = data["records"]
+    assert data["_meta"].get("holdout") is True and data["_meta"]["seed"] != sample["_meta"]["seed"]
+    assert len(recs) >= 400
+    per_country = {}
+    for r in recs:
+        per_country[r["country"]] = per_country.get(r["country"], 0) + 1
+    assert len(per_country) >= 20
+    assert sum(1 for n in per_country.values() if n >= 25) >= 15
+    assert {r["script"] for r in recs} - {"Latin"}, "holdout must include non-Latin scripts"
+    assert len({r["id"] for r in recs}) == len(recs)
+    for r in recs:
+        assert r["labels"]["street"] and r["labels"]["house_number"] and r["labels"]["postcode"]
+        assert r["inputs"]["structured"]["fields"]["street1"]
+        assert r["source"].startswith("osm:")
+    # no OSM object may appear in both the development sample and the held-out set
+    assert not {r["source"] for r in recs} & {r["source"] for r in sample["records"]}
+    assert "ODbL" in data["_meta"]["license"]
+    license_text = (EVAL_DIR / "DATA_LICENSE.md").read_text(encoding="utf-8")
+    assert "osm_holdout.json" in license_text and "NOT human-reviewed" in license_text

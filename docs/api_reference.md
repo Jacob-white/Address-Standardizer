@@ -57,7 +57,8 @@ Everything below is importable from `address_standardizer`.
 standardize_address(
     street1=None, street2=None, city=None, state=None, postal_code=None, country=None,
     is_vacant=None, enable_fuzzy=True, enable_geocoding=False, use_cache=True,
-    allow_locality=False, finalize=True, correct_state_from_zip=None, **kwargs,
+    allow_locality=False, finalize=True, correct_state_from_zip=None,
+    reference_provider=None, explain=False, alternatives=0, calibrator=None, **kwargs,
 ) -> StandardizedAddress
 ```
 
@@ -74,6 +75,8 @@ standardize_address(
 | `allow_locality` | `False` | Permit a result with no street (city/state only). It is returned with `address_status == "locality_only"`. Also enabled by `ADDRESS_STANDARDIZER_ALLOW_LOCALITY=1`. |
 | `finalize` | `True` | When `False`, skip confidence scoring, delivery intelligence, corporate risk, spatial resolution and the cache (fast normalization only). |
 | `correct_state_from_zip` | `None` | `True`: replace a state that contradicts the ZIP with the ZIP's state. `False`: never. `None`: follow `ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP`. See [section 4](#4-zip--state-policy). |
+| `reference_provider` | `None` | A reference-data provider; see [section 4](#reference-data-validation-optional). |
+| `explain`, `alternatives`, `calibrator` | `False`, `0`, `None` | Opt-in explanation trace, per-field confidence and alternative readings; see [Explanations](#explanations-per-field-confidence-and-alternatives). |
 | `**kwargs` | | Aliases: `street` (for `street1`), `vacant` (for `is_vacant`), and `allow_locality_only` / `allow_city_level` (for `allow_locality`). |
 
 Inputs are coerced to text first: `None` and NaN become empty, integral floats lose their `.0`, bytes are decoded.
@@ -86,6 +89,176 @@ Country handling: placeholders such as `N/A`, `none` or `unknown` mean "no count
 >>> a.normalized_address_key
 '100 WALL ST|STE 400|NEW YORK|NY|10005|USA'
 ```
+
+### Explanations, per-field confidence and alternatives
+
+All three are opt-in. A default call computes none of them, costs nothing extra, and its result is unchanged (the 14-key
+`as_dict()` is untouched; the new keys appear only when requested).
+
+```python
+std = standardize_address("100 main street suite 200", city="los angelas", state="california",
+                          postal_code="90012", country="USA", explain=True, alternatives=3)
+for r in std.explanation:
+    print(r["field"], r["rule"], r["before"], "->", r["after"])
+# street2 unit_split  -> STE 200
+# street1 street_type_abbreviation STREET -> ST
+# city typo_heal_city los angelas -> LOS ANGELES
+# state state_abbreviated california -> CA
+std.field_confidence   # {'street1': 0.99, 'street2': 0.85, 'city': 0.8, 'state': 0.99, 'postal_code': 0.97, 'country': 0.99}
+std.alternatives       # [{'changes': {'city': 'LOS ANGELAS'}, 'reason': '...', 'score': 0.4}, ...]
+```
+
+| Argument | Default | Effect |
+| :--- | :--- | :--- |
+| `explain` | `False` | Sets `std.explanation` (ordered change records) and `std.field_confidence`. |
+| `alternatives` | `0` | `1`..`5`: sets `std.alternatives`, the next-best readings, best first. Values above 5 are clamped. |
+| `calibrator` | `None` | A fitted `address_standardizer.calibration.Calibrator`; maps each field confidence through it. |
+
+Explained calls bypass the result cache (the trace has to be built from a real run) and are otherwise identical to a
+plain call: same fields, same `confidence_score`, same routing. They are meant for review, debugging and audit, not for
+bulk throughput. `as_dict(include_explanation=True)` (or `include_metadata=True`) adds `explanation`,
+`field_confidence` and `alternatives` when they were requested.
+
+**Change records.** Each entry of `explanation` is `{"field", "before", "after", "rule", "detail"}`:
+
+- `field`: `street1`, `street2`, `city`, `state`, `postal_code`, `country`, `dependent_locality` or `building_name`.
+- `before` / `after`: the value as supplied and as produced. For token-level street rules they are the affected
+  fragment (`STREET` -> `ST`), for field-level rules the whole value. Validation outcomes have `before == after`.
+- `rule`: a stable machine-readable id from the table below. Ids are never renamed or removed in a minor release; new
+  ids may be added, so consumers should ignore ids they do not know.
+- `detail`: an object with rule-specific keys, for example `{"candidate": "LOS ANGELES", "distance": 1,
+  "supplied": "los angelas"}` for `typo_heal_city` (the healed city, its Damerau-Levenshtein distance from the
+  supplied text), `{"zip_state": "CA", "postal_code": "90012"}` for `zip_state_mismatch_kept`, or the
+  provider, status and candidate places for the `reference_*` rules.
+
+Order: decisions the pipeline took (care-of removal, state-from-ZIP correction, country and script detection), then the
+per-field normalisations (country, street lines, city, locality, state, postal code), then validation outcomes (hub,
+locality-only, ZIP/state agreement, postal format, reference data). The records are built from the run itself plus a
+field-by-field comparison of what you supplied with what came out, so the fast path, the rule matrix, the CRF and the
+country grammars are all explained the same way. Only changes that happened are reported; a field that is returned
+exactly as supplied has no record.
+
+Rule ids:
+
+**Surface and street-line rules**
+
+| Rule id | Meaning |
+| :--- | :--- |
+| `case_normalized` | only letter case changed |
+| `punctuation_normalized` | only punctuation or whitespace changed |
+| `diacritics_folded` | accents were folded to their base letters |
+| `street_type_abbreviation` | street type replaced by its USPS abbreviation (STREET -> ST) |
+| `directional_abbreviation` | directional replaced by its abbreviation (NORTH -> N) |
+| `ordinal_normalized` | number or number word became an ordinal (FIRST -> 1ST) |
+| `unit_designator_abbreviation` | unit designator replaced by its abbreviation (SUITE -> STE) |
+| `unit_designator_inserted` | a unit designator was added in front of a bare unit number (# 5 -> APT 5) |
+| `number_words_to_digits` | number words became digits (FIVE HUNDRED -> 500) |
+| `typo_heal_street` | a street word was corrected to a known word within a small edit distance |
+| `token_rewritten` | a token was rewritten by a normalisation rule |
+| `tokens_removed` | tokens were dropped from the field |
+| `tokens_inserted` | tokens were added to the field |
+| `unit_split` | a trailing unit was moved from street1 to street2 |
+| `street1_moved_to_street2` | a street1 value that is not a street was moved to street2 |
+| `secondary_promoted_to_street` | street2 content (a PO box, or the rest of the street) became part of street1 |
+| `house_number_moved_to_front` | a trailing house number was moved in front of the street name |
+| `locality_moved_from_street` | city, state or postal code text was cut out of the street line |
+| `care_of_removed` | a c/o or attention clause was removed from the delivery line |
+| `city_noise_removed` | street1 only repeated the city or a municipal prefix and was cleared |
+| `private_residence_detected` | a privacy placeholder replaced the street line |
+
+**City and locality**
+
+| Rule id | Meaning |
+| :--- | :--- |
+| `typo_heal_city` | a misspelled city was corrected to a known city |
+| `city_inferred_from_text` | the city was taken from the street line |
+| `city_canonicalized` | the city was rewritten to its canonical form |
+| `city_discarded` | the supplied city was dropped |
+| `dependent_locality_extracted` | a dependent locality (district, urbanization) was separated from the city or street |
+| `building_name_extracted` | a building name was separated from the street line |
+
+**State and ZIP policy**
+
+| Rule id | Meaning |
+| :--- | :--- |
+| `state_abbreviated` | state name replaced by its postal abbreviation |
+| `state_from_zip` | state was missing and taken from the ZIP code |
+| `state_inferred_from_text` | state was missing and taken from the address text |
+| `state_normalized` | state was rewritten to its canonical form |
+| `state_corrected_from_zip` | a state that contradicted the ZIP was replaced (correct_state_from_zip policy) |
+| `zip_state_mismatch_kept` | the state contradicts the ZIP and was kept (default policy); the address is flagged |
+
+**Postal code**
+
+| Rule id | Meaning |
+| :--- | :--- |
+| `postal_normalized` | postal code was reformatted |
+| `postal_transposition_healed` | transposed digits in the postal code were corrected |
+| `postal_extracted_from_text` | the postal code was taken from the address text |
+| `postal_discarded` | the supplied postal code was dropped |
+| `postal_format_invalid` | the postal code does not match the country's format |
+
+**Country and script**
+
+| Rule id | Meaning |
+| :--- | :--- |
+| `country_normalized` | country name or code was resolved to ISO alpha-3 |
+| `country_inferred_from_script` | no country was given; it was inferred from the writing system |
+| `country_inferred_from_state` | no country was given; it was inferred from the state or province |
+| `country_inferred_from_postal` | no country was given; it was inferred from the postal code |
+| `country_inferred_from_text` | no country was given; it was inferred from the address text |
+| `country_defaulted_us` | no country evidence at all; the US default was used |
+| `script_single_line_split` | a non-Latin single-line address was split into street, city, state and postal code |
+
+**Outcomes**
+
+| Rule id | Meaning |
+| :--- | :--- |
+| `registered_agent_hub_detected` | the address is a known registered-agent / formation hub |
+| `locality_only_accepted` | no street line; accepted as a locality-only record |
+| `parse_failed` | no usable street line could be produced |
+
+**Reference data (only with a reference provider)**
+
+| Rule id | Meaning |
+| :--- | :--- |
+| `reference_confirmed` | postal code, state and place agree with the reference data |
+| `reference_postal_unknown` | the postal code is not in the reference data |
+| `reference_place_mismatch` | the city does not resemble any place for the postal code |
+| `reference_state_mismatch` | the state differs from the postal code's state in the reference data |
+| `reference_not_checked` | the reference data could not check this address |
+
+**Per-field confidence.** `std.field_confidence` maps `street1`, `street2`, `city`, `state`, `postal_code` and
+`country` to a value in [0, 1], derived from evidence the run can observe: whether the field was supplied, inferred or
+healed (and the healed edit distance), which parser produced the street line (fast path 0.99, US parser 0.95, a
+country grammar 0.90, the universal grammar 0.80 as the starting point), whether the postal code has a valid format for
+its country, whether the ZIP agrees with the state, the street-line reason codes when the result was finalized, and the
+reference-validation status when a provider was used. A field that is empty and not applicable (an unused `street2`,
+a state outside the countries that use one) scores 1.0; a missing field that should be there scores 0.0.
+
+These numbers are **heuristic**: fixed bonuses and penalties chosen by the engine's authors, not measured
+accuracies and not probabilities. A value of 0.9 does not mean "right 90% of the time". They rank fields within and
+across addresses (which field should a human check first) and nothing more, unless you calibrate them. Pass a
+`Calibrator` fitted with `address_standardizer.calibration.fit_isotonic` on `(field_score, was_correct)` pairs of this
+same quantity and each field score is mapped through it (see [evaluation.md](evaluation.md)); the composite
+`confidence_score` and `routing_tier` are never changed by any of this.
+
+**Alternatives.** Computed only on request and deterministically (no clock, no randomness, no network). Each entry is
+`{"changes": {field: value}, "reason": str, "score": float}`: the fields that would differ from the primary result under
+that reading. `score` is a relative plausibility used to order the list, not a probability. Three kinds exist:
+
+1. **Other country readings**, only when no country was supplied and it was inferred from weak evidence (the postal code
+   alone, or nothing but the US default): the countries whose postal-code format also accepts the postal code, with the
+   address re-parsed under each. Common destinations (US, CA, GB, AU, DE, FR, ES, IT, MX, BR, IN, JP, NL, NZ) score 0.4
+   and are listed first; others 0.1. A country inferred from a recognised state or province or from the script is not
+   treated as ambiguous.
+2. **City candidates** (US): when the supplied city is not itself a known city, the other known cities within the healing
+   distance (score `0.5 - 0.15 * distance`) and, if the city was changed, the supplied spelling (0.4). Ties that the
+   healer refuses to resolve (`DEVER` is as close to `DENVER` as to `DOVER`) are listed as alternatives.
+3. **Unit-versus-street split**: when a trailing unit was moved to `street2`, the reading where it stays in `street1`
+   (0.3).
+
+Alternatives are re-parsed without scoring, caching or ledger writes, so asking for them never adds audit records.
 
 ### Key and helper functions
 
@@ -139,6 +312,7 @@ A dataclass returned by `standardize_address` and `batch_standardize` (`from add
 | `is_registered_agent_hub` | `bool` | |
 | `dependent_locality`, `building_name` | `Optional[str]` | International fields. |
 | `care_of` | `Optional[str]` | Text of a removed `c/o` / `C/-` / `attn` clause (for example `Acme Holdings LLC`); `None` when there was none. The clause is never part of `street1`/`street2`. Returned by `as_dict(include_metadata=True)` and the REST API. |
+| `explanation`, `field_confidence`, `alternatives` | `Optional[list]`, `Optional[dict]`, `Optional[list]` | `None` unless requested with `explain=True` / `alternatives=N` (see [Explanations](#explanations-per-field-confidence-and-alternatives)). |
 | `rooftop_address` | `Optional[str]` | Street line without the unit (`None` for PO boxes, private residences, locality-only and failed parses). |
 
 **Computed properties** (set by `finalize=True` processing; all settable)
@@ -178,7 +352,7 @@ missing house number, or a failed parse, is `MANUAL_STEWARDSHIP`.
 
 **Methods**
 
-- `as_dict(include_metadata=False, include_rooftop=False) -> dict`. The base dict has `street1`, `street2`, `city`,
+- `as_dict(include_metadata=False, include_rooftop=False, include_explanation=False) -> dict`. The base dict has `street1`, `street2`, `city`,
   `state`, `postal_code`, `country`, `normalized_address_key`, `building_key`, `phonetic_key`, `address_status`,
   `raw_street_address`, `is_us`, `is_private_residence`, `is_registered_agent_hub`. `include_rooftop=True` adds
   `rooftop_address` and `full_rooftop_address`. `include_metadata=True` also adds `is_locality_only`, `is_city_level`,
@@ -447,6 +621,8 @@ served at `/docs`, `/redoc` and `/openapi.json`. Responses carry an `X-Response-
 | `GET /health` | Health, version, engine and cache telemetry |
 | `GET /ready` | Readiness: 200 when cache, audit ledger and reference DB are usable, else 503 (see [operations.md](operations.md)) |
 | `GET /metrics` | Request metrics (JSON or Prometheus text) |
+| `GET /review` | Steward review page (only when enabled, see [Steward review UI](#steward-review-ui)) |
+| `GET /v1/audit`, `POST /v1/audit/{audit_id}/override` | Review queue and decisions (only when the review UI is enabled) |
 
 ### `POST /v1/standardize`
 
@@ -462,6 +638,8 @@ Request body (`application/json`; unknown fields are ignored):
 | `allow_locality` | bool | `false` | Allow locality-only results. |
 | `correct_state_from_zip` | bool | `false` | See [section 4](#4-zip--state-policy). |
 | `include_metadata` | bool | `true` | When `false`, only the base fields plus `rooftop_address` and `full_rooftop_address` are returned. |
+| `include_explanation` | bool | `false` | Add `explanation` (change records) and `field_confidence`; see [Explanations](#explanations-per-field-confidence-and-alternatives). |
+| `alternatives` | int 0-5 | `0` | Add up to N next-best readings as `alternatives` (HTTP 422 above 5). |
 
 Response `200`: the object produced by `StandardizedAddress.as_dict(include_metadata=include_metadata, include_rooftop=True)`
 (field list in [section 3](#3-standardizedaddress)), as JSON. Enum values are plain strings. Unresolved geocodes have
@@ -486,6 +664,33 @@ curl -s -X POST localhost:8000/v1/standardize -H 'Content-Type: application/json
 ```text
 {"street1":"XYZ", ... "confidence_score":0.4375,"routing_tier":"MANUAL_STEWARDSHIP","failure_reason_codes":["ERR_MISSING_HOUSE_NUM"], ... "deliverability":"UNDELIVERABLE", ... "latitude":null,"longitude":null,"precision":"UNRESOLVED","accuracy_radius_meters":null,"census_tract":null,"fips_code":null,"spatial_result":{"latitude":null,"longitude":null,"precision":"UNRESOLVED","accuracy_radius_meters":null,"stage":0,"source":"NONE","h3_res10":"","parcel_id":null,...},"country_iso3":"USA"}
 ```
+
+With `include_explanation` or `alternatives` set the request bypasses the result cache. When
+`ADDRESS_STANDARDIZER_REFERENCE_DB` is configured the explanation also carries the `reference_*` outcome and
+`field_confidence` uses the reference status. `/v1/batch` does not accept these options.
+
+### Steward review UI
+
+A single self-contained page for data stewards to work the audit-ledger queue. **Off by default**: `GET /review`,
+`GET /v1/audit` and `POST /v1/audit/{audit_id}/override` exist only when API-key authentication is configured or
+`ADDRESS_STANDARDIZER_ENABLE_REVIEW_UI=1` is set (without authentication that flag exposes the ledger to anyone who can
+reach the port, so use it only on a trusted network). Otherwise all three paths return 404.
+
+- `GET /review`: the static page. It holds no data and no secrets, so it is served without a key (a browser cannot send a
+  key when navigating to a page); the steward pastes the API key into the page, which keeps it in memory only and sends it
+  as `X-API-Key` on every call. The response carries a per-response CSP nonce, `default-src 'none'` and
+  `connect-src 'self'`: no external script, style, font or CDN is ever loaded, and the page inserts server text with
+  `textContent` only.
+- `GET /v1/audit?status=PENDING&limit=50` (guarded by the API key): `{"records": [...], "count": n}`. Each record is the
+  ledger row plus a freshly computed `explanation`, `field_confidence` and `alternatives` for its original input
+  (re-run without scoring, so listing never writes to the ledger).
+- `POST /v1/audit/{audit_id}/override` (guarded): body `{"decision": "approve" | "modify" | "reject", "overrides":
+  {"street1": "..."}, "commentary": "...", "steward_id": "..."}`. It calls
+  `StewardshipAuditLedger.apply_manual_override`: `modify` commits the overridden fields (re-normalised) as `MODIFIED`,
+  `approve` commits the proposed values as `APPROVED`, `reject` commits nothing (`REJECTED`, empty
+  `final_committed_payload`). The steward is the API key's name, or `steward_id` when the key has none. 404 for an unknown
+  record, 422 for an unknown decision or a field other than street1/street2/city/state/postal_code/country. Every
+  override keeps the replaced version in the ledger history.
 
 ### `POST /v1/batch`
 
@@ -652,6 +857,7 @@ Notes:
 | `ADDRESS_STANDARDIZER_AUDIT_DB` | Path of a SQLite audit ledger used by the CLI `parse --audit` / `audit` commands when `--audit-db` is not given. | unset (in-memory) |
 | `ADDRESS_STANDARDIZER_AUDIT_MAX_ROWS` | Row cap of the default in-memory audit ledger. | `100000` |
 | `ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP` | `1`, `true`, `yes` or `on` turns on ZIP-based state correction when no explicit argument is given. The CLI flag sets it for the process. | off |
+| `ADDRESS_STANDARDIZER_ENABLE_REVIEW_UI` | `1`, `true`, `yes` or `on` serves the steward review page and audit endpoints even without API-key authentication (with authentication they are always on). See [Steward review UI](#steward-review-ui). | off |
 | `ADDRESS_STANDARDIZER_ALLOW_LOCALITY` | The value `1` makes every `standardize_address` call allow locality-only results. | off |
 | `ADDRESS_STANDARDIZER_API_KEYS`, `ADDRESS_STANDARDIZER_API_KEYS_FILE` | Turn on API-key authentication (`X-API-Key` or `Authorization: Bearer`; 401 missing, 403 unknown). `/health` and `/ready` stay open. See [operations.md](operations.md). | unset (open) |
 | `ADDRESS_STANDARDIZER_RATE_LIMIT`, `..._RATE_LIMIT_BURST`, `..._DAILY_QUOTA` | Per-key (or per-IP) token bucket such as `100/minute` and per-day quota; excess returns HTTP 429 with `Retry-After`. Per process. | unset |

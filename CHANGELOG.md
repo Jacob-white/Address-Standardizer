@@ -14,6 +14,18 @@ were previously incorrect, and matching keys for non-Latin addresses changed.
 
 ### Added
 
+- Explainable results (opt-in, defaults unchanged): `standardize_address(..., explain=True)` attaches `std.explanation`
+  (ordered change records with stable rule ids) and heuristic per-field `std.field_confidence` (optional `calibrator=`);
+  `alternatives=N` attaches next-best readings. REST `include_explanation` / `alternatives` request fields and SDK models.
+  Steward review page `GET /review` with `GET /v1/audit` and `POST /v1/audit/{id}/override` (off unless API keys are
+  configured or `ADDRESS_STANDARDIZER_ENABLE_REVIEW_UI=1`). `apply_manual_override` gained a `review_status` argument.
+- Pluggable result-cache backends (`address_standardizer.cache_backends`): `CacheBackend` protocol and an optional
+  `RedisCacheBackend` (`pip install "address-standardizer[redis]"`; TTL, key prefix, never breaks standardization on a
+  Redis outage). Select with `configure_cache(backend=...)` or `ADDRESS_STANDARDIZER_CACHE_URL`. Default behaviour (L1 LRU +
+  SQLite L2) is unchanged. See `docs/performance.md`.
+- `address_standardizer.transliterate` (`transliterate`, `std_to_latin`) and `parse --latin`: Latin rendering of Cyrillic and
+  Greek built in, any script with the optional `anyascii` package (`[translit]` extra); never invents output.
+- `scripts/load_test.py` (stdlib HTTP load test with p50/p95/p99) and `benchmarks/run_profile.py` (cProfile of the mixed path).
 - `care_of` field on `StandardizedAddress` (also in the HTTP API, the SDKs and `as_dict(include_metadata=True)`).
 - Opt-in `correct_state_from_zip` (API, SDKs, CLI, environment): replaces the state when it contradicts the ZIP and
   reports `WARN_STATE_CORRECTED_FROM_ZIP`. By default a ZIP/state mismatch is still only reported
@@ -32,6 +44,8 @@ were previously incorrect, and matching keys for non-Latin addresses changed.
 
 ### Changed
 
+- Performance: the corporate-registry lookup (run several times per address) no longer compiles a regex per registry entry
+  and is memoized; outputs are identical. Measured +33% on cold mixed input (`docs/performance.md`).
 - **Python 3.11 or newer is required** (previously the metadata allowed older versions).
 - **Matching keys for non-Latin addresses changed.** Latin, Cyrillic and Greek are transliterated; other scripts (CJK,
   Hangul, Arabic, ...) are encoded as `~<hex code point>` instead of being dropped, so different non-Latin streets no

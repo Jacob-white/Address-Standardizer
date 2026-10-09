@@ -908,7 +908,20 @@ CANADIAN_PROVINCES: Dict[str, str] = {
     "QC": "QC", "QUEBEC": "QC",
     "SK": "SK", "SASKATCHEWAN": "SK",
     "YT": "YT", "YUKON": "YT",
+    # French (accents folded, hyphens as spaces): "Nouveau-Brunswick", "Île-du-Prince-Édouard", ...
+    "NOUVEAU BRUNSWICK": "NB", "TERRE NEUVE ET LABRADOR": "NL", "TERRE NEUVE": "NL",
+    "TERRITOIRES DU NORD OUEST": "NT", "NOUVELLE ECOSSE": "NS", "ILE DU PRINCE EDOUARD": "PE",
+    "COLOMBIE BRITANNIQUE": "BC",
 }
+
+# Common non-ISO abbreviations of the provinces (Canada Post "traditional" forms), keyed dot- and accent-free.
+CANADIAN_PROVINCE_ABBREVIATIONS: Dict[str, str] = {
+    "ALTA": "AB", "MAN": "MB", "ONT": "ON", "QUE": "QC", "PQ": "QC", "SASK": "SK", "NFLD": "NL", "NF": "NL",
+    "NWT": "NT", "P E I": "PE", "N B": "NB", "N S": "NS", "N L": "NL", "N T": "NT", "P E": "PE",
+}
+
+# Province names with every space removed (the country detector strips non-alphanumerics before looking up).
+CANADIAN_PROVINCE_NAMES_COMPACT = frozenset(k.replace(" ", "") for k in CANADIAN_PROVINCES if len(k) > 3)
 
 # Numbered street words and ordinals
 WORD_ORDINALS: Dict[str, str] = {

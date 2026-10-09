@@ -285,7 +285,7 @@ def test_romanised_single_part_after_dropping_country_is_the_street():
 def test_native_japan_unspaced_with_building_and_floor_tail():
     r = _p(street1="東京都港区六本木6-10-1 六本木ヒルズ森タワー 32階")
     assert (r["state"], r["city"], r["name"], r["unum"], r["bldg"]) == (
-        "東京都", "港区", "六本木6-10-1", "32階", "六本木ヒルズ森タワー",
+        "東京都", "港区", "六本木 6-10-1", "32階", "六本木ヒルズ森タワー",
     )
 
 
@@ -296,7 +296,7 @@ def test_native_japan_tail_postal_and_building_without_room():
 
 def test_native_japan_leading_postal_mark():
     r = _p(street1="〒106-6132 東京都港区六本木6-10-1")
-    assert (r["post"], r["state"], r["city"], r["name"]) == ("106-6132", "東京都", "港区", "六本木6-10-1")
+    assert (r["post"], r["state"], r["city"], r["name"]) == ("106-6132", "東京都", "港区", "六本木 6-10-1")
 
 
 def test_native_japan_street2_room_or_plain_unit():
@@ -307,7 +307,7 @@ def test_native_japan_street2_room_or_plain_unit():
 
 def test_native_japan_whitespace_separated_divisions():
     r = _p(street1="東京都 港区 六本木6-10-1 ヒルズタワー 32階")
-    assert (r["state"], r["city"], r["name"], r["bldg"], r["unum"]) == ("東京都", "港区", "六本木6-10-1", "ヒルズタワー", "32階")
+    assert (r["state"], r["city"], r["name"], r["bldg"], r["unum"]) == ("東京都", "港区", "六本木 6-10-1", "ヒルズタワー", "32階")
     r = _p(street1="東京都 港区 六本木6-10-1 ヒルズ")
     assert (r["name"], r["bldg"]) == ("六本木6-10-1 ヒルズ", None)  # plain word stays in the street
 
@@ -319,7 +319,7 @@ def test_native_japan_city_without_prefecture_marker():
 
 def test_native_japan_latin_tail_token_becomes_building():
     r = _p(street1="東京都港区六本木6-10-1 Suite 5")
-    assert (r["bldg"], r["name"]) == ("Suite", "六本木6-10-1")
+    assert (r["bldg"], r["name"]) == ("Suite", "六本木 6-10-1")
 
 
 def test_native_japan_building_with_floor_and_trailing_digits_postal():
@@ -329,7 +329,7 @@ def test_native_japan_building_with_floor_and_trailing_digits_postal():
 
 def test_native_japan_without_municipality_keeps_block_as_street():
     r = _p(street1="東京都六本木6-10-1")
-    assert (r["state"], r["city"], r["name"]) == ("東京都", None, "六本木6-10-1")
+    assert (r["state"], r["city"], r["name"]) == ("東京都", None, "六本木 6-10-1")
 
 
 # --- Native Chinese ----------------------------------------------------------------------------------------------------
@@ -393,7 +393,7 @@ def test_native_korea_short_province_name_and_nested_city_district():
 
 def test_native_korea_province_prefix_without_city_marker():
     r = _p(street1="경기도판교로1", country="KOR")
-    assert (r["state"], r["city"], r["name"]) == ("경기도", None, "판교로1")
+    assert (r["state"], r["city"], r["name"]) == ("경기도", None, "판교로 1")
 
 
 def test_native_korea_street_without_province():
@@ -407,7 +407,7 @@ def test_native_korea_street_without_province():
 
 def test_native_taiwan_unspaced_county_district_and_floor():
     r = _p(street1="台北市信義區信義路五段7號 101樓", country="TWN")
-    assert (r["state"], r["city"], r["name"], r["unum"]) == ("台北市", "信義區", "信義路五段7號", "101樓")
+    assert (r["state"], r["city"], r["name"], r["unum"]) == ("台北市", "信義區", "信義路五段 7號", "101樓")
 
 
 def test_native_taiwan_spaced_with_building():
@@ -418,14 +418,14 @@ def test_native_taiwan_spaced_with_building():
 
 def test_native_taiwan_street_only_and_county_without_district():
     r = _p(street1="信義路五段7號", country="TWN")
-    assert (r["state"], r["city"], r["name"]) == (None, None, "信義路五段7號")
+    assert (r["state"], r["city"], r["name"]) == (None, None, "信義路五段 7號")
     r = _p(street1="台北市信義路五段7號", country="TWN")
-    assert (r["state"], r["city"], r["name"]) == ("台北市", None, "信義路五段7號")
+    assert (r["state"], r["city"], r["name"]) == ("台北市", None, "信義路五段 7號")
 
 
 def test_native_taiwan_tail_postal_code():
     r = _p(street1="台灣信義路五段7號 110", country="TWN")
-    assert (r["post"], r["name"]) == ("110", "台灣信義路五段7號")
+    assert (r["post"], r["name"]) == ("110", "台灣信義路五段 7號")
 
 
 def test_native_prefecture_names_override_a_conflicting_country_hint():
@@ -464,7 +464,7 @@ def test_native_building_remnant_with_room_in_spaced_and_tail_tokens():
 
 def test_native_korea_unspaced_province_city_street():
     r = _p(street1="서울특별시강남구테헤란로152", country="KOR")
-    assert (r["state"], r["city"], r["name"]) == ("서울특별시", "강남구", "테헤란로152")
+    assert (r["state"], r["city"], r["name"]) == ("서울특별시", "강남구", "테헤란로 152")
 
 
 def test_korean_room_characters_without_a_room_number_fall_through_to_latin_units():

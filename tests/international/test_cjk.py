@@ -62,7 +62,7 @@ def test_japan_native_address_end_to_end():
     assert res.country == "JPN"
     assert res.state == "東京都"
     assert res.city == "港区"
-    assert "六本木6-10-1" in res.street1
+    assert "六本木 6-10-1" in res.street1
     assert res.street2 == "32階"
     assert res.postal_code == "106-6132"
     assert res.is_us is False
@@ -165,7 +165,7 @@ def test_taiwan_native_address_end_to_end():
     assert res.country == "TWN"
     assert res.state == "台北市"
     assert res.city == "信義區"
-    assert res.street1 == "信義路五段7號"
+    assert res.street1 == "信義路五段 7號"
     assert res.street2 == "89樓"
     assert res.postal_code == "110"
 
@@ -191,7 +191,7 @@ def test_cjk_discrete_field_standardization():
         postal_code="100-0013",
         country="JPN",
     )
-    assert parsed.format_street1() == "霞が関1-1-1"
+    assert parsed.format_street1() == "霞が関 1-1-1"
     assert parsed.format_street2() == "501号室"
     assert parsed.city == "千代田区"
     assert parsed.state == "東京都"
@@ -211,5 +211,5 @@ def test_cjk_upu_formatting():
     upu = format_upu_address(parsed, recipient="Yamada Taro")
     assert "Yamada Taro" in upu
     assert "〒100-0013" in upu
-    assert "東京都千代田区霞が関1-1-1" in upu
+    assert "東京都千代田区霞が関 1-1-1" in upu
     assert "JAPAN" in upu

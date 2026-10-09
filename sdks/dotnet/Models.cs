@@ -42,6 +42,46 @@ namespace AddressStandardizer.Client
 
         [JsonPropertyName("include_metadata")]
         public bool? IncludeMetadata { get; set; }
+
+        /// <summary>Add <c>explanation</c> and <c>field_confidence</c> to the response (server default: false).</summary>
+        [JsonPropertyName("include_explanation")]
+        public bool? IncludeExplanation { get; set; }
+
+        /// <summary>Ask for up to this many next-best interpretations (0-5, server default: 0).</summary>
+        [JsonPropertyName("alternatives")]
+        public int? Alternatives { get; set; }
+    }
+
+    /// <summary>One change or decision the engine made, with a stable machine-readable <c>rule</c> id.</summary>
+    public class ExplanationRecord
+    {
+        [JsonPropertyName("field")]
+        public string Field { get; set; } = "";
+
+        [JsonPropertyName("before")]
+        public string Before { get; set; } = "";
+
+        [JsonPropertyName("after")]
+        public string After { get; set; } = "";
+
+        [JsonPropertyName("rule")]
+        public string Rule { get; set; } = "";
+
+        [JsonPropertyName("detail")]
+        public Dictionary<string, object>? Detail { get; set; }
+    }
+
+    /// <summary>A next-best interpretation of an ambiguous input; <c>Score</c> is a relative plausibility, not a probability.</summary>
+    public class Alternative
+    {
+        [JsonPropertyName("changes")]
+        public Dictionary<string, string> Changes { get; set; } = new Dictionary<string, string>();
+
+        [JsonPropertyName("reason")]
+        public string Reason { get; set; } = "";
+
+        [JsonPropertyName("score")]
+        public double Score { get; set; }
     }
 
     public class StandardizedAddress
@@ -142,6 +182,18 @@ namespace AddressStandardizer.Client
 
         [JsonPropertyName("full_rooftop_address")]
         public string? FullRooftopAddress { get; set; }
+
+        /// <summary>Only with <c>IncludeExplanation</c>.</summary>
+        [JsonPropertyName("explanation")]
+        public List<ExplanationRecord>? Explanation { get; set; }
+
+        /// <summary>Only with <c>IncludeExplanation</c>: per-field confidence in [0, 1] (heuristic, not a probability).</summary>
+        [JsonPropertyName("field_confidence")]
+        public Dictionary<string, double>? FieldConfidence { get; set; }
+
+        /// <summary>Only with <c>Alternatives</c> &gt;= 1.</summary>
+        [JsonPropertyName("alternatives")]
+        public List<Alternative>? Alternatives { get; set; }
     }
 
     public class BatchStandardizeRequest

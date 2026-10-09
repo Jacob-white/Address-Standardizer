@@ -65,6 +65,7 @@ nav:
       - Evaluation and calibration: evaluation.md
   - Operations:
       - Running the service: operations.md
+      - Performance and caching: performance.md
   - Project:
       - Releasing: RELEASING.md
       - Versioning: VERSIONING.md

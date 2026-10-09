@@ -39,6 +39,7 @@ ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
 ]
+HOLDOUT_SEED = 20261201
 FIELDS = ("house_number", "street", "city", "state", "postcode", "country")
 
 # Per-country configuration. bboxes are (south, west, north, east). ``street1`` is how the street line is
@@ -46,85 +47,158 @@ FIELDS = ("house_number", "street", "city", "state", "postcode", "country")
 COUNTRIES: Dict[str, Dict[str, Any]] = {
     "US": {"iso3": "USA", "name": "United States", "script": "Latin", "lang": "en",
            "bboxes": [(42.30, -71.15, 42.40, -71.00), (37.74, -122.45, 37.80, -122.39)],
+           "holdout_bboxes": [(41.89,-87.66,41.93,-87.62), (30.25,-97.76,30.29,-97.72), (39.72,-105.00,39.76,-104.96)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{state} {pc}"]},
     "CA": {"iso3": "CAN", "name": "Canada", "script": "Latin", "lang": "en", "state_keys": ["addr:province", "addr:state"],
            "bboxes": [(43.64, -79.42, 43.68, -79.36), (45.40, -75.72, 45.43, -75.67)],
+           "holdout_bboxes": [(49.26,-123.14,49.29,-123.09), (45.50,-73.60,45.53,-73.55)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{state} {pc}"]},
     "GB": {"iso3": "GBR", "name": "United Kingdom", "script": "Latin", "lang": "en",
            "bboxes": [(51.49, -0.15, 51.54, -0.07), (53.46, -2.27, 53.50, -2.20)],
+           "holdout_bboxes": [(52.47,-1.92,52.50,-1.88), (55.94,-3.21,55.96,-3.17), (51.44,-2.62,51.47,-2.57)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{pc}"]},
     "IE": {"iso3": "IRL", "name": "Ireland", "script": "Latin", "lang": "en",
            "bboxes": [(53.33, -6.30, 53.36, -6.23)],
+           "holdout_bboxes": [(51.89,-8.50,51.91,-8.45), (53.26,-9.07,53.28,-9.03)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{pc}"]},
     "AU": {"iso3": "AUS", "name": "Australia", "script": "Latin", "lang": "en", "city_keys": ["addr:city", "addr:suburb"],
            "bboxes": [(-33.90, 151.17, -33.85, 151.23), (-37.84, 144.94, -37.79, 145.00)],
+           "holdout_bboxes": [(-33.83,151.00,-33.80,151.04), (-37.83,145.00,-37.80,145.04), (-27.49,153.00,-27.45,153.04), (-34.94,138.58,-34.91,138.62)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{state} {pc}"]},
     "NZ": {"iso3": "NZL", "name": "New Zealand", "script": "Latin", "lang": "en",
            "bboxes": [(-36.88, 174.74, -36.83, 174.80)],
+           "holdout_bboxes": [(-41.30,174.76,-41.27,174.79), (-43.54,172.62,-43.51,172.66)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{pc}"]},
     "DE": {"iso3": "DEU", "name": "Germany", "script": "Latin", "lang": "de",
            "bboxes": [(52.49, 13.35, 52.55, 13.45), (48.12, 11.53, 48.17, 11.60)],
+           "holdout_bboxes": [(53.54,9.96,53.57,10.01), (50.92,6.93,50.95,6.97), (50.10,8.66,50.13,8.70)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "AT": {"iso3": "AUT", "name": "Austria", "script": "Latin", "lang": "de",
            "bboxes": [(48.19, 16.34, 48.23, 16.40)],
+           "holdout_bboxes": [(47.06,15.42,47.09,15.46), (47.79,13.03,47.82,13.06)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "CH": {"iso3": "CHE", "name": "Switzerland", "script": "Latin", "lang": "de",
            "bboxes": [(47.36, 8.52, 47.40, 8.57)],
+           "holdout_bboxes": [(46.94,7.43,46.96,7.46), (46.19,6.13,46.22,6.16)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "FR": {"iso3": "FRA", "name": "France", "script": "Latin", "lang": "fr",
            "bboxes": [(48.84, 2.30, 48.88, 2.38), (45.74, 4.82, 45.78, 4.88)],
+           "holdout_bboxes": [(43.28,5.36,43.31,5.40), (43.59,1.43,43.62,1.46), (44.83,-0.59,44.86,-0.56)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{pc} {city}"]},
     "ES": {"iso3": "ESP", "name": "Spain", "script": "Latin", "lang": "es",
            "bboxes": [(40.40, -3.72, 40.44, -3.66), (41.37, 2.15, 41.42, 2.20)],
+           "holdout_bboxes": [(37.38,-6.01,37.41,-5.97), (39.46,-0.39,39.49,-0.35)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "IT": {"iso3": "ITA", "name": "Italy", "script": "Latin", "lang": "it",
            "bboxes": [(41.88, 12.46, 41.92, 12.52), (44.48, 11.32, 44.52, 11.37)],
+           "holdout_bboxes": [(45.45,9.17,45.48,9.21), (40.83,14.24,40.86,14.28), (45.06,7.66,45.09,7.70)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "PT": {"iso3": "PRT", "name": "Portugal", "script": "Latin", "lang": "pt",
            "bboxes": [(38.70, -9.16, 38.74, -9.12)],
+           "holdout_bboxes": [(41.14,-8.63,41.17,-8.59)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "NL": {"iso3": "NLD", "name": "Netherlands", "script": "Latin", "lang": "nl",
            "bboxes": [(52.35, 4.87, 52.39, 4.94), (51.90, 4.45, 51.94, 4.51)],
+           "holdout_bboxes": [(52.08,5.10,52.11,5.14), (52.07,4.29,52.10,4.33)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "BE": {"iso3": "BEL", "name": "Belgium", "script": "Latin", "lang": "nl",
            "bboxes": [(50.83, 4.33, 50.87, 4.39)],
+           "holdout_bboxes": [(51.20,4.39,51.23,4.43), (51.04,3.71,51.07,3.75)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "PL": {"iso3": "POL", "name": "Poland", "script": "Latin", "lang": "pl",
            "bboxes": [(52.21, 20.97, 52.25, 21.04)],
+           "holdout_bboxes": [(50.05,19.92,50.08,19.96), (51.10,17.02,51.12,17.06)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "SE": {"iso3": "SWE", "name": "Sweden", "script": "Latin", "lang": "sv",
            "bboxes": [(59.31, 18.04, 59.35, 18.10)],
+           "holdout_bboxes": [(57.69,11.95,57.72,11.99), (55.59,12.99,55.62,13.02)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "DK": {"iso3": "DNK", "name": "Denmark", "script": "Latin", "lang": "da",
            "bboxes": [(55.66, 12.55, 55.70, 12.61)],
+           "holdout_bboxes": [(56.14,10.19,56.17,10.23), (55.39,10.37,55.41,10.41)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "BR": {"iso3": "BRA", "name": "Brazil", "script": "Latin", "lang": "pt",
            "bboxes": [(-23.58, -46.68, -23.54, -46.63)],
+           "holdout_bboxes": [(-22.98,-43.22,-22.95,-43.18), (-25.45,-49.29,-25.42,-49.25)],
            "street1": "{street}, {hn}", "segments": ["{street1}", "{city} - {state}", "{pc}"]},
     "RU": {"iso3": "RUS", "name": "Russia", "script": "Cyrillic", "lang": "ru",
            "bboxes": [(55.73, 37.58, 55.78, 37.66), (59.91, 30.28, 59.96, 30.36)],
+           "holdout_bboxes": [(55.77,49.10,55.81,49.14), (55.01,82.91,55.05,82.96)],
            "street1": "{street}, {hn}", "segments": ["{pc}", "{city}", "{street1}"]},
     "UA": {"iso3": "UKR", "name": "Ukraine", "script": "Cyrillic", "lang": "uk",
            "bboxes": [(50.43, 30.50, 50.47, 30.56)],
+           "holdout_bboxes": [(49.83,24.00,49.86,24.04), (49.98,36.22,50.01,36.26)],
            "street1": "{street}, {hn}", "segments": ["{pc}", "{city}", "{street1}"]},
     "GR": {"iso3": "GRC", "name": "Greece", "script": "Greek", "lang": "el",
            "bboxes": [(37.96, 23.71, 38.00, 23.76), (40.61, 22.93, 40.65, 22.97)],
+           "holdout_bboxes": [(38.23,21.72,38.26,21.76), (35.33,25.12,35.35,25.15)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
     "IL": {"iso3": "ISR", "name": "Israel", "script": "Hebrew", "lang": "he",
            "bboxes": [(32.05, 34.76, 32.10, 34.80), (31.76, 35.19, 31.80, 35.23)],
+           "holdout_bboxes": [(32.79,34.98,32.83,35.02), (31.24,34.78,31.27,34.81)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{city}", "{pc}"]},
     "TH": {"iso3": "THA", "name": "Thailand", "script": "Thai", "lang": "th",
            "bboxes": [(13.72, 100.50, 13.78, 100.58), (18.77, 98.96, 18.81, 99.01)],
+           "holdout_bboxes": [(7.87,98.38,7.90,98.41), (12.92,100.87,12.95,100.90)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{city} {pc}"]},
     "JP": {"iso3": "JPN", "name": "Japan", "script": "Japanese", "lang": "ja", "sep": " ",
            "bboxes": [(35.65, 139.69, 35.70, 139.78), (34.66, 135.48, 34.71, 135.53)],
+           "holdout_bboxes": [(35.15,136.89,35.19,136.93), (43.05,141.33,43.08,141.37), (33.58,130.39,33.61,130.43)],
            "street1": "{street}{hn}", "segments": ["{pc}", "{city}", "{street1}"]},
     "KR": {"iso3": "KOR", "name": "South Korea", "script": "Hangul", "lang": "ko", "sep": " ",
            "bboxes": [(37.50, 127.00, 37.56, 127.08), (35.14, 129.03, 35.18, 129.09)],
+           "holdout_bboxes": [(37.44,126.69,37.47,126.73), (35.86,128.58,35.89,128.62)],
            "street1": "{street} {hn}", "segments": ["{city}", "{street1}", "{pc}"]},
     "TW": {"iso3": "TWN", "name": "Taiwan", "script": "Han", "lang": "zh", "sep": " ",
            "bboxes": [(25.02, 121.50, 25.06, 121.56)],
+           "holdout_bboxes": [(24.13,120.66,24.16,120.70), (22.61,120.29,22.64,120.33)],
            "street1": "{street}{hn}", "segments": ["{pc}", "{city}", "{street1}"]},
+    # ---- held-out only countries (no development bboxes; used by --holdout) ----
+    "MX": {"iso3": "MEX", "name": "Mexico", "script": "Latin", "lang": "es", "bboxes": [],
+           "holdout_bboxes": [(19.40, -99.18, 19.44, -99.14), (20.65, -103.38, 20.69, -103.34)],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    "AR": {"iso3": "ARG", "name": "Argentina", "script": "Latin", "lang": "es", "bboxes": [],
+           "holdout_bboxes": [(-34.62, -58.45, -34.59, -58.41), (-31.43, -64.20, -31.40, -64.17)],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    "CL": {"iso3": "CHL", "name": "Chile", "script": "Latin", "lang": "es", "bboxes": [],
+           "holdout_bboxes": [(-33.46, -70.67, -33.43, -70.63), (-33.05, -71.63, -33.02, -71.60)],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    "IN": {"iso3": "IND", "name": "India", "script": "Latin", "lang": "en", "bboxes": [],
+           "holdout_bboxes": [(28.62, 77.19, 28.65, 77.23), (19.05, 72.82, 19.09, 72.87), (12.96, 77.58, 13.00, 77.62)],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city} {pc}"]},
+    "ZA": {"iso3": "ZAF", "name": "South Africa", "script": "Latin", "lang": "en", "bboxes": [],
+           "holdout_bboxes": [(-33.94, 18.40, -33.91, 18.44), (-26.22, 28.02, -26.18, 28.06)],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{pc}"]},
+    "SG": {"iso3": "SGP", "name": "Singapore", "script": "Latin", "lang": "en", "bboxes": [],
+           "holdout_bboxes": [(1.28, 103.83, 1.32, 103.87), (1.33, 103.72, 1.37, 103.76)],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city} {pc}"]},
+    "HK": {"iso3": "HKG", "name": "Hong Kong", "script": "Latin", "lang": "en", "bboxes": [],
+           "holdout_bboxes": [(22.27, 114.15, 22.30, 114.19)],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city}"]},
+    "SA": {"iso3": "SAU", "name": "Saudi Arabia", "script": "Arabic", "lang": "ar", "bboxes": [],
+           "holdout_bboxes": [(24.62, 46.69, 24.66, 46.73), (21.50, 39.15, 21.54, 39.20)],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city} {pc}"]},
+    "EG": {"iso3": "EGY", "name": "Egypt", "script": "Arabic", "lang": "ar", "bboxes": [],
+           "holdout_bboxes": [(30.03, 31.22, 30.07, 31.26), (31.19, 29.89, 31.23, 29.93)],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{pc}"]},
+    "TR": {"iso3": "TUR", "name": "Turkey", "script": "Latin", "lang": "tr", "bboxes": [],
+           "holdout_bboxes": [(41.02, 28.97, 41.06, 29.01), (39.91, 32.84, 39.94, 32.88), (38.41, 27.12, 38.44, 27.16)],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    "NO": {"iso3": "NOR", "name": "Norway", "script": "Latin", "lang": "no", "bboxes": [],
+           "holdout_bboxes": [(59.91, 10.73, 59.94, 10.77), (60.38, 5.31, 60.41, 5.35)],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    "FI": {"iso3": "FIN", "name": "Finland", "script": "Latin", "lang": "fi", "bboxes": [],
+           "holdout_bboxes": [(60.16, 24.92, 60.19, 24.96), (61.48, 23.75, 61.51, 23.79)],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    "CZ": {"iso3": "CZE", "name": "Czechia", "script": "Latin", "lang": "cs", "bboxes": [],
+           "holdout_bboxes": [(50.07, 14.40, 50.10, 14.44), (49.18, 16.59, 49.21, 16.63)],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    "HU": {"iso3": "HUN", "name": "Hungary", "script": "Latin", "lang": "hu", "bboxes": [],
+           "holdout_bboxes": [(47.48, 19.04, 47.51, 19.08), (47.52, 21.60, 47.55, 21.64)],
+           "street1": "{street} {hn}", "segments": ["{pc} {city}", "{street1}"]},
+    "RO": {"iso3": "ROU", "name": "Romania", "script": "Latin", "lang": "ro", "bboxes": [],
+           "holdout_bboxes": [(44.42, 26.08, 44.45, 26.12), (46.75, 23.57, 46.78, 23.61)],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
 }
 
 # Abbreviation tables per language, used ONLY to make messy renderings (independent of the engine).
@@ -345,6 +419,7 @@ def build_corpus(
     fetch_limit: int = 150,
     fetcher: Optional[Callable[[str], Dict[str, Any]]] = None,
     log: Callable[[str], None] = lambda m: None,
+    holdout: bool = False,
 ) -> List[Dict[str, Any]]:
     """Fetch (or read from cache), label, sample and render. ``fetcher(query) -> payload`` is injectable."""
     if fetcher is None:  # pragma: no cover - network default
@@ -354,7 +429,7 @@ def build_corpus(
     for iso2 in countries:
         cfg = COUNTRIES[iso2]
         pool: List[Dict[str, Any]] = []
-        for bbox in cfg["bboxes"]:
+        for bbox in (cfg.get("holdout_bboxes", []) if holdout else cfg["bboxes"]):
             for city_key in cfg.get("city_keys", ["addr:city"]):
                 try:
                     payload = fetcher(build_query(bbox, city_key, fetch_limit))
@@ -394,11 +469,13 @@ def write_corpus(corpus: List[Dict[str, Any]], path: str, seed: int, meta: Optio
 
 def main(argv: Optional[List[str]] = None) -> int:  # pragma: no cover - thin CLI wrapper
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out", default=os.path.join(HERE, "osm_sample.json"))
-    ap.add_argument("--countries", default=",".join(COUNTRIES), help="comma-separated ISO2 codes")
-    ap.add_argument("--per-country", type=int, default=22)
+    ap.add_argument("--holdout", action="store_true",
+                    help="use the disjoint holdout_bboxes (never used for tuning); changes default out/seed/per-country")
+    ap.add_argument("--out", default=None, help="default osm_sample.json, or osm_holdout.json with --holdout")
+    ap.add_argument("--countries", default=None, help="comma-separated ISO2 codes (default: all configured)")
+    ap.add_argument("--per-country", type=int, default=None, help="default 22 (30 with --holdout)")
     ap.add_argument("--fetch-limit", type=int, default=150, help="max Overpass elements per bbox query")
-    ap.add_argument("--seed", type=int, default=20261009)
+    ap.add_argument("--seed", type=int, default=None, help="default 20261009 (20261201 with --holdout)")
     ap.add_argument("--cache-dir", default=os.path.join(HERE, ".cache"))
     ap.add_argument("--delay", type=float, default=5.0, help="seconds to wait after each network request")
     ap.add_argument("--offline", action="store_true", help="use only cached responses")
@@ -408,11 +485,21 @@ def main(argv: Optional[List[str]] = None) -> int:  # pragma: no cover - thin CL
     def fetcher(q: str) -> Dict[str, Any]:
         return fetch_overpass(q, args.cache_dir, user_agent=args.user_agent, delay=args.delay, offline=args.offline)
 
-    wanted = [c.strip().upper() for c in args.countries.split(",") if c.strip()]
-    corpus = build_corpus(wanted, args.per_country, args.seed, args.cache_dir, args.fetch_limit, fetcher,
-                          log=lambda m: print(m, file=sys.stderr))
-    write_corpus(corpus, args.out, args.seed, {"countries": sorted({r["country"] for r in corpus})})
-    print(f"wrote {len(corpus)} records to {args.out}")
+    hold = args.holdout
+    out = args.out or os.path.join(HERE, "osm_holdout.json" if hold else "osm_sample.json")
+    seed = args.seed if args.seed is not None else (HOLDOUT_SEED if hold else 20261009)
+    per_country = args.per_country or (30 if hold else 22)
+    default_countries = [c for c, cfg in COUNTRIES.items() if cfg.get("holdout_bboxes" if hold else "bboxes")]
+    wanted = [c.strip().upper() for c in (args.countries.split(",") if args.countries else default_countries)
+              if c.strip()]
+    corpus = build_corpus(wanted, per_country, seed, args.cache_dir, args.fetch_limit, fetcher,
+                          log=lambda m: print(m, file=sys.stderr), holdout=hold)
+    meta: Dict[str, Any] = {"countries": sorted({r["country"] for r in corpus})}
+    if hold:
+        meta["holdout"] = True
+        meta["note"] = "Held-out set: areas disjoint from osm_sample.json; never used for engine tuning."
+    write_corpus(corpus, out, seed, meta)
+    print(f"wrote {len(corpus)} records to {out}")
     return 0
 
 

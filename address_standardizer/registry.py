@@ -43,11 +43,23 @@ COUNTRY_SYNONYMS: Dict[str, List[str]] = {
 }
 
 
+@lru_cache(maxsize=2048)
+def _token_run_regex(pattern: str) -> "re.Pattern[str]":
+    """Compiled, cached matcher for `pattern` delimited by non-alphanumerics."""
+    return re.compile(r"(?<![A-Z0-9])" + re.escape(pattern) + r"(?![A-Z0-9])")
+
+
 def _contains_token_run(pattern: str, text: str) -> bool:
     """True if `pattern` occurs in `text` delimited by non-alphanumerics (so '1209 N ORANGE' never matches '11209 N ORANGE')."""
-    if not pattern:
+    if not pattern or pattern not in text:  # plain substring test rejects almost every registry entry cheaply
         return False
-    return re.search(r"(?<![A-Z0-9])" + re.escape(pattern) + r"(?![A-Z0-9])", text) is not None
+    return _token_run_regex(pattern).search(text) is not None
+
+
+_LOOKUP_MEMO_MAX = 4096
+_LOOKUP_MEMO: Dict[Tuple[Any, ...], Optional[CorporateRegistryEntry]] = {}
+# (registry list, its length) the memo was filled against; swapping or resizing the registry invalidates it.
+_LOOKUP_MEMO_OWNER: List[Any] = [None, -1]
 
 
 def lookup_corporate_registry(
@@ -63,7 +75,37 @@ def lookup_corporate_registry(
     Looks up an address against the comprehensive curated corporate registry.
     Returns the matching CorporateRegistryEntry if found, else None.
     Supports US domestic, UK, European, Swiss, and offshore secrecy hubs.
+
+    The lookup is a pure function of its arguments and the registry list, and one standardization asks the same
+    question several times (hub flag, risk score, delivery intelligence), so results are memoized in a bounded dict
+    that is dropped whenever the registry list object is replaced or changes length.
     """
+    registry = CURATED_CORPORATE_REGISTRY
+    if _LOOKUP_MEMO_OWNER[0] is not registry or _LOOKUP_MEMO_OWNER[1] != len(registry):
+        _LOOKUP_MEMO.clear()
+        _LOOKUP_MEMO_OWNER[0] = registry
+        _LOOKUP_MEMO_OWNER[1] = len(registry)
+    key = (street1, street2, city, state, postal_code, country, raw_street)
+    try:
+        return _LOOKUP_MEMO[key]
+    except KeyError:
+        pass
+    entry = _lookup_corporate_registry_uncached(street1, street2, city, state, postal_code, country, raw_street)
+    if len(_LOOKUP_MEMO) >= _LOOKUP_MEMO_MAX:
+        _LOOKUP_MEMO.clear()
+    _LOOKUP_MEMO[key] = entry
+    return entry
+
+
+def _lookup_corporate_registry_uncached(
+    street1: str,
+    street2: str = "",
+    city: str = "",
+    state: str = "",
+    postal_code: str = "",
+    country: str = "USA",
+    raw_street: str = "",
+) -> Optional[CorporateRegistryEntry]:
     combined_raw = f"{street1} {street2} {city} {state} {postal_code} {raw_street}"
     combined = _fold_ascii(combined_raw)
     norm_st = _fold_ascii(street1)

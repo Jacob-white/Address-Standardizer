@@ -97,6 +97,8 @@ _RE_DE_POSTFACH_UNIT = re.compile(r"^(?:POSTFACH|POSTBOX|PF)\s+(\d+)(?:\s*[,;]\s
 class GermanicGrammar(CountryGrammar):
     """Germanic and Nordic address grammar with inverted house number ordering."""
 
+    split_commaless_line: ClassVar[bool] = True
+
     country_iso3: ClassVar[str] = "DEU"
     supported_countries: ClassVar[Tuple[str, ...]] = (
         "DEU",
@@ -177,7 +179,7 @@ class GermanicGrammar(CountryGrammar):
                 last_part = parts_comma[-1].strip()
                 # Check for "10115 Berlin", "1016 EK Amsterdam", or "111 35 Stockholm"
                 m_post_city = re.match(
-                    r"^(\d{4,5}(?:\s+[A-Z]{2})?|\d{3}\s+\d{2})\s+(.*)$",
+                    r"^(\d{4}[A-Z]{2}|\d{4,5}(?:\s+[A-Z]{2})?|\d{3}\s+\d{2})\s+(.*)$",
                     last_part,
                     re.IGNORECASE,
                 )
@@ -221,8 +223,13 @@ class GermanicGrammar(CountryGrammar):
         m_dash_unit = re.match(r"^(.*?)\s+(\d+)-([A-Za-z0-9]+)$", st1_base)
         # Check for Finnish/Nordic stairwell and apartment like "12 B 25"
         m_stair_apt = re.match(r"^(.*?)\s+(\d+)\s+([A-Za-z]\s*\d+)$", st1_base)
-        # "5-7" is a house-number range, not a unit (only Dutch "421-2"/"421-B" additions are units)
-        if m_dash_unit and m_dash_unit.group(3).isdigit() and country_iso != "NLD":
+        # "5-7" is a house-number range, not a unit. Only Dutch "421-B" and descending "421-2" additions are units: an
+        # ascending numeric pair ("59-72") is a range in the Netherlands too.
+        if (
+            m_dash_unit
+            and m_dash_unit.group(3).isdigit()
+            and (country_iso != "NLD" or int(m_dash_unit.group(3)) > int(m_dash_unit.group(2)))
+        ):
             m_dash_unit = None
         if m_dash_unit and not unit_type and not unit_number:
             thoroughfare_stem = m_dash_unit.group(1).strip()

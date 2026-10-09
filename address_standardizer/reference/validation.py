@@ -183,6 +183,24 @@ def close_server_providers() -> None:
         _server_providers.clear()
 
 
+def server_reference_provider() -> Optional[Any]:
+    """The provider the REST server validates against, or None when ``ADDRESS_STANDARDIZER_REFERENCE_DB`` is unset or
+    the database cannot be opened (``attach_server_reference_validation`` reports that case in its response)."""
+    path = os.environ.get(REFERENCE_DB_ENV)
+    if not path:
+        return None
+    from address_standardizer.reference.geonames import GeoNamesPostalProvider
+
+    try:
+        with _server_lock:
+            provider = _server_providers.get(path)
+            if provider is None:
+                provider = _server_providers[path] = GeoNamesPostalProvider(path)
+    except (OSError, ValueError):
+        return None
+    return provider
+
+
 def attach_server_reference_validation(std_address: Any, response: Dict[str, Any]) -> Dict[str, Any]:
     """Add a ``reference_validation`` object to a REST response, only when ``ADDRESS_STANDARDIZER_REFERENCE_DB`` is set.
 

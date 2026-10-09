@@ -12,6 +12,7 @@ from address_standardizer.tables import (
     US_STATES,
     COUNTRY_MAP,
     CANADIAN_PROVINCES,
+    CANADIAN_PROVINCE_NAMES_COMPACT,
     ZIP3_TO_STATE,
     GLOBAL_METRO_TO_COUNTRY,
 )
@@ -57,6 +58,10 @@ _RE_AU_STATE_POSTCODE = re.compile(r"(?:^|[,\s])(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT)
 
 
 _RE_TRAILING_CAN_PROVINCE = re.compile(r",\s*(?:ON|QC|BC|AB|MB|SK|NS|NB|NL|PE|NT|YT|NU)\s*$")
+# Names scanned out of free text (street lines, city parts). The numeric ISO codes in COUNTRY_MAP ("500" = Montserrat,
+# "250" = France, ...) are only meaningful in the dedicated country field: in free text they are house numbers.
+_COUNTRY_NAME_MAP = {name: iso for name, iso in COUNTRY_MAP.items() if not name.isdigit()}
+
 UNKNOWN_COUNTRY = "ZZZ"  # ISO 3166 user-assigned code, used when a supplied country name cannot be resolved
 _COUNTRY_PLACEHOLDERS = frozenset(
     {"N/A", "N.A.", "N.A", "NONE", "NULL", "NIL", "UNKNOWN", "UNK", "NOT AVAILABLE", "NOT APPLICABLE", "-", "--", "?", "TBD"}
@@ -125,7 +130,8 @@ def normalize_country_code(
     is_valid_us_state = False
     if state_raw:
         s_clean = RE_NON_ALPHANUMERIC.sub("", state_raw.strip().upper())
-        if s_clean in CANADIAN_PROVINCES:
+        s_ascii = "".join(c for c in unicodedata.normalize("NFKD", s_clean) if not unicodedata.combining(c))
+        if s_clean in CANADIAN_PROVINCES or s_ascii in CANADIAN_PROVINCE_NAMES_COMPACT:
             return "CAN"
         if s_clean in US_STATES:
             is_valid_us_state = True
@@ -238,34 +244,34 @@ def normalize_country_code(
                 continue
             if p_alphanumeric in STREET_SUFFIXES or p_alphanumeric in STREET_SUFFIXES.values():
                 continue
-            if p_clean in COUNTRY_MAP and COUNTRY_MAP[p_clean] != "USA":
-                return COUNTRY_MAP[p_clean]
-            if p_alphanumeric in COUNTRY_MAP and COUNTRY_MAP[p_alphanumeric] != "USA":
-                return COUNTRY_MAP[p_alphanumeric]
+            if p_clean in _COUNTRY_NAME_MAP and _COUNTRY_NAME_MAP[p_clean] != "USA":
+                return _COUNTRY_NAME_MAP[p_clean]
+            if p_alphanumeric in _COUNTRY_NAME_MAP and _COUNTRY_NAME_MAP[p_alphanumeric] != "USA":
+                return _COUNTRY_NAME_MAP[p_alphanumeric]
 
         raw_words = RE_NON_ALPHANUMERIC.sub(" ", raw_street).strip().upper().split()
         if len(raw_words) >= 2:
             two_w = f"{raw_words[-2]} {raw_words[-1]}"
-            if two_w in COUNTRY_MAP and COUNTRY_MAP[two_w] != "USA":
-                return COUNTRY_MAP[two_w]
-        if raw_words and raw_words[-1] in COUNTRY_MAP and COUNTRY_MAP[raw_words[-1]] != "USA":
+            if two_w in _COUNTRY_NAME_MAP and _COUNTRY_NAME_MAP[two_w] != "USA":
+                return _COUNTRY_NAME_MAP[two_w]
+        if raw_words and raw_words[-1] in _COUNTRY_NAME_MAP and _COUNTRY_NAME_MAP[raw_words[-1]] != "USA":
             if (
                 (len(raw_words[-1]) > 2 or raw_words[-1] not in FROZEN_US_STATE_CODES)
                 and not raw_words[-1].isdigit()
                 and raw_words[-1] not in STREET_SUFFIXES
                 and raw_words[-1] not in STREET_SUFFIXES.values()
             ):
-                return COUNTRY_MAP[raw_words[-1]]
+                return _COUNTRY_NAME_MAP[raw_words[-1]]
         elif len(raw_words) >= 2 and raw_words[-1].isdigit():
             prev_w = raw_words[-2]
             if (
-                prev_w in COUNTRY_MAP
-                and COUNTRY_MAP[prev_w] != "USA"
+                prev_w in _COUNTRY_NAME_MAP
+                and _COUNTRY_NAME_MAP[prev_w] != "USA"
                 and (len(prev_w) > 2 or prev_w not in FROZEN_US_STATE_CODES)
                 and prev_w not in STREET_SUFFIXES
                 and prev_w not in STREET_SUFFIXES.values()
             ):
-                return COUNTRY_MAP[prev_w]
+                return _COUNTRY_NAME_MAP[prev_w]
 
         # Check global metros in raw street SECOND
         for part in raw_street.split(","):
@@ -283,8 +289,8 @@ def normalize_country_code(
             if p_no_num and p_no_num != p_clean:
                 if p_no_num in GLOBAL_METRO_TO_COUNTRY:
                     return GLOBAL_METRO_TO_COUNTRY[p_no_num]
-                if p_no_num in COUNTRY_MAP and COUNTRY_MAP[p_no_num] != "USA":
-                    return COUNTRY_MAP[p_no_num]
+                if p_no_num in _COUNTRY_NAME_MAP and _COUNTRY_NAME_MAP[p_no_num] != "USA":
+                    return _COUNTRY_NAME_MAP[p_no_num]
             p_no_lead = re.sub(r"^\d+\s+", "", p_clean).strip()
             if p_no_lead and p_no_lead != p_clean:
                 if p_no_lead in GLOBAL_METRO_TO_COUNTRY:
@@ -292,8 +298,8 @@ def normalize_country_code(
                 p_lead_unaccent = unicodedata.normalize("NFKD", p_no_lead).encode("ASCII", "ignore").decode("utf-8")
                 if p_lead_unaccent in GLOBAL_METRO_TO_COUNTRY:
                     return GLOBAL_METRO_TO_COUNTRY[p_lead_unaccent]
-                if p_no_lead in COUNTRY_MAP and COUNTRY_MAP[p_no_lead] != "USA":
-                    return COUNTRY_MAP[p_no_lead]
+                if p_no_lead in _COUNTRY_NAME_MAP and _COUNTRY_NAME_MAP[p_no_lead] != "USA":
+                    return _COUNTRY_NAME_MAP[p_no_lead]
 
     if country_supplied and not country_cand:
         # A country was given but nothing recognises it and nothing else points to the US: do not silently call it USA.

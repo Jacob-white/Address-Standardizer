@@ -475,3 +475,177 @@ def compute_confidence_score(
     if calibrator is not None:
         result.calibrated_score = calibrator.calibrate(result.composite_score)
     return result
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Per-field confidence (opt-in; see ``standardize_address(..., explain=True)``)
+# ---------------------------------------------------------------------------------------------------------------------
+
+FIELD_CONFIDENCE_FIELDS = ("street1", "street2", "city", "state", "postal_code", "country")
+
+# Starting confidence of the street line by the parser that produced it. These are engineering priors, not measured
+# accuracies: a deterministic fast-path match is the most constrained reading, the generic grammar the least.
+_PARSE_PATH_BASE = {
+    "fast_path": 0.99,
+    "us_parser": 0.95,
+    "country_grammar": 0.90,
+    "universal_grammar": 0.80,
+}
+_PARSE_PATH_DEFAULT = 0.90
+
+_COUNTRY_RULE_SCORE = (
+    ("country_inferred_from_script", 0.80),
+    ("country_inferred_from_state", 0.90),
+    ("country_inferred_from_postal", 0.75),
+    ("country_inferred_from_text", 0.70),
+    ("country_defaulted_us", 0.60),
+)
+
+
+def _clamp(value: float) -> float:
+    return round(max(0.0, min(1.0, value)), 4)
+
+
+def compute_field_confidence(
+    std_address: Any,
+    evidence: Optional[Dict[str, Any]] = None,
+    calibrator: Optional[Any] = None,
+) -> Dict[str, float]:
+    """Per-field confidence in [0, 1] for ``street1``, ``street2``, ``city``, ``state``, ``postal_code``, ``country``.
+
+    The values are **heuristic**: fixed penalties and bonuses applied to observable evidence (was the field supplied,
+    inferred or healed, the healed edit distance, which parser produced the street line, whether the postal code has a
+    valid format, whether the ZIP agrees with the state, and the reference-validation status when present). They are
+    not probabilities. With a fitted :class:`~address_standardizer.calibration.Calibrator` each value is mapped
+    through it; that is only meaningful if the calibrator was fitted on (field score, was_correct) pairs of this same
+    quantity. ``calibrator=None`` (the default) leaves the heuristic values untouched.
+
+    ``evidence`` is the dict built by :func:`address_standardizer.explain.build_evidence`:
+    ``supplied`` {field: bool}, ``rules`` {field: [rule ids]}, ``distances`` {field: edit distance},
+    ``parse_path``, ``postal_valid`` (bool or None), ``zip_state`` ("agree" | "mismatch" | None) and
+    ``reference_status`` (str or None). Missing keys mean "no such evidence".
+    """
+    ev = evidence or {}
+    rules: Dict[str, List[str]] = ev.get("rules") or {}
+    dist: Dict[str, int] = ev.get("distances") or {}
+    codes = set(getattr(std_address, "failure_reason_codes", None) or [])
+    ref_status = ev.get("reference_status")
+    is_us = bool(getattr(std_address, "is_us", False))
+
+    def has(field: str, rule: str) -> bool:
+        return rule in rules.get(field, ())
+
+    # street1 -----------------------------------------------------------------------------------------------------
+    street1 = (getattr(std_address, "street1", "") or "").strip()
+    if not street1:
+        s1 = 0.0
+    elif getattr(std_address, "is_private_residence", False):
+        s1 = 0.30
+    else:
+        s1 = _PARSE_PATH_BASE.get(ev.get("parse_path"), _PARSE_PATH_DEFAULT)
+        if has("street1", "typo_heal_street"):
+            s1 -= 0.08 * max(1, dist.get("street1", 1))
+        if has("street1", "secondary_promoted_to_street"):
+            s1 -= 0.10
+        if has("street1", "token_rewritten") or has("street1", "tokens_removed"):
+            s1 -= 0.04
+        if ERR_MISSING_HOUSE_NUM in codes:
+            s1 -= 0.35
+        if ERR_UNRESOLVED_SUFFIX in codes:
+            s1 -= 0.20
+        if WARN_LANDMARK_CAMPUS_PREMISE in codes:
+            s1 -= 0.15
+
+    # street2 -----------------------------------------------------------------------------------------------------
+    street2 = (getattr(std_address, "street2", "") or "").strip()
+    if not street2:
+        # Nothing to be wrong about, unless the delivery point is known to need a unit.
+        s2 = 0.50 if (WARN_MISSING_SECONDARY_UNIT in codes) else 1.0
+    else:
+        s2 = 0.97 if ev.get("supplied", {}).get("street2") else 0.90
+        if has("street2", "unit_split"):
+            s2 -= 0.05
+        if has("street2", "street1_moved_to_street2"):
+            s2 -= 0.15
+        if has("street2", "number_words_to_digits"):
+            s2 -= 0.02
+
+    # city --------------------------------------------------------------------------------------------------------
+    city = (getattr(std_address, "city", "") or "").strip()
+    if not city:
+        c = 0.0
+    elif has("city", "typo_heal_city"):
+        c = 0.90 - 0.10 * max(1, dist.get("city", 1))
+    elif has("city", "city_inferred_from_text"):
+        c = 0.70
+    elif has("city", "city_canonicalized"):
+        c = 0.85
+    else:
+        c = 0.95
+    if ref_status == "confirmed":
+        c += 0.04
+    elif ref_status == "place_mismatch":
+        c *= 0.6
+
+    # state -------------------------------------------------------------------------------------------------------
+    state = (getattr(std_address, "state", "") or "").strip()
+    if not state:
+        st = 0.0 if is_us else 1.0  # outside the US a missing state is normal for most countries
+    elif is_us and state not in US_STATES.values() and state not in US_STATES:
+        st = 0.20
+    elif has("state", "state_corrected_from_zip"):
+        st = 0.80
+    elif has("state", "state_from_zip"):
+        st = 0.85
+    elif has("state", "state_inferred_from_text"):
+        st = 0.80
+    else:
+        st = 0.97
+    if ev.get("zip_state") == "mismatch" or ERR_ZIP_STATE_MISMATCH in codes:
+        st = min(st, 0.35)
+    elif ev.get("zip_state") == "agree":
+        st += 0.02
+    if ref_status == "state_mismatch":
+        st = min(st, 0.30)
+
+    # postal_code -------------------------------------------------------------------------------------------------
+    postal = (getattr(std_address, "postal_code", "") or "").strip()
+    if not postal:
+        p = 0.0
+    elif ev.get("postal_valid") is False:
+        p = 0.30
+    elif has("postal_code", "postal_transposition_healed"):
+        p = 0.70
+    elif has("postal_code", "postal_extracted_from_text"):
+        p = 0.85
+    else:
+        p = 0.97
+    if ref_status == "postal_unknown":
+        p = min(p, 0.30)
+    elif ref_status in ("confirmed", "place_mismatch", "state_mismatch"):
+        p += 0.03
+
+    # country -----------------------------------------------------------------------------------------------------
+    country = (getattr(std_address, "country", "") or "").strip()
+    if not country:
+        k = 0.0
+    else:
+        k = 0.99
+        for rule, score in _COUNTRY_RULE_SCORE:
+            if has("country", rule):
+                k = score
+                break
+    if country and len(country) != 3:  # not an ISO alpha-3 code: the country was not resolved
+        k = min(k, 0.50)
+
+    out = {
+        "street1": _clamp(s1),
+        "street2": _clamp(s2),
+        "city": _clamp(c),
+        "state": _clamp(st),
+        "postal_code": _clamp(p),
+        "country": _clamp(k),
+    }
+    if calibrator is not None:
+        out = {name: _clamp(calibrator.calibrate(value)) for name, value in out.items()}
+    return out

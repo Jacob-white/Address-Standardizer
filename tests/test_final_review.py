@@ -80,3 +80,12 @@ def test_memory_module_imports_without_the_posix_resource_module(monkeypatch):
     finally:
         monkeypatch.undo()
         importlib.reload(_memory)
+
+
+@pytest.mark.parametrize("line", ["500 5th Avenue, New York, 10018", "250 Main St, Springfield, 62701", "840 Elm St, Austin, 78701"])
+def test_numeric_iso_country_codes_in_free_text_are_house_numbers(line):
+    from address_standardizer import normalize_country_code
+
+    assert standardize_address(line, use_cache=False).country == "USA"
+    # ...but a numeric code in the dedicated country field still resolves
+    assert normalize_country_code("500") == "MSR" and normalize_country_code("250") == "FRA"

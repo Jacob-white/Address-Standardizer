@@ -343,6 +343,12 @@ def _cmd_parse(args: argparse.Namespace) -> None:
         if engine_to_close:
             engine_to_close.close()
 
+    if getattr(args, "latin", False):
+        from address_standardizer.transliterate import LATIN_FIELDS, std_to_latin
+
+        data["native"] = {name: data.get(name) for name in LATIN_FIELDS}
+        data.update({name: value for name, value in std_to_latin(res).items() if name in LATIN_FIELDS})
+
     if args.confidence:
         data["confidence_score"] = res.confidence_score
         data["routing_tier"] = res.routing_tier
@@ -918,6 +924,7 @@ def main():
     parse_parser.add_argument("--confidence", action="store_true", help="Include composite confidence score and routing tier")
     parse_parser.add_argument("--audit", action="store_true", help="Include stewardship audit record details")
     parse_parser.add_argument("--audit-db", help="SQLite file for the audit ledger, so records persist between runs (default: in-memory; env ADDRESS_STANDARDIZER_AUDIT_DB)")
+    parse_parser.add_argument("--latin", action="store_true", help="Render street1/street2/city/state in Latin script (Cyrillic and Greek built in; other scripts need the optional anyascii package, otherwise they are left unchanged); the originals are kept under \"native\"")
     parse_parser.add_argument("--no-cache", action="store_true", help="Bypass multi-tier reference cache")
     parse_parser.add_argument("--reference-db", help="GeoNames postal index (see `data build geonames`): validate postal code / city / state and add reference_validation (single address only; docs/reference_data.md)")
     parse_parser.add_argument("--correct-state-from-zip", action="store_true", help="Replace a US state that contradicts the ZIP with the ZIP's state (reported as WARN_STATE_CORRECTED_FROM_ZIP). Default: keep the given state, flag ERR_ZIP_STATE_MISMATCH and mark the address UNDELIVERABLE.")

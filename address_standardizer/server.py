@@ -9,6 +9,7 @@ Production-grade FastAPI daemon exposing OpenAPI 3.1 endpoints for:
   - Real-time Prometheus and JSON metrics (/metrics)
 """
 
+import dataclasses
 import json
 import logging
 import os
@@ -19,7 +20,7 @@ from typing import Any, Dict, Iterator, List, Optional, Union
 from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 
 from address_standardizer import __version__
@@ -227,6 +228,13 @@ class StandardizeRequest(BaseModel):
         "Off by default: a mismatching state is kept and the address is flagged ERR_ZIP_STATE_MISMATCH / UNDELIVERABLE.",
     )
     include_metadata: bool = Field(default=True, description="Include delivery intelligence and spatial metadata")
+    include_explanation: bool = Field(
+        default=False,
+        description="Add `explanation` (ordered change records) and `field_confidence` (per-field, heuristic) to the response.",
+    )
+    alternatives: int = Field(
+        default=0, ge=0, le=5, description="Add up to N next-best interpretations of an ambiguous input as `alternatives`."
+    )
 
     model_config = {
         "extra": "ignore",
@@ -274,8 +282,21 @@ class StandardizeResponse(BaseModel):
     rooftop_address: Optional[str] = None
     full_rooftop_address: Optional[str] = None
     care_of: Optional[str] = None  # text of a removed "c/o" / "attn" clause
+    explanation: Optional[List[Dict[str, Any]]] = None  # only with include_explanation=true
+    field_confidence: Optional[Dict[str, float]] = None  # only with include_explanation=true
+    alternatives: Optional[List[Dict[str, Any]]] = None  # only with alternatives >= 1
 
     model_config = {"extra": "allow"}
+
+
+class AuditDecisionRequest(BaseModel):
+    """A steward's decision on one pending audit record (review UI)."""
+    decision: str = Field(default="modify", description="approve | modify | reject")
+    steward_id: Optional[str] = Field(default=None, max_length=64, description="Required unless the API key has a name")
+    overrides: Dict[str, str] = Field(default_factory=dict, description="Field values to commit (decision=modify)")
+    commentary: str = Field(default="", max_length=2000)
+
+    model_config = {"extra": "forbid"}
 
 
 class BatchStandardizeRequest(BaseModel):
@@ -336,6 +357,14 @@ def _standardize_from_req(req: StandardizeRequest) -> Dict[str, Any]:
     if not st1 and req.address:
         st1 = req.address
 
+    explain_args: Dict[str, Any] = {}
+    if req.include_explanation or req.alternatives:
+        from address_standardizer.reference.validation import server_reference_provider
+
+        explain_args = {
+            "explain": req.include_explanation, "alternatives": req.alternatives,
+            "reference_provider": server_reference_provider(),
+        }
     std = standardize_address(
         street1=st1,
         street2=req.street2,
@@ -347,11 +376,19 @@ def _standardize_from_req(req: StandardizeRequest) -> Dict[str, Any]:
         enable_fuzzy=req.enable_fuzzy,
         allow_locality=req.allow_locality,
         correct_state_from_zip=req.correct_state_from_zip,
+        **explain_args,
     )
     from address_standardizer.reference.validation import attach_server_reference_validation
 
     # Adds "reference_validation" only when ADDRESS_STANDARDIZER_REFERENCE_DB is configured (docs/reference_data.md).
-    return attach_server_reference_validation(std, std.as_dict(include_metadata=req.include_metadata, include_rooftop=True))
+    return attach_server_reference_validation(
+        std,
+        std.as_dict(
+            include_metadata=req.include_metadata,
+            include_rooftop=True,
+            include_explanation=bool(req.include_explanation or req.alternatives),
+        ),
+    )
 
 
 def _process_item_to_dict(
@@ -396,6 +433,52 @@ def _process_item_to_dict(
 # ============================================================================
 # Application Factory
 # ============================================================================
+
+def _register_review_routes(app: FastAPI, runtime: ServiceRuntime) -> None:
+    """Steward review UI (GET /review) and its audit endpoints. Registered only when authentication is configured or
+    ADDRESS_STANDARDIZER_ENABLE_REVIEW_UI=1; otherwise none of these paths exist (404)."""
+    from address_standardizer.audit import ReviewStatus, get_audit_ledger
+    from address_standardizer.service import review
+
+    if not review.review_enabled(runtime.keystore is not None, os.environ):
+        return
+    # The page is static and carries no data; the browser cannot send an API key when navigating to it, so it is
+    # exempt from the key check (the audit endpoints below are not).
+    runtime.config = dataclasses.replace(runtime.config, open_paths=runtime.config.open_paths | {review.PAGE_PATH})
+
+    @app.get(review.PAGE_PATH, include_in_schema=False)
+    def review_page():
+        html, headers = review.render_page()
+        return HTMLResponse(html, headers=headers)
+
+    @app.get("/v1/audit", summary="List audit-ledger records for review", tags=["Stewardship"])
+    def audit_list(
+        status: str = Query("PENDING", description="PENDING, APPROVED, MODIFIED or REJECTED"),
+        limit: int = Query(50, ge=1, le=review.MAX_LIST),
+    ):
+        """Records with the given review status, newest first, each with a re-computed explanation trace."""
+        valid = (ReviewStatus.PENDING, ReviewStatus.APPROVED, ReviewStatus.MODIFIED, ReviewStatus.REJECTED)
+        if status not in valid:
+            raise HTTPException(status_code=422, detail=f"status must be one of {list(valid)}")
+        records = review.list_records(get_audit_ledger(), status, limit)
+        return JSONResponse({"records": records, "count": len(records)})
+
+    @app.post("/v1/audit/{audit_id}/override", summary="Approve, modify or reject a record", tags=["Stewardship"])
+    def audit_override(audit_id: str, body: AuditDecisionRequest, request: Request):
+        """Applies the decision through ``StewardshipAuditLedger.apply_manual_override`` (signed with the key name)."""
+        steward = getattr(request.state, "key_name", None) or body.steward_id
+        if not steward:
+            raise HTTPException(status_code=422, detail="steward_id is required when the API key has no name")
+        try:
+            updated = review.apply_decision(
+                get_audit_ledger(), audit_id, steward, body.decision, body.overrides, body.commentary
+            )
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Audit record not found")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return JSONResponse(updated)
+
 
 def create_app(runtime: Optional[ServiceRuntime] = None) -> FastAPI:
     """Create and configure the FastAPI application daemon.
@@ -712,6 +795,7 @@ def create_app(runtime: Optional[ServiceRuntime] = None) -> FastAPI:
         )
         return await autocomplete_post(req)
 
+    _register_review_routes(app, runtime)
     return app
 
 

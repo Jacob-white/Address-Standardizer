@@ -45,6 +45,12 @@ server = [
     "pydantic>=2.0.0",
     "httpx>=0.24.0",
 ]
+redis = [
+    "redis>=5.0",
+]
+translit = [
+    "anyascii>=0.3",
+]
 otel = [
     "opentelemetry-api>=1.20",
 ]
@@ -73,6 +79,9 @@ address-standardizer = "address_standardizer.cli:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["address_standardizer*"]
+
+[tool.setuptools.package-data]
+address_standardizer = ["service/static/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

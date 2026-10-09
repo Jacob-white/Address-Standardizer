@@ -9,13 +9,23 @@ Topology:
   L2: Embedded SQLite key-value store with WAL mode (sub-0.050 ms latency)
 """
 
-import json
+import logging
+import os
 import sqlite3
 import threading
 import time
 from collections import OrderedDict
 from contextvars import ContextVar
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Union
+
+from address_standardizer.cache_backends import (
+    CacheBackend,
+    backend_from_url,
+    deserialize_value,
+    serialize_value,
+)
+
+logger = logging.getLogger(__name__)
 
 # Tenant namespace for cache keys (set per request by the HTTP service when tenant isolation is enabled).
 # Names never contain "|", and the prefix is always the first "|"-delimited segment of the key, so a tenant
@@ -201,108 +211,7 @@ class SQLiteCache:
                 with conn:  # recency for LRU-style eviction
                     conn.execute("UPDATE l2_address_cache SET created_at = ? WHERE cache_key = ?", (self._stamp(), key))
                 try:
-                    data = json.loads(row["payload"])
-                    if isinstance(data, dict) and data.get("__class__") == "StandardizedAddress":
-                        from address_standardizer.models import StandardizedAddress
-                        std = StandardizedAddress(
-                            street1=data["street1"],
-                            street2=data["street2"],
-                            city=data["city"],
-                            state=data["state"],
-                            postal_code=data["postal_code"],
-                            country=data["country"],
-                            normalized_address_key=data.get("normalized_address_key"),
-                            address_status=data["address_status"],
-                            raw_street_address=data["raw_street_address"],
-                            is_us=data["is_us"],
-                            is_private_residence=data.get("is_private_residence", False),
-                            building_key=data.get("building_key"),
-                            phonetic_key=data.get("phonetic_key"),
-                            is_registered_agent_hub=data.get("is_registered_agent_hub", False),
-                            rooftop_address=data.get("rooftop_address"),
-                        )
-                        std.confidence_score = data.get("confidence_score")
-                        std.routing_tier = data.get("routing_tier")
-                        std.failure_reason_codes = data.get("failure_reason_codes") or []
-                        std.rdi = data.get("rdi", "Unknown")
-                        std.cmra = data.get("cmra", False)
-                        std.is_cmra = data.get("is_cmra", False)
-                        std.vacant = data.get("vacant", False)
-                        std.is_vacant = data.get("is_vacant", False)
-                        std.dpv_footnotes = data.get("dpv_footnotes") or []
-                        std.corporate_risk_score = data.get("corporate_risk_score", 0.0)
-                        std.corporate_risk_flags = data.get("corporate_risk_flags") or []
-
-                        if data.get("audit_record_payload"):
-                            from address_standardizer.audit import StewardshipAuditRecord
-                            std.audit_record = StewardshipAuditRecord.from_dict(data["audit_record_payload"])
-                        elif data.get("audit_id"):
-                            from address_standardizer.audit import get_audit_ledger
-                            std.audit_record = get_audit_ledger().get_record(data["audit_id"])
-
-                        if data.get("cascade_result_payload"):
-                            from address_standardizer.cascade import CascadeResult
-                            c_dict = data["cascade_result_payload"]
-                            std.cascade_result = CascadeResult(
-                                latitude=c_dict["latitude"],
-                                longitude=c_dict["longitude"],
-                                precision=c_dict["precision"],
-                                accuracy_radius_meters=c_dict["accuracy_radius_meters"],
-                                source=c_dict["source"],
-                                stage=c_dict["stage"],
-                                census_tract=c_dict.get("census_tract"),
-                            )
-                        elif data.get("cascade") and isinstance(data["cascade"], dict):
-                            from address_standardizer.cascade import CascadeResult
-                            c_dict = data["cascade"]
-                            std.cascade_result = CascadeResult(
-                                latitude=c_dict["latitude"],
-                                longitude=c_dict["longitude"],
-                                precision=c_dict["precision"],
-                                accuracy_radius_meters=c_dict["accuracy_radius_meters"],
-                                source=c_dict["source"],
-                                stage=c_dict["stage"],
-                                census_tract=c_dict.get("census_tract"),
-                            )
-
-                        if data.get("spatial_result_payload"):
-                            from address_standardizer.models import SpatialResolutionResult
-                            s_dict = data["spatial_result_payload"]
-                            std.spatial_result = SpatialResolutionResult(
-                                latitude=s_dict["latitude"],
-                                longitude=s_dict["longitude"],
-                                precision=s_dict["precision"],
-                                accuracy_radius_meters=s_dict["accuracy_radius_meters"],
-                                stage=s_dict["stage"],
-                                source=s_dict["source"],
-                                h3_res10=s_dict["h3_res10"],
-                                parcel_id=s_dict.get("parcel_id"),
-                                execution_time_ms=s_dict.get("execution_time_ms", 0.0),
-                                metadata=s_dict.get("metadata", {}),
-                            )
-                        elif data.get("spatial_result") and isinstance(data["spatial_result"], dict):
-                            from address_standardizer.models import SpatialResolutionResult
-                            s_dict = data["spatial_result"]
-                            std.spatial_result = SpatialResolutionResult(
-                                latitude=s_dict["latitude"],
-                                longitude=s_dict["longitude"],
-                                precision=s_dict["precision"],
-                                accuracy_radius_meters=s_dict["accuracy_radius_meters"],
-                                stage=s_dict["stage"],
-                                source=s_dict["source"],
-                                h3_res10=s_dict["h3_res10"],
-                                parcel_id=s_dict.get("parcel_id"),
-                                execution_time_ms=s_dict.get("execution_time_ms", 0.0),
-                                metadata=s_dict.get("metadata", {}),
-                            )
-
-                        if data.get("country_iso3"):
-                            std.country_iso3 = data["country_iso3"]
-
-                        return std
-                    if isinstance(data, dict) and "__cache_value__" in data:
-                        return data["__cache_value__"]
-                    return data
+                    return deserialize_value(row["payload"])
                 except Exception:
                     # A payload that cannot be rebuilt (older schema, truncated write) is a miss, not a value.
                     self._hits -= 1
@@ -315,23 +224,7 @@ class SQLiteCache:
 
     def set(self, key: str, value: Any):
         with self._lock:
-            from address_standardizer.models import StandardizedAddress
-            if isinstance(value, StandardizedAddress):
-                d = value.as_dict(include_metadata=True)
-                d["__class__"] = "StandardizedAddress"
-                if value.audit_record is not None and hasattr(value.audit_record, "as_dict"):
-                    d["audit_record_payload"] = value.audit_record.as_dict()
-                if value.cascade_result is not None and hasattr(value.cascade_result, "as_dict"):
-                    d["cascade_result_payload"] = value.cascade_result.as_dict()
-                if value.spatial_result is not None and hasattr(value.spatial_result, "as_dict"):
-                    d["spatial_result_payload"] = value.spatial_result.as_dict()
-                payload_str = json.dumps(d)
-            else:
-                # Tag generic values so None / str / int round-trip with their type intact.
-                try:
-                    payload_str = json.dumps({"__cache_value__": value})
-                except (TypeError, ValueError):
-                    payload_str = json.dumps({"__cache_value__": str(value)})
+            payload_str = serialize_value(value)
 
             conn = self._get_conn()
             with conn:
@@ -391,7 +284,10 @@ class SQLiteCache:
 
 class MultiTierCache:
     """
-    Coordinated Multi-Tier Caching System (L1 LRU + L2 SQLite).
+    Coordinated Multi-Tier Caching System: an in-process L1 LRU in front of a pluggable L2.
+
+    The L2 defaults to the embedded SQLite store; pass ``l2`` (any ``CacheBackend``, e.g. ``RedisCacheBackend``) to
+    replace it. L1 is always per process; whether L2 is shared depends on the backend.
     """
 
     def __init__(
@@ -400,10 +296,11 @@ class MultiTierCache:
         l2_db_path: Optional[str] = None,
         l2_max_entries: int = 50000,
         enabled: bool = True,
+        l2: Optional[CacheBackend] = None,
     ):
         self._enabled = enabled
         self._l1 = LRUCache(maxsize=l1_maxsize)
-        self._l2 = SQLiteCache(db_path=l2_db_path, max_entries=l2_max_entries)
+        self._l2: CacheBackend = l2 if l2 is not None else SQLiteCache(db_path=l2_db_path, max_entries=l2_max_entries)
         self._lock = threading.RLock()
 
     def is_enabled(self) -> bool:
@@ -418,27 +315,21 @@ class MultiTierCache:
     def get(self, key: str) -> Optional[Any]:
         if not self._enabled:
             return None
-        with self._lock:
-            # 1. Check L1 Cache
-            val = self._l1.get(key)
-            if val is not None:
-                return val
-
-            # 2. Check L2 Cache
-            val = self._l2.get(key)
-            if val is not None:
-                # Promote to L1
-                self._l1.set(key, val)
-                return val
-
-            return None
+        # Each tier has its own lock; no lock is held across the L2 call, so a slow network L2 never serialises threads.
+        val = self._l1.get(key)
+        if val is not None:
+            return val
+        val = self._l2.get(key)
+        if val is not None:
+            self._l1.set(key, val)  # promote
+            return val
+        return None
 
     def set(self, key: str, value: Any):
         if not self._enabled:
             return
-        with self._lock:
-            self._l1.set(key, value)
-            self._l2.set(key, value)
+        self._l1.set(key, value)
+        self._l2.set(key, value)
 
     def delete(self, key: str) -> bool:
         with self._lock:
@@ -460,6 +351,7 @@ class MultiTierCache:
             overall_rate = (total_hits / total_lookups) if total_lookups > 0 else 0.0
             return {
                 "enabled": self._enabled,
+                "l2_backend": l2_s.get("backend", "sqlite"),
                 "l1": l1_s,
                 "l2": l2_s,
                 "total_lookups": total_lookups,
@@ -467,8 +359,27 @@ class MultiTierCache:
                 "overall_hit_rate": round(overall_rate, 4),
             }
 
+    def stats(self) -> Dict[str, Any]:
+        """``CacheBackend``-style alias of :meth:`get_stats`."""
+        return self.get_stats()
 
-_DEFAULT_CACHE = MultiTierCache()
+
+CACHE_URL_ENV = "ADDRESS_STANDARDIZER_CACHE_URL"
+
+
+def _backend_from_env() -> Optional[CacheBackend]:
+    """The L2 backend named by ``ADDRESS_STANDARDIZER_CACHE_URL``, or None (unset, or invalid: logged, default kept)."""
+    url = os.environ.get(CACHE_URL_ENV, "").strip()
+    if not url:
+        return None
+    try:
+        return backend_from_url(url)
+    except ValueError as exc:
+        logger.warning("Ignoring %s: %s; using the default SQLite L2.", CACHE_URL_ENV, exc)
+        return None
+
+
+_DEFAULT_CACHE = MultiTierCache(l2=_backend_from_env())
 
 
 def get_default_cache() -> MultiTierCache:
@@ -481,14 +392,25 @@ def configure_cache(
     l1_maxsize: int = 50000,
     l2_db_path: Optional[str] = None,
     l2_max_entries: int = 50000,
+    backend: Union[None, str, CacheBackend] = None,
 ) -> MultiTierCache:
-    """Configures global caching parameters."""
+    """Configures global caching parameters.
+
+    ``backend`` replaces the L2 tier: a ``CacheBackend`` instance, or a ``redis://`` / ``rediss://`` / ``unix://`` URL
+    (needs ``pip install "address-standardizer[redis]"``; a Redis outage never breaks standardization). When omitted,
+    ``ADDRESS_STANDARDIZER_CACHE_URL`` is honoured, else the embedded SQLite L2 is used (``l2_db_path``).
+    """
     global _DEFAULT_CACHE
+    if isinstance(backend, str):
+        backend = backend_from_url(backend)
+    elif backend is None:
+        backend = _backend_from_env()
     _DEFAULT_CACHE = MultiTierCache(
         l1_maxsize=l1_maxsize,
         l2_db_path=l2_db_path,
         l2_max_entries=l2_max_entries,
         enabled=enabled,
+        l2=backend,
     )
     return _DEFAULT_CACHE
 

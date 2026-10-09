@@ -89,6 +89,21 @@ PROMINENT_STATE_CITIES: Dict[str, List[str]] = {
     "NJ": ["NEWARK", "JERSEY CITY", "PATERSON", "ELIZABETH", "TRENTON", "CLIFTON", "CAMDEN", "PASSAIC"],
 }
 
+# Neighbourhood / borough / district names that USPS accepts as the "city" of a mailing address inside a larger
+# city's ZIP codes.  They are valid as supplied and are never rewritten into a different (prominent) city.
+VALID_LOCALITY_NAMES = frozenset({
+    # Boston
+    "DORCHESTER", "ROXBURY", "JAMAICA PLAIN", "ROSLINDALE", "HYDE PARK", "MATTAPAN", "BRIGHTON", "ALLSTON",
+    "CHARLESTOWN", "SOUTH BOSTON", "EAST BOSTON", "WEST ROXBURY", "NORTH END", "BACK BAY", "FENWAY",
+    # New York City
+    "BROOKLYN", "BRONX", "QUEENS", "STATEN ISLAND", "MANHATTAN", "ASTORIA", "FLUSHING", "JAMAICA", "BAYSIDE",
+    "RIDGEWOOD", "WOODSIDE", "SUNNYSIDE", "ELMHURST", "CORONA", "FOREST HILLS", "KEW GARDENS", "LONG ISLAND CITY",
+    "JACKSON HEIGHTS", "RICHMOND HILL", "OZONE PARK", "FAR ROCKAWAY", "WHITESTONE", "COLLEGE POINT",
+    # Los Angeles
+    "HOLLYWOOD", "VAN NUYS", "SHERMAN OAKS", "NORTH HOLLYWOOD", "WOODLAND HILLS", "ENCINO", "TARZANA", "RESEDA",
+    "CANOGA PARK", "SAN PEDRO", "WILMINGTON", "SUN VALLEY", "SYLMAR", "PACOIMA", "STUDIO CITY", "VENICE",
+})
+
 # Common US Street Names susceptible to typos
 COMMON_STREET_NAMES = frozenset({
     "MAIN", "BROADWAY", "WASHINGTON", "LINCOLN", "JEFFERSON", "MADISON", "JACKSON",
@@ -207,7 +222,7 @@ def heal_city_token(
 
     # A city that is itself a known city (in any state) is never rewritten into a different one.
     all_known = {c for cities in PROMINENT_STATE_CITIES.values() for c in cities}
-    if clean_city in all_known:
+    if clean_city in all_known or clean_city in VALID_LOCALITY_NAMES:
         return clean_city
 
     candidate_cities: List[str] = []
@@ -223,17 +238,16 @@ def heal_city_token(
 
     # Collect every candidate at the best distance; only a unique winner is a trustworthy correction
     # (e.g. DEVER is equally close to DENVER and DOVER, so it is left alone).
-    best: List[str] = []
-    min_dist = max_distance + 1
+    scored: List[Tuple[int, str]] = []
     c_len = len(clean_city)
     for cand in dict.fromkeys(candidate_cities):
         if abs(len(cand) - c_len) <= max_distance:
             d = damerau_levenshtein_distance(clean_city, cand)
-            if d <= max_distance:
-                if d < min_dist:
-                    min_dist, best = d, [cand]
-                elif d == min_dist:
-                    best.append(cand)
+            # A two-edit "typo" that also replaces the first letter is a different word (DORCHESTER/WORCESTER).
+            if d <= max_distance and (d < 2 or cand[0] == clean_city[0]):
+                scored.append((d, cand))
+    best_d = min((d for d, _ in scored), default=0)
+    best = [c for d, c in scored if d == best_d]
 
     return best[0] if len(best) == 1 else None
 

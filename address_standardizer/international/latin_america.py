@@ -26,9 +26,12 @@ from address_standardizer.international.romance import (
     _SEC_END,
     extract_units_from_part,
     make_strict_sec_regex,
+    collapse_number_range,
     merge_num_barrio,
+    merge_standalone_number,
     merge_units,
     parse_street2_unit,
+    split_number_from_locality,
 )
 from address_standardizer.tables import COUNTRY_MAP, GLOBAL_METRO_TO_COUNTRY
 
@@ -80,6 +83,17 @@ LATAM_ROAD_TYPES: Dict[str, str] = {
     "LARGO": "LARGO",
 }
 
+# Brazilian states: two-letter UF codes and (upper-case, accent-folded or not) names.
+BR_STATES = frozenset({
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI",
+    "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+    "ACRE", "ALAGOAS", "AMAPÁ", "AMAPA", "AMAZONAS", "BAHIA", "CEARÁ", "CEARA", "DISTRITO FEDERAL",
+    "ESPÍRITO SANTO", "ESPIRITO SANTO", "GOIÁS", "GOIAS", "MARANHÃO", "MARANHAO", "MATO GROSSO",
+    "MATO GROSSO DO SUL", "MINAS GERAIS", "PARÁ", "PARA", "PARAÍBA", "PARAIBA", "PARANÁ", "PARANA",
+    "PERNAMBUCO", "PIAUÍ", "PIAUI", "RIO DE JANEIRO", "RIO GRANDE DO NORTE", "RIO GRANDE DO SUL",
+    "RONDÔNIA", "RONDONIA", "RORAIMA", "SANTA CATARINA", "SÃO PAULO", "SAO PAULO", "SERGIPE", "TOCANTINS",
+})
+
 # Brazilian CEP: 12345-678 or 12345678
 RE_BRA_CEP = re.compile(r"^\b(\d{5})-?(\d{3})\b$")
 
@@ -115,6 +129,8 @@ RE_FLOOR_DOOR = re.compile(r"\b(\d+)(?:\s*[ºª°]\s*|o\s+)([A-Za-z0-9\-]{1,3})\
 
 class LatinAmericaGrammar(CountryGrammar):
     """Regional grammar family for Latin America (MEX, BRA, COL, ARG, CHL)."""
+
+    split_commaless_line: ClassVar[bool] = True
 
     country_iso3: ClassVar[str] = "MEX"
     supported_countries: ClassVar[Tuple[str, ...]] = (
@@ -196,6 +212,9 @@ class LatinAmericaGrammar(CountryGrammar):
         country_raw = metadata.get("country", self.country_iso3)
         country_iso = self._resolve_country_iso(country_raw)
 
+        # Only Argentina has four-digit postal codes; elsewhere a bare four-digit number is a house number.
+        pc_digits = r"\d{4,7}" if country_iso == "ARG" else r"\d{5,7}"
+
         unit_type: Optional[str] = None
         unit_number: Optional[str] = None
         sec_units: List[str] = []
@@ -233,9 +252,13 @@ class LatinAmericaGrammar(CountryGrammar):
                     continue
 
                 # Check if entire part is a postal code
+                # (a bare four-digit part after a street part is a house number, not a postal code, outside Argentina)
                 if (
                     RE_BRA_CEP.match(part.strip())
-                    or RE_ARG_CPA.match(part.strip())
+                    or (
+                        RE_ARG_CPA.match(part.strip())
+                        and (country_iso == "ARG" or not part.strip().isdigit() or not rem_parts)
+                    )
                     or re.match(r"^\d{5,7}$", part.strip())
                 ):
                     postal_raw = part.strip()
@@ -254,6 +277,8 @@ class LatinAmericaGrammar(CountryGrammar):
 
             # "street, number - barrio, city" (Brazil / Mexico style): the number belongs to the street line and the
             # barrio is the dependent locality, so the remaining parts read "street number, city".
+            # "Rua X, 123, Bairro, Cidade": the bare number part belongs to the street, not to a locality.
+            merge_standalone_number(rem_parts)
             if not city_raw and not dep_locality:
                 dep_locality = merge_num_barrio(rem_parts)
 
@@ -275,7 +300,7 @@ class LatinAmericaGrammar(CountryGrammar):
                 # OR "Carrera 7 # 71-21", "Bogotá 110221"
                 # OR "Huérfanos 48", "Santiago", "Región Metropolitana 8320000"
                 m_pc_last_start = re.match(r"^(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3})\s+(.*)$", rem_parts[-1], re.IGNORECASE)
-                m_pc_last_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|\d{4,7})$", rem_parts[-1], re.IGNORECASE)
+                m_pc_last_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|@)$".replace("@", pc_digits), rem_parts[-1], re.IGNORECASE)
                 if m_pc_last_start:
                     postal_raw = m_pc_last_start.group(1)
                     city_raw = m_pc_last_start.group(2)
@@ -292,7 +317,12 @@ class LatinAmericaGrammar(CountryGrammar):
                         street_line = ", ".join(rem_parts[:-1])
                 else:
                     p_last_clean = rem_parts[-1].strip().upper()
-                    if p_last_clean in GLOBAL_METRO_TO_COUNTRY or p_last_clean in (
+                    if country_iso == "BRA" and p_last_clean not in BR_STATES:
+                        # Brazil writes "street, bairro, cidade": the last part is the city, the one before the bairro.
+                        city_raw = rem_parts[-1].strip()
+                        dep_locality = rem_parts[-2].strip()
+                        street_line = ", ".join(rem_parts[:-2])
+                    elif p_last_clean in GLOBAL_METRO_TO_COUNTRY or p_last_clean in (
                         "BOGOTÁ", "BOGOTA", "SANTIAGO", "BUENOS AIRES", "LIMA", "CARACAS", "MONTEVIDEO", "QUITO"
                     ):
                         city_raw = rem_parts[-1].strip()
@@ -301,7 +331,7 @@ class LatinAmericaGrammar(CountryGrammar):
                     else:
                         state_raw = rem_parts[-1]
                         m_pc_mid_start = re.match(r"^(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3})\s+(.*)$", rem_parts[-2], re.IGNORECASE)
-                        m_pc_mid_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|\d{4,7})$", rem_parts[-2], re.IGNORECASE)
+                        m_pc_mid_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|@)$".replace("@", pc_digits), rem_parts[-2], re.IGNORECASE)
                         if m_pc_mid_start:
                             postal_raw = m_pc_mid_start.group(1)
                             city_raw = m_pc_mid_start.group(2)
@@ -313,8 +343,8 @@ class LatinAmericaGrammar(CountryGrammar):
                         street_line = ", ".join(rem_parts[:-2])
             elif len(rem_parts) == 2:
                 # e.g. "Balcarce 50", "C1064AAB Buenos Aires" OR "Carrera 7 # 71-21", "Bogotá 110221"
-                m_pc_start = re.match(r"^(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|\d{4,7})\s+(.*)$", rem_parts[1], re.IGNORECASE)
-                m_pc_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|\d{4,7})$", rem_parts[1], re.IGNORECASE)
+                m_pc_start = re.match(r"^(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|@)\s+(.*)$".replace("@", pc_digits), rem_parts[1], re.IGNORECASE)
+                m_pc_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|@)$".replace("@", pc_digits), rem_parts[1], re.IGNORECASE)
                 if m_pc_start:
                     postal_raw = m_pc_start.group(1)
                     city_raw = m_pc_start.group(2)
@@ -335,12 +365,16 @@ class LatinAmericaGrammar(CountryGrammar):
                 # Every part was consumed as colonia / unit / postal code: no street line remains.
                 street_line = ""
 
+            if city_raw:
+                street_line, city_raw = split_number_from_locality(street_line, city_raw)
+
         # Handle secondary units in s2_raw or embedded in street_line
         s2_type: Optional[str] = None
         s2_number: Optional[str] = None
         if s2_raw:
             s2_type, s2_number = parse_street2_unit(s2_raw, RE_LATAM_SEC)
 
+        street_line = collapse_number_range(street_line)
         # Check for Brazil " - " separator (e.g. "Avenida Paulista, 1578 - Bela Vista")
         if " - " in street_line:
             p_dash = street_line.split(" - ", 1)

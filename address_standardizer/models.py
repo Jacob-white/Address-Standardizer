@@ -402,6 +402,33 @@ class StandardizedAddress:
         self._reference_validation = value
 
     @property
+    def explanation(self) -> Optional[List[Dict[str, Any]]]:
+        """Ordered change records; set only when ``standardize_address(..., explain=True)`` was used."""
+        return getattr(self, "_explanation", None)
+
+    @explanation.setter
+    def explanation(self, value: Optional[List[Dict[str, Any]]]):
+        self._explanation = value
+
+    @property
+    def field_confidence(self) -> Optional[Dict[str, float]]:
+        """Per-field confidence in [0, 1]; set only with ``explain=True`` (heuristic unless calibrated)."""
+        return getattr(self, "_field_confidence", None)
+
+    @field_confidence.setter
+    def field_confidence(self, value: Optional[Dict[str, float]]):
+        self._field_confidence = value
+
+    @property
+    def alternatives(self) -> Optional[List[Dict[str, Any]]]:
+        """Next-best interpretations; set only when ``standardize_address(..., alternatives=N)`` was used."""
+        return getattr(self, "_alternatives", None)
+
+    @alternatives.setter
+    def alternatives(self, value: Optional[List[Dict[str, Any]]]):
+        self._alternatives = value
+
+    @property
     def country_iso3(self) -> str:
         return getattr(self, "_country_iso3", getattr(self, "country", "USA") or "USA")
 
@@ -443,7 +470,9 @@ class StandardizedAddress:
             parts.append(self.country)
         return ", ".join(parts)
 
-    def as_dict(self, include_metadata: bool = False, include_rooftop: bool = False) -> Dict[str, Any]:
+    def as_dict(
+        self, include_metadata: bool = False, include_rooftop: bool = False, include_explanation: bool = False
+    ) -> Dict[str, Any]:
         d = {
             "street1": self.street1,
             "street2": self.street2,
@@ -512,6 +541,14 @@ class StandardizedAddress:
             d["country_iso3"] = self.country_iso3
             if self.reference_validation is not None:
                 d["reference_validation"] = self.reference_validation.as_dict()
+        if include_explanation or include_metadata:
+            # Present only when explain=True / alternatives=N was requested; the default result never carries them.
+            if self.explanation is not None:
+                d["explanation"] = [dict(r) for r in self.explanation]
+            if self.field_confidence is not None:
+                d["field_confidence"] = dict(self.field_confidence)
+            if self.alternatives is not None:
+                d["alternatives"] = [dict(a) for a in self.alternatives]
         return d
 
     def as_extended_dict(self) -> Dict[str, Any]:

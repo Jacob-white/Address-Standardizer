@@ -456,12 +456,16 @@ class StewardshipAuditLedger:
         steward_id: str,
         overrides: Dict[str, Any],
         commentary: str = "",
+        review_status: str = ReviewStatus.MODIFIED,
     ) -> StewardshipAuditRecord:
         """
         Applies a data steward manual override:
         - Updates final_committed_payload
         - Signs with steward_id and reviewed_at
         - Updates action_type to MANUAL_OVERRIDE and review_status to MODIFIED
+
+        ``review_status`` (default MODIFIED) lets the review UI record an approval (APPROVED: the proposed values are
+        committed) or a rejection (REJECTED: nothing is committed, ``final_committed_payload`` is left empty).
         """
         existing = self.get_record(audit_id)
         if not existing:
@@ -481,7 +485,7 @@ class StewardshipAuditLedger:
             country=committed.get("country"),
         )
 
-        final_payload = {
+        final_payload = {} if review_status == ReviewStatus.REJECTED else {
             "street1": re_norm.street1,
             "street2": re_norm.street2,
             "city": re_norm.city,
@@ -511,7 +515,7 @@ class StewardshipAuditLedger:
             proposed_standardized_payload=existing.proposed_standardized_payload,
             final_committed_payload=final_payload,
             steward_commentary=commentary,
-            review_status=ReviewStatus.MODIFIED,
+            review_status=review_status,
             reviewed_by=steward_id,
             reviewed_at=now_utc,
         )
