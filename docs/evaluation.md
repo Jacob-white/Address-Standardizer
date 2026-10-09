@@ -209,8 +209,9 @@ least in-sample coverage or new city shapes: Japan 21% (100% in-sample), Hungary
 
 `osm_holdout_v2.json` is a third corpus, built with `build_osm_corpus.py --holdout-v2` from each country's
 `holdout_v2_bboxes` (new cities or districts, disjoint from both the development `bboxes` and the v1 `holdout_bboxes`),
-seed 20270115, 30 records per country, the same 40 countries plus HK and ID, MY, PH, VN, KE, NG, UY, CO, PE, EC where
-Overpass returned enough tagged addresses. Offline tests check disjointness, structure, the ODbL note and that no OSM
+seed 20270115, up to 30 records per country, the same 40 countries plus ID, MY, PH, VN, KE, NG, UY, CO, PE, EC (1,506
+records in 51 countries; Ukraine has 20 and Kenya 16 because Overpass returned too few tagged addresses, and Hong Kong
+yielded none, so it is absent). Offline tests check disjointness, structure, the ODbL note and that no OSM
 object or record id is shared with the other two files.
 
 **It is sealed until the current accuracy round is complete.** The engine has not been run on it, there is no report or

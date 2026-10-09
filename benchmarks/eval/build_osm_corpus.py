@@ -40,6 +40,7 @@ ENDPOINTS = [
     "https://overpass.kumi.systems/api/interpreter",
 ]
 HOLDOUT_SEED = 20261201
+HOLDOUT_V2_SEED = 20270115
 FIELDS = ("house_number", "street", "city", "state", "postcode", "country")
 
 # Per-country configuration. bboxes are (south, west, north, east). ``street1`` is how the street line is
@@ -199,7 +200,93 @@ COUNTRIES: Dict[str, Dict[str, Any]] = {
     "RO": {"iso3": "ROU", "name": "Romania", "script": "Latin", "lang": "ro", "bboxes": [],
            "holdout_bboxes": [(44.42, 26.08, 44.45, 26.12), (46.75, 23.57, 46.78, 23.61)],
            "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    # ---- countries that appear only in the sealed v2 holdout (--holdout-v2) ----
+    "ID": {"iso3": "IDN", "name": "Indonesia", "script": "Latin", "lang": "id", "bboxes": [],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{city} {pc}"]},
+    "MY": {"iso3": "MYS", "name": "Malaysia", "script": "Latin", "lang": "ms", "bboxes": [],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{pc} {city}"]},
+    "PH": {"iso3": "PHL", "name": "Philippines", "script": "Latin", "lang": "en", "bboxes": [],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city} {pc}"]},
+    "VN": {"iso3": "VNM", "name": "Vietnam", "script": "Latin", "lang": "vi", "bboxes": [],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{pc}"]},
+    "KE": {"iso3": "KEN", "name": "Kenya", "script": "Latin", "lang": "en", "bboxes": [],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city} {pc}"]},
+    "NG": {"iso3": "NGA", "name": "Nigeria", "script": "Latin", "lang": "en", "bboxes": [],
+           "street1": "{hn} {street}", "segments": ["{street1}", "{city} {pc}"]},
+    "UY": {"iso3": "URY", "name": "Uruguay", "script": "Latin", "lang": "es", "bboxes": [],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
+    "CO": {"iso3": "COL", "name": "Colombia", "script": "Latin", "lang": "es", "bboxes": [],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{city}", "{pc}"]},
+    "PE": {"iso3": "PER", "name": "Peru", "script": "Latin", "lang": "es", "bboxes": [],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{city} {pc}"]},
+    "EC": {"iso3": "ECU", "name": "Ecuador", "script": "Latin", "lang": "es", "bboxes": [],
+           "street1": "{street} {hn}", "segments": ["{street1}", "{pc} {city}"]},
 }
+
+# Sealed v2 holdout areas (--holdout-v2): disjoint from every ``bboxes`` and ``holdout_bboxes`` entry above (a test
+# enforces it). Reserved for MEASUREMENT only: do not diagnose, tune or fix against records from these areas.
+HOLDOUT_V2_BBOXES: Dict[str, List[Tuple[float, float, float, float]]] = {
+    "US": [(47.60, -122.34, 47.63, -122.30), (39.93, -75.18, 39.96, -75.14), (33.76, -84.40, 33.79, -84.36),
+           (45.51, -122.68, 45.54, -122.64)],
+    "CA": [(51.03, -114.10, 51.06, -114.06), (44.64, -63.60, 44.67, -63.56), (46.80, -71.23, 46.83, -71.19)],
+    "GB": [(53.79, -1.56, 53.81, -1.52), (55.85, -4.28, 55.88, -4.24), (51.47, -3.19, 51.50, -3.15),
+           (54.96, -1.63, 54.99, -1.59)],
+    "IE": [(52.65, -8.64, 52.68, -8.60), (52.25, -7.13, 52.27, -7.09)],
+    "AU": [(-31.97, 115.84, -31.94, 115.88), (-35.30, 149.11, -35.27, 149.15), (-42.89, 147.31, -42.86, 147.35),
+           (-32.94, 151.74, -32.91, 151.78)],
+    "NZ": [(-37.80, 175.26, -37.77, 175.30), (-45.88, 170.49, -45.85, 170.53)],
+    "DE": [(48.77, 9.16, 48.80, 9.20), (51.33, 12.36, 51.36, 12.40), (51.21, 6.77, 51.24, 6.81)],
+    "AT": [(47.25, 11.38, 47.28, 11.42), (48.29, 14.27, 48.32, 14.31)],
+    "CH": [(47.55, 7.58, 47.57, 7.62), (46.51, 6.62, 46.54, 6.65), (47.04, 8.29, 47.06, 8.32)],
+    "FR": [(47.20, -1.57, 47.23, -1.53), (48.57, 7.74, 48.60, 7.78), (50.62, 3.05, 50.65, 3.09)],
+    "ES": [(43.25, -2.94, 43.28, -2.90), (41.64, -0.91, 41.67, -0.87), (36.71, -4.44, 36.74, -4.40)],
+    "IT": [(43.76, 11.24, 43.79, 11.28), (38.11, 13.35, 38.14, 13.39), (44.40, 8.92, 44.43, 8.96)],
+    "PT": [(40.20, -8.44, 40.22, -8.40), (41.54, -8.44, 41.56, -8.40)],
+    "NL": [(53.20, 6.55, 53.23, 6.59), (51.43, 5.46, 51.46, 5.50), (50.84, 5.68, 50.86, 5.72)],
+    "BE": [(50.63, 5.56, 50.66, 5.60), (50.87, 4.69, 50.89, 4.72)],
+    "PL": [(54.34, 18.63, 54.37, 18.67), (52.40, 16.91, 52.43, 16.95), (51.76, 19.44, 51.79, 19.48)],
+    "SE": [(59.85, 17.62, 59.87, 17.66), (58.40, 15.60, 58.43, 15.64)],
+    "DK": [(57.03, 9.91, 57.06, 9.95), (55.47, 8.44, 55.49, 8.48)],
+    "BR": [(-19.94, -43.96, -19.91, -43.92), (-30.05, -51.24, -30.02, -51.20), (-12.99, -38.50, -12.96, -38.46)],
+    "RU": [(56.82, 60.59, 56.85, 60.63), (56.31, 43.98, 56.34, 44.02), (53.19, 50.09, 53.22, 50.13)],
+    "UA": [(46.47, 30.72, 46.49, 30.76), (48.45, 35.03, 48.47, 35.07), (47.83, 35.14, 47.86, 35.18), (49.22, 28.46, 49.25, 28.50)],
+    "GR": [(39.62, 22.40, 39.65, 22.43), (39.35, 22.93, 39.38, 22.96), (39.65, 20.84, 39.68, 20.87)],
+    "IL": [(32.31, 34.84, 32.34, 34.87), (31.96, 34.79, 31.99, 34.82), (31.78, 34.63, 31.81, 34.66), (32.08, 34.87, 32.10, 34.90), (32.00, 34.76, 32.03, 34.79)],
+    "TH": [(16.42, 102.82, 16.45, 102.85), (7.00, 100.46, 7.02, 100.49), (19.89, 99.82, 19.92, 99.85)],
+    "JP": [(35.44, 139.62, 35.47, 139.66), (34.98, 135.75, 35.01, 135.79), (34.38, 132.45, 34.41, 132.49),
+           (38.25, 140.86, 38.28, 140.90), (34.68, 135.17, 34.71, 135.21), (26.20, 127.67, 26.23, 127.71)],
+    "KR": [(36.34, 127.38, 36.37, 127.42), (35.14, 126.90, 35.17, 126.94), (37.26, 127.01, 37.29, 127.04)],
+    "TW": [(22.98, 120.19, 23.01, 120.23), (24.79, 120.96, 24.82, 121.00), (24.98, 121.29, 25.01, 121.33)],
+    "MX": [(25.66, -100.33, 25.69, -100.29), (19.03, -98.22, 19.06, -98.18), (20.96, -89.63, 20.99, -89.59)],
+    "AR": [(-32.96, -60.66, -32.93, -60.62), (-32.91, -68.86, -32.88, -68.82)],
+    "CL": [(-36.84, -73.07, -36.81, -73.03), (-38.74, -72.61, -38.72, -72.57)],
+    "IN": [(13.04, 80.23, 13.07, 80.27), (22.55, 88.34, 22.58, 88.38), (18.51, 73.84, 18.54, 73.88),
+           (17.41, 78.45, 17.44, 78.49)],
+    "ZA": [(-25.76, 28.18, -25.73, 28.22), (-29.87, 31.00, -29.84, 31.04), (-33.94, 18.84, -33.92, 18.88)],
+    "SG": [(1.29, 103.78, 1.32, 103.82), (1.35, 103.93, 1.38, 103.97), (1.30, 103.88, 1.33, 103.92),
+           (1.42, 103.82, 1.45, 103.86)],
+    "HK": [(22.31, 114.16, 22.34, 114.19), (22.38, 114.18, 22.40, 114.21), (22.36, 114.11, 22.38, 114.13), (22.28, 114.20, 22.30, 114.23), (22.44, 114.16, 22.46, 114.18)],
+    "SA": [(26.41, 50.08, 26.44, 50.12), (24.46, 39.60, 24.49, 39.64), (21.40, 39.81, 21.43, 39.85), (28.37, 36.55, 28.40, 36.59), (26.27, 50.19, 26.30, 50.23)],
+    "EG": [(29.99, 31.18, 30.02, 31.21), (30.08, 31.31, 30.11, 31.35), (31.03, 31.37, 31.06, 31.40), (30.77, 31.00, 30.80, 31.03), (30.04, 31.38, 30.07, 31.42)],
+    "TR": [(40.17, 29.04, 40.20, 29.08), (36.88, 30.69, 36.91, 30.73), (36.98, 35.31, 37.01, 35.35)],
+    "NO": [(63.42, 10.38, 63.44, 10.42), (58.96, 5.72, 58.98, 5.76), (69.64, 18.94, 69.67, 18.98)],
+    "FI": [(60.44, 22.25, 60.46, 22.29), (65.00, 25.46, 65.03, 25.50), (60.20, 24.65, 60.22, 24.69)],
+    "CZ": [(49.73, 13.36, 49.76, 13.40), (49.82, 18.25, 49.85, 18.29), (49.58, 17.24, 49.60, 17.28)],
+    "HU": [(46.24, 20.14, 46.27, 20.18), (46.06, 18.21, 46.09, 18.25), (47.67, 17.62, 47.70, 17.66)],
+    "RO": [(45.74, 21.21, 45.77, 21.25), (47.15, 27.57, 47.18, 27.61), (45.64, 25.58, 45.67, 25.62)],
+    "ID": [(-6.24, 106.80, -6.21, 106.84), (-6.93, 107.60, -6.90, 107.64), (-7.28, 112.72, -7.25, 112.76)],
+    "MY": [(3.13, 101.68, 3.16, 101.72), (5.40, 100.30, 5.43, 100.34), (1.46, 103.74, 1.49, 103.78)],
+    "PH": [(14.55, 121.00, 14.58, 121.04), (10.30, 123.88, 10.33, 123.92), (7.06, 125.59, 7.09, 125.63)],
+    "VN": [(21.01, 105.83, 21.04, 105.87), (10.77, 106.68, 10.80, 106.72), (16.05, 108.20, 16.08, 108.23)],
+    "KE": [(-1.30, 36.80, -1.27, 36.84), (-4.07, 39.65, -4.04, 39.69), (-0.11, 34.74, -0.08, 34.78), (-0.30, 36.06, -0.27, 36.10)],
+    "NG": [(6.43, 3.40, 6.46, 3.44), (9.05, 7.47, 9.08, 7.51), (7.37, 3.89, 7.40, 3.93), (4.80, 7.00, 4.83, 7.04)],
+    "UY": [(-34.92, -56.18, -34.89, -56.14), (-34.91, -54.97, -34.89, -54.94)],
+    "CO": [(4.64, -74.08, 4.67, -74.04), (6.23, -75.59, 6.26, -75.55), (3.43, -76.54, 3.46, -76.50)],
+    "PE": [(-12.12, -77.05, -12.09, -77.01), (-16.41, -71.55, -16.38, -71.51)],
+    "EC": [(-0.20, -78.50, -0.17, -78.46), (-2.19, -79.90, -2.16, -79.86), (-2.91, -79.02, -2.88, -78.98), (-1.26, -78.64, -1.23, -78.60)],
+}
+for _iso2, _boxes in HOLDOUT_V2_BBOXES.items():
+    COUNTRIES.setdefault(_iso2, {})["holdout_v2_bboxes"] = _boxes
 
 # Abbreviation tables per language, used ONLY to make messy renderings (independent of the engine).
 ABBREVIATIONS: Dict[str, List[Tuple[str, str]]] = {
@@ -420,6 +507,7 @@ def build_corpus(
     fetcher: Optional[Callable[[str], Dict[str, Any]]] = None,
     log: Callable[[str], None] = lambda m: None,
     holdout: bool = False,
+    holdout_v2: bool = False,
 ) -> List[Dict[str, Any]]:
     """Fetch (or read from cache), label, sample and render. ``fetcher(query) -> payload`` is injectable."""
     if fetcher is None:  # pragma: no cover - network default
@@ -429,7 +517,11 @@ def build_corpus(
     for iso2 in countries:
         cfg = COUNTRIES[iso2]
         pool: List[Dict[str, Any]] = []
-        for bbox in (cfg.get("holdout_bboxes", []) if holdout else cfg["bboxes"]):
+        if holdout_v2:
+            boxes = cfg.get("holdout_v2_bboxes", [])
+        else:
+            boxes = cfg.get("holdout_bboxes", []) if holdout else cfg["bboxes"]
+        for bbox in boxes:
             for city_key in cfg.get("city_keys", ["addr:city"]):
                 try:
                     payload = fetcher(build_query(bbox, city_key, fetch_limit))
@@ -471,7 +563,10 @@ def main(argv: Optional[List[str]] = None) -> int:  # pragma: no cover - thin CL
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--holdout", action="store_true",
                     help="use the disjoint holdout_bboxes (never used for tuning); changes default out/seed/per-country")
-    ap.add_argument("--out", default=None, help="default osm_sample.json, or osm_holdout.json with --holdout")
+    ap.add_argument("--holdout-v2", action="store_true",
+                    help="use the sealed holdout_v2_bboxes (measurement only; disjoint from sample and holdout v1)")
+    ap.add_argument("--out", default=None,
+                    help="default osm_sample.json, osm_holdout.json with --holdout, osm_holdout_v2.json with --holdout-v2")
     ap.add_argument("--countries", default=None, help="comma-separated ISO2 codes (default: all configured)")
     ap.add_argument("--per-country", type=int, default=None, help="default 22 (30 with --holdout)")
     ap.add_argument("--fetch-limit", type=int, default=150, help="max Overpass elements per bbox query")
@@ -485,17 +580,30 @@ def main(argv: Optional[List[str]] = None) -> int:  # pragma: no cover - thin CL
     def fetcher(q: str) -> Dict[str, Any]:
         return fetch_overpass(q, args.cache_dir, user_agent=args.user_agent, delay=args.delay, offline=args.offline)
 
-    hold = args.holdout
-    out = args.out or os.path.join(HERE, "osm_holdout.json" if hold else "osm_sample.json")
-    seed = args.seed if args.seed is not None else (HOLDOUT_SEED if hold else 20261009)
-    per_country = args.per_country or (30 if hold else 22)
-    default_countries = [c for c, cfg in COUNTRIES.items() if cfg.get("holdout_bboxes" if hold else "bboxes")]
+    v2 = args.holdout_v2
+    hold = args.holdout and not v2
+    if v2:
+        out = args.out or os.path.join(HERE, "osm_holdout_v2.json")
+        seed = args.seed if args.seed is not None else HOLDOUT_V2_SEED
+        per_country = args.per_country or 30
+        key = "holdout_v2_bboxes"
+    else:
+        out = args.out or os.path.join(HERE, "osm_holdout.json" if hold else "osm_sample.json")
+        seed = args.seed if args.seed is not None else (HOLDOUT_SEED if hold else 20261009)
+        per_country = args.per_country or (30 if hold else 22)
+        key = "holdout_bboxes" if hold else "bboxes"
+    default_countries = [c for c, cfg in COUNTRIES.items() if cfg.get(key)]
     wanted = [c.strip().upper() for c in (args.countries.split(",") if args.countries else default_countries)
               if c.strip()]
     corpus = build_corpus(wanted, per_country, seed, args.cache_dir, args.fetch_limit, fetcher,
-                          log=lambda m: print(m, file=sys.stderr), holdout=hold)
+                          log=lambda m: print(m, file=sys.stderr), holdout=hold, holdout_v2=v2)
     meta: Dict[str, Any] = {"countries": sorted({r["country"] for r in corpus})}
-    if hold:
+    if v2:
+        meta["holdout"] = True
+        meta["holdout_v2"] = True
+        meta["note"] = ("Sealed held-out v2 set: areas disjoint from osm_sample.json and osm_holdout.json; "
+                        "measurement only, never used to diagnose, tune or fix the engine.")
+    elif hold:
         meta["holdout"] = True
         meta["note"] = "Held-out set: areas disjoint from osm_sample.json; never used for engine tuning."
     write_corpus(corpus, out, seed, meta)
