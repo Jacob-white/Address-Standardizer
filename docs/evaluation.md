@@ -220,3 +220,21 @@ are finished. Run it once, afterwards, with `run_eval.py --corpus benchmarks/eva
 number as the generalisation estimate. After that it is contaminated like the others: any further fix derived from it
 needs a v3 with fresh boxes and a fresh seed. Without `--holdout-v2` the builder's default and `--holdout` outputs are
 unchanged.
+
+### Held-out v2: measured (once)
+
+`osm_holdout_v2.json` (1,506 records, 51 countries, seed 20270115, built from new areas and never run through the engine
+before the accuracy round was complete) was measured exactly once, on 2026-10-09. Result: **92.2% all-fields exact match**
+(95% CI 91.7% - 92.6%, n = 12,872 renderings); see `benchmarks/eval/REPORT_HOLDOUT_V2.md`.
+
+| Set | Role | All-fields exact |
+| :--- | :--- | :--- |
+| `osm_sample.json` | development (used to diagnose and fix) | ~98.5% |
+| `osm_holdout.json` (v1) | diagnostic during the accuracy round | ~97% |
+| `osm_holdout_v2.json` | sealed, measured once | **92.2%** |
+
+The gap between the development sets and v2 (about 5-6 points) is the over-fitting the fixes carry; v2 is the honest
+generalisation estimate. Weakest fields on v2: `state` (66.5%, mostly Latin-American and Indian labels that carry the full
+state name while the engine returns nothing or a code) and, by country, AR, CO, JP, ID, KE, MX, SA and PE. V2 is now
+consumed: any engine change motivated by its failures must be validated on a new, sealed v3, never on v2 again.
+
