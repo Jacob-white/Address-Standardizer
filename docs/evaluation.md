@@ -64,6 +64,12 @@ Comparisons are deliberately lenient only where the same address can legitimatel
 - case, accents/diacritics and punctuation are ignored (`ß` = `ss`, NFKC/NFKD folding);
 - street types and directionals are canonicalised (`St`/`Street`, `Str.`/`straße`, `N`/`North`, `Av.`/`Avenida`,
   `ул.`/`улица` ...) and English ordinal words (`Fifth` = `5th`);
+- Turkish dotted/dotless `i` are one letter (`ı`, `İ`, `I`, `i` all fold to `i`): the engine upper-cases
+  `Kızılırmak` to `KIZILIRMAK`, which is the same street, not a different one;
+- for records labelled Canada only, French directionals equal their one-letter forms and the English words
+  (`Ouest`/`O`/`West`/`W`, `Est`/`E`/`East`, `Nord`/`N`, `Sud`/`S`) and `boul` = `boulevard` (`Avenue`/`AV` and
+  `Boulevard`/`BD` were already canonical). A different direction, a missing directional or a different street name
+  still counts as wrong, and `O`/`E` are not equated with `Ouest`/`Est` for any other country;
 - the house number is correct when its alphanumeric form appears as a whole token (or adjacent tokens) of the
   engine's street line; `12` does not match `123`;
 - postal codes ignore spaces/hyphens/case; a US ZIP+4 matches its ZIP5;
@@ -198,3 +204,18 @@ least in-sample coverage or new city shapes: Japan 21% (100% in-sample), Hungary
 - Once a fix is made from holdout findings, that area is no longer held out. Cut a fresh holdout (new
   `holdout_bboxes`, new seed) before reporting a new generalisation number, and keep the old file for history.
 - Quote the held-out figure, with its interval and the OSM-label caveats above, whenever an accuracy number is needed.
+
+## Held-out v2 (sealed)
+
+`osm_holdout_v2.json` is a third corpus, built with `build_osm_corpus.py --holdout-v2` from each country's
+`holdout_v2_bboxes` (new cities or districts, disjoint from both the development `bboxes` and the v1 `holdout_bboxes`),
+seed 20270115, 30 records per country, the same 40 countries plus HK and ID, MY, PH, VN, KE, NG, UY, CO, PE, EC where
+Overpass returned enough tagged addresses. Offline tests check disjointness, structure, the ODbL note and that no OSM
+object or record id is shared with the other two files.
+
+**It is sealed until the current accuracy round is complete.** The engine has not been run on it, there is no report or
+baseline for it, and nobody should look at per-record failures before the fixes made from the development and v1 sets
+are finished. Run it once, afterwards, with `run_eval.py --corpus benchmarks/eval/osm_holdout_v2.json`, and report that
+number as the generalisation estimate. After that it is contaminated like the others: any further fix derived from it
+needs a v3 with fresh boxes and a fresh seed. Without `--holdout-v2` the builder's default and `--holdout` outputs are
+unchanged.

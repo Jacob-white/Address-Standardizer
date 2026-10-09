@@ -19,6 +19,11 @@ from address_standardizer.international.base import (
     ParsedAddressComponents,
     split_intl_secondary_unit,
 )
+from address_standardizer.international.commaless import (
+    COMMONWEALTH_TYPE_WORDS,
+    split_commaless_region_postal_city,
+    town_set,
+)
 from address_standardizer.tables import (
     CANADIAN_PROVINCE_ABBREVIATIONS,
     CANADIAN_PROVINCES,
@@ -121,6 +126,55 @@ RURAL_DELIVERY_MODES: Dict[str, str] = {
 }
 
 
+_RE_CAN_TRAILING_COUNTRY = re.compile(r"\s+(?:CANADA|CAN)\s*$", re.IGNORECASE)
+
+# First letters of the postal codes of each province (Canada Post forward sortation areas).
+_PROVINCE_FSA_LETTERS: Dict[str, str] = {
+    "NL": "A", "NS": "B", "PE": "C", "NB": "E", "QC": "GHJ", "ON": "KLMNP", "MB": "R", "SK": "S", "AB": "T",
+    "BC": "V", "NU": "X", "NT": "X", "YT": "Y",
+}
+
+# Words that end a French street name (the direction) or, for the comma-less splitter, are no street start.
+_CAN_TYPE_WORDS = COMMONWEALTH_TYPE_WORDS | frozenset(
+    RE_NON_ALPHANUMERIC.sub("", d) for d in ("OUEST", "EST", "NORD", "SUD", "NORD-EST", "NORD-OUEST", "SUD-EST", "SUD-OUEST")
+)
+_CAN_PREFIX_TYPES = frozenset(RE_NON_ALPHANUMERIC.sub("", t).upper() for t in FRENCH_STREET_TYPES)
+_CAN_SUFFIX_DIRECTIONALS = frozenset({
+    "NORTH", "SOUTH", "EAST", "WEST", "NORTHEAST", "NORTHWEST", "SOUTHEAST", "SOUTHWEST", "N", "S", "E", "W", "NE",
+    "NW", "SE", "SW",
+})
+
+# Well-known cities (English and French spellings), used only to find where the city starts in a comma-less line.
+CA_TOWNS = town_set((
+    "TORONTO", "MONTRÉAL", "MONTREAL", "VANCOUVER", "CALGARY", "EDMONTON", "OTTAWA", "WINNIPEG", "QUÉBEC", "QUEBEC",
+    "HAMILTON", "KITCHENER", "LONDON", "VICTORIA", "HALIFAX", "OSHAWA", "WINDSOR", "SASKATOON", "REGINA",
+    "SHERBROOKE", "ST. JOHN'S", "ST JOHNS", "BARRIE", "KELOWNA", "ABBOTSFORD", "KINGSTON", "SUDBURY", "SAGUENAY",
+    "TROIS-RIVIÈRES", "GUELPH", "MONCTON", "BRANTFORD", "THUNDER BAY", "SAINT JOHN", "PETERBOROUGH", "LAVAL",
+    "GATINEAU", "LONGUEUIL", "MISSISSAUGA", "BRAMPTON", "MARKHAM", "VAUGHAN", "RICHMOND HILL", "OAKVILLE", "BURLINGTON",
+    "NORTH YORK", "SCARBOROUGH", "ETOBICOKE", "EAST YORK", "NORTH VANCOUVER", "WEST VANCOUVER", "SURREY",
+    "BURNABY", "RICHMOND", "COQUITLAM", "NEW WESTMINSTER", "LANGLEY", "NANAIMO", "KAMLOOPS", "SAINT-LAURENT",
+    "SAINT-LÉONARD", "SAINT-JEAN-SUR-RICHELIEU", "SAINT-HYACINTHE", "SAINT-JÉRÔME", "SAINT-BRUNO", "LÉVIS",
+    "DRUMMONDVILLE", "GRANBY", "SHAWINIGAN", "RIMOUSKI", "CHICOUTIMI", "JONQUIÈRE", "VERDUN", "LASALLE", "OUTREMONT",
+    "WESTMOUNT", "ANJOU", "LACHINE", "PIERREFONDS", "MONTRÉAL-NORD", "MONTRÉAL-OUEST", "CÔTE-SAINT-LUC", "LÉVIS",
+    "CHARLOTTETOWN", "FREDERICTON", "WHITEHORSE", "YELLOWKNIFE", "IQALUIT", "ST. CATHARINES", "ST CATHARINES",
+    "NIAGARA FALLS", "WATERLOO", "CAMBRIDGE", "SARNIA", "BELLEVILLE", "CORNWALL", "NORTH BAY", "SAULT STE. MARIE",
+    "RED DEER", "LETHBRIDGE", "MEDICINE HAT", "GRANDE PRAIRIE", "FORT MCMURRAY", "ST. ALBERT", "ST ALBERT",
+    "PRINCE GEORGE", "PRINCE ALBERT", "MOOSE JAW", "BRANDON", "SAINT-LAMBERT", "BROSSARD", "TERREBONNE", "REPENTIGNY",
+    "BLAINVILLE", "BOUCHERVILLE", "DORVAL", "KIRKLAND", "POINTE-CLAIRE", "BEACONSFIELD", "MONT-ROYAL", "MONTREAL WEST",
+))
+
+
+def _can_region_suffix(rest: List[str], postal: str) -> Optional[Tuple[int, str]]:
+    """Province words (code or name, English or French) directly before the postal code, accepted only when the
+    postal code's first letter belongs to that province ("Rue Ontario H2L 1R9" keeps "Ontario" in the street)."""
+    for n in (4, 3, 2, 1):
+        if len(rest) > n:
+            code = province_code(" ".join(rest[-n:]))
+            if code and postal.upper()[:1] in _PROVINCE_FSA_LETTERS[code]:
+                return n, code
+    return None
+
+
 def province_code(raw: str) -> Optional[str]:
     """Two-letter province code for a province name or abbreviation in English or French, else None.
 
@@ -158,6 +212,33 @@ class CanadaGrammar(CountryGrammar):
 
     country_iso3: ClassVar[str] = "CAN"
     supported_countries: ClassVar[Tuple[str, ...]] = ("CAN", "CANADA")
+
+    def standardize(
+        self,
+        street1: Optional[str] = None,
+        street2: Optional[str] = None,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        postal_code: Optional[str] = None,
+        country: Optional[str] = None,
+        raw_street_address: Optional[str] = None,
+    ) -> ParsedAddressComponents:
+        """Standardize; a comma-less "683 Abbott Street Vancouver BC V6B 0J4" is split at its province and postal
+        code first."""
+        if street1 and not (city or state or postal_code) and "," not in street1:
+            split = split_commaless_region_postal_city(
+                street1,
+                is_valid_canadian_postal_code,
+                _can_region_suffix,
+                CA_TOWNS,
+                _RE_CAN_TRAILING_COUNTRY,
+                _CAN_TYPE_WORDS,
+                _CAN_SUFFIX_DIRECTIONALS,
+                _CAN_PREFIX_TYPES,
+            )
+            if split is not None:
+                street1, city, state, postal_code = split
+        return super().standardize(street1, street2, city, state, postal_code, country, raw_street_address)
 
     def normalize_postal_code(self, raw_code: str) -> str:
         if not raw_code:

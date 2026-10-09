@@ -112,14 +112,60 @@ def strip_trailing_country(text: str) -> Tuple[str, Optional[str]]:
     return text[:m.start()].rstrip(" ,、"), _TRAILING_COUNTRIES[m.group(1).upper()]
 
 
+# Bare names of Japan's designated cities and Tokyo, as written without the 市 suffix ("810-0001 福岡 天神2-13-7").
+JP_BARE_CITIES = frozenset({
+    "札幌", "仙台", "さいたま", "千葉", "横浜", "川崎", "相模原", "新潟", "静岡", "浜松", "名古屋", "京都", "大阪",
+    "堺", "神戸", "岡山", "広島", "北九州", "福岡", "熊本", "東京",
+})
+RE_JP_MUNICIPALITY = re.compile(r"^(.*?[市区町村郡])(.*)$")
+
+
+def split_jp_tokens(w_tokens: List[str]) -> Optional[Tuple[str, str, str, List[str]]]:
+    """Whitespace-delimited Japanese administrative tokens -> (state, city, dependent locality, remaining tokens).
+
+    Handles the layouts the generic prefecture/city/district reading gets wrong: a designated city followed by its
+    ward ("福岡市 中央区 今泉1-18-25": city 福岡市, ward as dependent locality), a bare or Romanised city name
+    ("福岡 天神2-13-7", "Nagoya 千種区千種3-33-14") and a municipality written together with its town before the street
+    ("名古屋市東区白壁 出来町通4-63-3": the whole first token is the locality). Returns None for anything else.
+    """
+    idx = 0
+    state = ""
+    if w_tokens[0] in JP_PREFECTURES and len(w_tokens) > 1:
+        state, idx = w_tokens[0], 1
+    head, rest = w_tokens[idx], w_tokens[idx + 1:]
+    for pref in JP_PREFECTURES:
+        if head.startswith(pref) and len(head) > len(pref):
+            state, head = pref, head[len(pref):]
+            break
+    if not rest or any(ch.isdigit() for ch in head):
+        return None
+    if head.endswith("市"):
+        if len(rest) >= 2 and _is_district_token(rest[0]) and rest[0].endswith("区"):
+            return state, head, rest[0], rest[1:]
+        return state, head, "", rest
+    # The next token must be a numbered street, not a room/building remnant ("六本木 ヒルズ32階").
+    has_number = any(ch.isdigit() for ch in rest[0]) and not _search_cjk_room(rest[0])
+    if has_number and (head in JP_BARE_CITIES or (head.isascii() and head.isalpha())):
+        return state, head, "", rest
+    m_muni = RE_JP_MUNICIPALITY.match(head)
+    if has_number and m_muni and m_muni.group(2):
+        return state, head, "", rest
+    return None
+
+
 # Korean district at the start of a token: 시/군/구 after at least two syllables, or one of the one-syllable 구 names.
 # ("압구정로38길" must not read "압구" as a district: the marker character occurs inside the road name.)
 RE_KR_DISTRICT = re.compile(r"^((?:[중동서남북]구)|(?:\S{2,}?[시군구]))\s*(.*)$")
 
 # House-number blocks that end a native street line (digits are already ASCII; dashes are "-", "一" or "ー")
-_JP_DASH = r"[-一ー]"
+_JP_DASH = r"[-一ー\u2010-\u2015\u2212]"
 RE_JP_CHOME_BLOCK = re.compile(rf"(?<=[^\d\s])(\d+丁目(?:\d+(?:{_JP_DASH}\d+)*(?:番地?(?:\d+号?)?|号)?)?)$")
 RE_JP_DASHED_BLOCK = re.compile(rf"(?<=[^\d\s\-一ー目])(\d+(?:{_JP_DASH}\d+)+)$")
+# A lone number glued to a road/street name ("石山通1001", "国道230号1281", "末広通り6").
+RE_JP_PLAIN_BLOCK = re.compile(r"(?<=[通り号町道線筋字])(\d+)$")
+# Hokkaido grid addresses ("北1条西17丁目16"): the 条/丁目 blocks name the block, only the trailing number is the house.
+RE_JP_GRID_BLOCK = re.compile(rf"^(.*\d+条[東西南北]\s*\d+丁目)\s*(\d+(?:{_JP_DASH}\d+)*)?$")
+RE_JP_GRID_SPACE = re.compile(r"(\d+条[東西南北])\s+(\d+丁目)")
 RE_JP_BAN_BLOCK = re.compile(r"(?<=[^\d\s目])(\d+番地?(?:\d+号?)?)$")
 RE_TW_NUMBER_TAIL = re.compile(r"^(.*[路街段巷弄道])(\d+(?:之\d+)?(?:-\d+)?[號号]?)$")
 RE_KR_NUMBER_TAIL = re.compile(r"^(.*[로길])(\d+(?:-\d+)?)$")
@@ -129,10 +175,13 @@ def separate_house_number(street: str, country_iso: str) -> str:
     """Put a space between a native street name and the house-number block glued to it.
 
     Japan: "まねき通り1丁目1一6" -> "まねき通り 1丁目1一6" (chome-ban-go block kept verbatim, including its dash).
-    Taiwan: "復興北路231巷34" -> "復興北路231巷 34". Korea: "테헤란로152" -> "테헤란로 152".
+    Hokkaido grid: "北1条西17丁目16" -> "北1条西17丁目 16". Taiwan: "復興北路231巷34" -> "復興北路231巷 34". Korea: "테헤란로152" -> "테헤란로 152".
     """
     if country_iso == "JPN":
-        for pattern in (RE_JP_CHOME_BLOCK, RE_JP_DASHED_BLOCK, RE_JP_BAN_BLOCK):
+        m_grid = RE_JP_GRID_BLOCK.match(RE_JP_GRID_SPACE.sub(r"\1\2", street))
+        if m_grid:
+            return f"{m_grid.group(1)} {m_grid.group(2)}" if m_grid.group(2) else m_grid.group(1)
+        for pattern in (RE_JP_CHOME_BLOCK, RE_JP_DASHED_BLOCK, RE_JP_BAN_BLOCK, RE_JP_PLAIN_BLOCK):
             m = pattern.search(street)
             if m:
                 return f"{street[:m.start()]} {street[m.start():]}"
@@ -362,7 +411,7 @@ class CJKGrammar(CountryGrammar):
             work = s1_raw.strip()
 
             # Extract postal code if present at start or end
-            m_post = re.search(r"(?:〒|\b)(\d{3}-\d{4}|\d{5,6})\b", work)
+            m_post = re.search(r"(?:〒|\b)(\d{3}-\d{4}|\d{7}|\d{5,6})\b", work)
             if m_post and not postal_raw:
                 postal_raw = m_post.group(1)
                 work = work[:m_post.start()] + work[m_post.end():]
@@ -395,10 +444,14 @@ class CJKGrammar(CountryGrammar):
                 and len(w_tokens) >= 2
                 and not _is_district_token(w_tokens[1])
             )
-            if city_level or (len(w_tokens) >= 3 and is_div_token):
-                if city_level:
+            jp_split = split_jp_tokens(w_tokens) if country_iso == "JPN" else None
+            if jp_split or city_level or (len(w_tokens) >= 3 and is_div_token):
+                if jp_split:
+                    state_raw, city_raw, dep_locality, rem_tokens = jp_split
+                    dep_locality = dep_locality or None
+                elif city_level:
                     city_raw = w_tokens[0]
-                    idx = 1
+                    rem_tokens = w_tokens[1:]
                 else:
                     state_raw = w_tokens[0]
                     city_raw = w_tokens[1]
@@ -406,7 +459,7 @@ class CJKGrammar(CountryGrammar):
                     if idx < len(w_tokens) and any(w_tokens[idx].endswith(s) for s in ("区", "區", "县", "縣", "군", "구")) and len(w_tokens) > 3:
                         dep_locality = w_tokens[idx]
                         idx += 1
-                rem_tokens = w_tokens[idx:]
+                    rem_tokens = w_tokens[idx:]
 
                 # Scan rem_tokens for room / building
                 street_tokens = []

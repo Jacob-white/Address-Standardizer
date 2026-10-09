@@ -67,6 +67,7 @@ from address_standardizer.us_street_parser import (  # noqa: E402
 
 from address_standardizer.normalization import (  # noqa: E402
     num_to_ordinal,  # noqa: F401
+    swap_us_city_state,
     get_state_from_zip3,  # noqa: F401
     _clean_token,  # noqa: F401
     normalize_country_code,  # noqa: F401
@@ -582,6 +583,8 @@ def standardize_address(
         if _xr is not None:
             _xr.country(country_raw, country_iso, state_raw, postal_raw, _script_iso)
     is_us =country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
+    if is_us:
+        city_raw, state_raw = swap_us_city_state(city_raw, state_raw)
 
     # Strip terminal sovereign country before US or international parsing if structured components present
     if city_raw or state_raw or postal_raw:

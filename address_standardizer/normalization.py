@@ -328,6 +328,17 @@ def normalize_us_state(state_raw: Optional[str], zip5: Optional[str] = None) -> 
     return res
 
 
+def swap_us_city_state(city: Optional[str], state: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """Repair a city/state pair entered the wrong way round ("city: IL, state: Chicago").
+
+    Only when the city field is a US state (code or name) and the state field is NOT one; "Indiana" + "PA" (a town) and
+    any pair whose state field is a real state stay as given.
+    """
+    if city and state and city.strip(" .").upper() in US_STATES and state.strip(" .").upper() not in US_STATES:
+        return state, city
+    return city, state
+
+
 def normalize_us_postal_code(postal_raw: Optional[str]) -> Tuple[str, str]:
     """Returns (formatted_postal_code, zip5).
 

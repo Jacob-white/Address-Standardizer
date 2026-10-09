@@ -57,6 +57,13 @@ _TYPE_CANON = {
     "ул": "улица", "пр": "проспект", "просп": "проспект", "пер": "переулок", "бул": "бульвар", "вул": "вулиця",
     "пров": "провулок",
 }
+# Canadian French: directionals written out ("Ouest") against the engine's one-letter form ("O"), and the type
+# abbreviation "boul". "e"/"est"/"east" etc. are one class, so English "E" / "East" labels still match. Applied only
+# to records labelled CAN (see street_tokens(french=True)); "o"/"e" alone are not equated anywhere else.
+_FR_CANON = {
+    "o": "west", "ouest": "west", "e": "east", "est": "east", "n": "north", "nord": "north", "s": "south",
+    "sud": "south", "boul": "boulevard",
+}
 _ORDINALS = {
     "first": "1st", "second": "2nd", "third": "3rd", "fourth": "4th", "fifth": "5th", "sixth": "6th",
     "seventh": "7th", "eighth": "8th", "ninth": "9th", "tenth": "10th", "eleventh": "11th", "twelfth": "12th",
@@ -85,7 +92,9 @@ _STATE_CODES = {
 
 def _fold(text: Any) -> str:
     """Casefold, strip accents/combining marks, turn every non-alphanumeric character into a space."""
-    s = unicodedata.normalize("NFKC", str(text or "")).casefold().replace("ß", "ss")
+    # Turkish dotless/dotted i: "ı" (and, after casefold, "İ" -> "i" + combining dot) fold to plain "i", because the
+    # engine upper-cases Kızılırmak to KIZILIRMAK while the label keeps "ı".
+    s = unicodedata.normalize("NFKC", str(text or "")).casefold().replace("ß", "ss").replace("ı", "i")
     s = "".join(ch for ch in unicodedata.normalize("NFKD", s) if unicodedata.category(ch) != "Mn")
     return "".join(ch if unicodedata.category(ch)[0] in "LN" else " " for ch in s)
 
@@ -103,8 +112,10 @@ def _canon_token(tok: str) -> str:
     return tok
 
 
-def street_tokens(text: Any, house_number: str = "") -> List[str]:
-    """Street tokens with the house number removed and street types/directionals canonicalised."""
+def street_tokens(text: Any, house_number: str = "", french: bool = False) -> List[str]:
+    """Street tokens with the house number removed and street types/directionals canonicalised.
+
+    ``french`` additionally applies the Canadian-French directional / "boul" table (_FR_CANON)."""
     hn = "".join(tokens(house_number))
     toks = tokens(text)
     if hn:
@@ -114,6 +125,8 @@ def street_tokens(text: Any, house_number: str = "") -> List[str]:
                 k = next(k for k in range(1, 5) if "".join(toks[i:i + k]) == hn)
                 toks = toks[:i] + toks[i + k:]
                 break
+    if french:
+        toks = [_FR_CANON.get(t, t) for t in toks]
     return [_canon_token(t) for t in toks]
 
 
@@ -182,8 +195,9 @@ def judge_fields(labels: Dict[str, str], pred: Dict[str, Any], unscored: List[st
             else:
                 out[field] = ("wrong" if has_house_number_candidate(street1) else "missing", street1)
         elif field == "street":
-            got = street_tokens(street1, labels.get("house_number", ""))
-            want = street_tokens(label)
+            french = str(labels.get("country") or "").upper() == "CAN"
+            got = street_tokens(street1, labels.get("house_number", ""), french)
+            want = street_tokens(label, "", french)
             if not got:
                 out[field] = ("missing", street1)
             else:

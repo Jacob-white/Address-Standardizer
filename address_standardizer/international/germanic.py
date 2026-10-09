@@ -210,7 +210,7 @@ class GermanicGrammar(CountryGrammar):
             street_line = street_line.strip(" ,")
 
         # Extract secondary unit from s2_raw or street_line
-        st1_base, st2_base = split_intl_secondary_unit(street_line, s2_raw)
+        st1_base, st2_base = split_intl_secondary_unit(street_line, s2_raw, native_types=True)
         if st2_base and not unit_number:
             s2_parts = st2_base.split(maxsplit=1)
             unit_type = s2_parts[0]

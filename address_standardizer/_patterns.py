@@ -156,8 +156,18 @@ FROZEN_SECONDARY_UNIT_VALUES = frozenset(SECONDARY_UNITS.values())
 ROUTE_PREFIXES = frozenset({
     "RTE", "ROUTE", "HWY", "HIGHWAY", "CR", "SR", "RR", "FM", "RM",
     "COUNTY RD", "COUNTY ROAD", "STATE ROUTE", "ROAD", "RD", "CO RD",
-    "RANCH ROAD", "FARM ROAD"
+    "RANCH ROAD", "FARM ROAD", "INTERSTATE", "I", "IH", "US", "SH", "STATE HWY", "STATE HIGHWAY",
 })
+# A bare number after a state name is that state's route number ("Texas 71", "California 1"), never an ordinal.
+ROUTE_STATE_NAMES = frozenset(name for name in US_STATES if len(name) > 2)
+
+
+def is_route_number_prefix(prev: str, prev2: str = "") -> bool:
+    """True when a bare number following `prev` (and the two-word `prev2`) is a route number, not a street ordinal.
+
+    "Highway 35", "Interstate 35 N", "US 90", "SH 71", "State Route 9", "County Road 12", "Texas 71".
+    """
+    return prev in ROUTE_PREFIXES or prev2 in ROUTE_PREFIXES or prev in ROUTE_STATE_NAMES
 
 KNOWN_VALID_SINGLE_WORD_STREETS = frozenset({
     "BROADWAY", "BOWERY", "THE EMBARCADERO", "THE MALL", "WALL", "MALL"

@@ -33,6 +33,7 @@ from address_standardizer._patterns import (
     FROZEN_US_STATE_CODES,
     FROZEN_DIRECTIONAL_VALUES,
     ROUTE_PREFIXES,
+    is_route_number_prefix,
     get_fuzzy_suffix,
     get_fuzzy_directional,
     RE_NON_ALPHANUMERIC,
@@ -182,6 +183,14 @@ def _normalize_fast_street_phrase(phrase: str, enable_fuzzy: bool = True) -> Opt
         return None
     if route_scan and (route_scan[0] in ROUTE_PREFIXES or (len(route_scan) > 1 and f"{route_scan[0]} {route_scan[1]}" in ROUTE_PREFIXES)):
         return None
+
+    # A bare number after a route word anywhere in the name ("N Interstate Highway 35 Service Rd", "Texas 71 Frontage Rd")
+    # is a route number, not an ordinal: Tier 2 handles it.
+    for r_idx in range(len(rem_tokens) - 1):
+        if rem_tokens[r_idx + 1].isdigit() and is_route_number_prefix(
+            rem_tokens[r_idx], f"{rem_tokens[r_idx - 1]} {rem_tokens[r_idx]}" if r_idx else ""
+        ):
+            return None
 
     # Directional ambiguity check: if remaining tokens are just e.g. ['SOUTH', 'ST']
     # 'SOUTH' is the street name, not a directional! Handled by Tier 2 positional grammar.

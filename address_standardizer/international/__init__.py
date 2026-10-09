@@ -37,7 +37,7 @@ from address_standardizer.international.uk import (
 )
 from address_standardizer.international.hong_kong import HongKongGrammar
 from address_standardizer.international.singapore import SingaporeGrammar
-from address_standardizer.international.australia import AustraliaGrammar
+from address_standardizer.international.australia import AustraliaGrammar, NewZealandGrammar
 from address_standardizer.international.india import IndiaGrammar
 from address_standardizer.international.ireland import (
     IrelandGrammar,
@@ -69,6 +69,7 @@ def register_default_grammars() -> None:
     CountryGrammarRegistry.register(HongKongGrammar())
     CountryGrammarRegistry.register(SingaporeGrammar())
     CountryGrammarRegistry.register(AustraliaGrammar())
+    CountryGrammarRegistry.register(NewZealandGrammar())
     CountryGrammarRegistry.register(IndiaGrammar())
     CountryGrammarRegistry.register(IrelandGrammar())
 
@@ -97,6 +98,7 @@ __all__ = [
     "HongKongGrammar",
     "SingaporeGrammar",
     "AustraliaGrammar",
+    "NewZealandGrammar",
     "IndiaGrammar",
     "IrelandGrammar",
     "is_valid_eircode",

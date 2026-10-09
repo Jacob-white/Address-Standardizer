@@ -182,3 +182,35 @@ def test_committed_sample_meets_baseline():
     assert report["n_records"] == baseline["n_records"]
     problems = ev.check_baseline(report, baseline)
     assert not problems, "accuracy on the OSM sample regressed:\n" + "\n".join(problems)
+
+
+def test_turkish_dotted_dotless_i_folds_to_one_letter():
+    assert ev.tokens("Kızılırmak") == ev.tokens("KIZILIRMAK") == ["kizilirmak"]
+    assert ev.tokens("İzmir") == ev.tokens("IZMIR") == ev.tokens("İZMIR") == ["izmir"]
+    # genuinely different streets still differ
+    assert ev.tokens("Kızılırmak") != ev.tokens("Kizilirmak Mah")
+    labels = {"street": "Şair Eşref Bulvarı", "house_number": "63", "country": "TUR"}
+    ok = ev.judge_fields(labels, {"street1": "ŞAIR EŞREF BULVARI 63"}, [])
+    assert ok["street"][0] == "correct"
+    other = ev.judge_fields(labels, {"street1": "ŞAIR EŞREF CADDESI 63"}, [])
+    assert other["street"][0] == "wrong"
+
+
+def test_canadian_french_directionals_and_types():
+    can = {"street": "Avenue Viger Ouest", "house_number": "9", "country": "CAN"}
+    assert ev.judge_fields(can, {"street1": "9 AV VIGER O"}, [])["street"][0] == "correct"
+    assert ev.judge_fields(can, {"street1": "9 AV VIGER OUEST"}, [])["street"][0] == "correct"
+    # a different direction, a different street or a missing directional still mismatch
+    assert ev.judge_fields(can, {"street1": "9 AV VIGER E"}, [])["street"][0] == "wrong"
+    assert ev.judge_fields(can, {"street1": "9 AV VIGER"}, [])["street"][0] == "wrong"
+    assert ev.judge_fields(can, {"street1": "9 AV VIGNEAU O"}, [])["street"][0] == "wrong"
+    boul = {"street": "Boulevard Saint-Laurent Est", "house_number": "1", "country": "CAN"}
+    assert ev.judge_fields(boul, {"street1": "1 BOUL SAINT-LAURENT E"}, [])["street"][0] == "correct"
+    # English labels in Canada keep matching through the same class
+    eng = {"street": "King Street East", "house_number": "5", "country": "CAN"}
+    assert ev.judge_fields(eng, {"street1": "5 KING ST E"}, [])["street"][0] == "correct"
+    # outside Canada "O"/"E" are not equated with Ouest/East
+    fr = {"street": "Rue Haute Ouest", "house_number": "2", "country": "FRA"}
+    assert ev.judge_fields(fr, {"street1": "2 RUE HAUTE O"}, [])["street"][0] == "wrong"
+    assert ev.street_tokens("Rue X Ouest", french=True) == ev.street_tokens("Rue X O", french=True)
+    assert ev.street_tokens("Rue X Ouest") != ev.street_tokens("Rue X O")

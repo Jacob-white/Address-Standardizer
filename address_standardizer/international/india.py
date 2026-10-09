@@ -64,6 +64,15 @@ RE_IN_PINCODE = re.compile(
     r"\b([1-9][0-9]{5})\b",
 )
 
+# A PIN written with a space ("560 001") at the end of the address, optionally before the country name.
+RE_IN_PIN_SPACED = re.compile(
+    r"\b([1-9][0-9]{2})\s([0-9]{3})\b(?=[\s,.]*(?:INDIA|IND|BHARAT)?[\s,.]*$)",
+    re.IGNORECASE,
+)
+
+# Union territories / states that are also the city ("New Delhi 110001"): the locality stays the city.
+IN_CITY_STATES = frozenset({"DELHI", "NEW DELHI", "CHANDIGARH", "PUDUCHERRY", "PONDICHERRY"})
+
 # SEZ, Plot, Sector, Phase, Block patterns
 RE_IN_PLOT = re.compile(
     r"\b(?:PLOT\s+NUMBER\b|PLOT\s+NO\b|PLOT)\.?\s*([0-9A-Za-z\/\-]+)\b",
@@ -91,6 +100,7 @@ class IndiaGrammar(CountryGrammar):
     """India localized address grammar."""
 
     country_iso3: ClassVar[str] = "IND"
+    split_commaless_line: ClassVar[bool] = True
     supported_countries: ClassVar[Tuple[str, ...]] = (
         "IND",
         "IN",
@@ -154,6 +164,11 @@ class IndiaGrammar(CountryGrammar):
             if m_pin:
                 norm_post = m_pin.group(1)
                 combined = combined[:m_pin.start()] + " " + combined[m_pin.end():]
+            else:
+                m_spaced = RE_IN_PIN_SPACED.search(combined)
+                if m_spaced:
+                    norm_post = m_spaced.group(1) + m_spaced.group(2)
+                    combined = combined[:m_spaced.start()] + " " + combined[m_spaced.end():]
 
         # Normalize State
         norm_state = ""
@@ -178,6 +193,14 @@ class IndiaGrammar(CountryGrammar):
 
         combined = re.sub(r"(?:,\s*|\s+)\b(?:INDIA|IND|BHARAT)\b$", "", combined, flags=re.IGNORECASE).strip(" ,.-")
 
+        # "..., New Delhi" / "..., Chandigarh": a city-state in the final locality position is the city (and the state).
+        city_state_head, _, city_state_tail = combined.rpartition(",")
+        if not city_raw and city_state_head and city_state_tail.strip().upper() in IN_CITY_STATES:
+            city_raw = city_state_tail.strip()
+            if not norm_state:
+                norm_state = IN_STATES[city_state_tail.strip().upper()]
+            combined = city_state_head.strip(" ,.-")
+
         # Strip / extract State from combined
         for s_name, s_code in sorted(IN_STATES.items(), key=lambda x: len(x[0]), reverse=True):
             m_s = re.search(rf"\b{re.escape(s_name)}\b", combined, re.IGNORECASE)
@@ -188,11 +211,19 @@ class IndiaGrammar(CountryGrammar):
                 combined = " ".join(combined.strip(" ,.-").split())
                 break
 
+        dep_locality: Optional[str] = None
+
         # Extract city if comma-separated
         if not city_raw and "," in combined:
             st_part, city_part = combined.rsplit(",", 1)
             city_raw = city_part.strip().upper()
             combined = st_part.strip()
+            # "36 Rebello Road, Bandra, Mumbai": letters-only parts between a numbered street and the city are the
+            # sub-locality (dependent locality), not part of the street.
+            head, *middle = [p.strip() for p in combined.split(",") if p.strip()]
+            if head[0].isdigit() and middle and not any(ch.isdigit() for ch in ",".join(middle)):
+                dep_locality = ", ".join(middle).upper()
+                combined = head
 
         # Extract thoroughfare components
         b_name, st_num, st_name = self.extract_premise_and_thoroughfare(combined)
@@ -208,7 +239,7 @@ class IndiaGrammar(CountryGrammar):
             unit_type=u_type,
             unit_number=u_num,
             building_name=b_name,
-            dependent_locality=None,
+            dependent_locality=dep_locality,
             city=city_raw.strip().upper() if city_raw else "",
             state=norm_state,
             postal_code=norm_post or "",

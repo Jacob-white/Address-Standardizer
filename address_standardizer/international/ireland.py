@@ -18,6 +18,7 @@ from address_standardizer._patterns import (
     RE_NON_ALPHANUMERIC,
     is_invalid_thoroughfare,
 )
+from address_standardizer.international.uk import split_commaless_postal_city
 from address_standardizer.international.base import (
     may_abbreviate_street_type,
     street_type_index,
@@ -133,6 +134,16 @@ def is_valid_eircode(code: Optional[str]) -> bool:
     return routing_key in ALL_EIRCODE_ROUTING_KEYS or len(routing_key) == 3
 
 
+_RE_IE_TRAILING_COUNTRY = re.compile(
+    r"\s+(?:REPUBLIC\s+OF\s+IRELAND|IRELAND|EIRE|ÉIRE|IRL|IE)\s*$", re.IGNORECASE
+)
+
+
+def _is_eircode_run(run: str) -> bool:
+    """True for a 7-character Eircode written as "H91 KW97" or "H91KW97" (routing key: letter, digit, alphanumeric)."""
+    return is_valid_eircode(run) and run.split()[0][1:2].isdigit() and len(run.replace(" ", "")) == 7
+
+
 def format_eircode(code: str) -> str:
     """Format 7-character Eircode into canonical 'A65 F4E2' representation."""
     if not code:
@@ -204,6 +215,25 @@ class IrelandGrammar(CountryGrammar):
         "ÉIRE",
         "EIRE",
     )
+
+    def standardize(
+        self,
+        street1: Optional[str] = None,
+        street2: Optional[str] = None,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        postal_code: Optional[str] = None,
+        country: Optional[str] = None,
+        raw_street_address: Optional[str] = None,
+    ) -> ParsedAddressComponents:
+        """Standardize; a comma-less "9 High Street Galway H91 KW97" is split at its trailing Eircode first."""
+        if street1 and not (city or state or postal_code) and "," not in street1:
+            split = split_commaless_postal_city(
+                street1, _is_eircode_run, IR_POST_TOWNS | IR_COUNTY_NAMES, _RE_IE_TRAILING_COUNTRY
+            )
+            if split is not None:
+                street1, city, postal_code = split
+        return super().standardize(street1, street2, city, state, postal_code, country, raw_street_address)
 
     def normalize_postal_code(self, raw_code: str) -> str:
         """Normalize Irish Eircode to canonical form (e.g. D02 X285)."""

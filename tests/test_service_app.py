@@ -260,6 +260,7 @@ def test_metrics_include_latency_histogram_and_per_key_counts():
     client = make_client({"API_KEYS": KEYS})
     client.get("/metrics", headers=auth(KEY_A))
     client.get("/metrics", headers=auth(KEY_A))
+    client.get("/metrics", headers=auth(KEY_B))  # a request is counted after its response, so bravo needs an earlier one
     text = client.get("/metrics?format=prometheus", headers=auth(KEY_B)).text
     assert 'address_standardizer_key_requests_total{key="alpha"}' in text
     assert 'address_standardizer_key_requests_total{key="bravo"}' in text

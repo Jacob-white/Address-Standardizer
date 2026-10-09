@@ -10,15 +10,17 @@ Provides specialized parsing and normalization for Australian addresses:
 from __future__ import annotations
 
 import re
-from typing import ClassVar, Dict, List, Optional, Tuple
+from typing import Callable, ClassVar, Dict, List, Optional, Tuple
 
 from address_standardizer.international.base import (
     may_abbreviate_street_type,
     street_type_index,
     CountryGrammar,
     ParsedAddressComponents,
+    UniversalInternationalGrammar,
     split_intl_secondary_unit,
 )
+from address_standardizer.international.commaless import split_commaless_region_postal_city, town_set
 from address_standardizer.tables import DIRECTIONALS, STREET_SUFFIXES
 
 
@@ -45,6 +47,85 @@ AU_POSTCODE_RANGES: List[Tuple[int, int, str]] = [
     (7000, 7799, "TAS"), (7800, 7999, "TAS"),
     (800, 899, "NT"), (900, 999, "NT"),
 ]
+
+_RE_AU_TRAILING_COUNTRY = re.compile(r"\s+(?:AUSTRALIA|COMMONWEALTH\s+OF\s+AUSTRALIA|AUS|AU)\s*$", re.IGNORECASE)
+_RE_NZ_TRAILING_COUNTRY = re.compile(r"\s+(?:NEW\s+ZEALAND|AOTEAROA|NZL|NZ)\s*$", re.IGNORECASE)
+_RE_FOUR_DIGITS = re.compile(r"\d{4}")
+
+# Well-known cities and suburbs, used only to find where the city starts in a comma-less line (the street-type
+# word is the primary anchor; this list covers multi-word names and names that start with a direction).
+AU_TOWNS = town_set((
+    "LANE COVE", "SYDNEY", "MELBOURNE", "BRISBANE", "PERTH", "ADELAIDE", "HOBART", "DARWIN", "CANBERRA", "GOLD COAST", "NEWCASTLE",
+    "WOLLONGONG", "GEELONG", "CAIRNS", "TOWNSVILLE", "TOOWOOMBA", "BALLARAT", "BENDIGO", "LAUNCESTON", "ALBURY",
+    "WAGGA WAGGA", "MACKAY", "ROCKHAMPTON", "BUNDABERG", "HERVEY BAY", "SUNSHINE COAST", "ALICE SPRINGS", "PARRAMATTA",
+    "NORTH PARRAMATTA", "SOUTH YARRA", "SOUTH BRISBANE", "WEST END", "FORTITUDE VALLEY", "NEW FARM", "HIGHGATE HILL",
+    "SURRY HILLS", "BONDI JUNCTION", "BONDI BEACH", "ST KILDA", "ST LEONARDS", "ST ALBANS", "ST PETERS", "ST IVES",
+    "PORT MELBOURNE", "PORT ADELAIDE", "NORTH SYDNEY", "NORTH MELBOURNE", "WEST MELBOURNE", "SOUTH MELBOURNE",
+    "EAST MELBOURNE", "SOUTHBANK", "DOCKLANDS", "CARLTON", "FITZROY", "RICHMOND", "HAWTHORN", "KEW", "CAMBERWELL",
+    "BOX HILL", "CHATSWOOD", "MANLY", "BLACKTOWN", "PENRITH", "LIVERPOOL", "CAMPBELLTOWN", "HORNSBY", "BURWOOD",
+    "STRATHFIELD", "BANKSTOWN", "HURSTVILLE", "SUTHERLAND", "MOUNT GRAVATT", "MOUNT LAWLEY", "SOUTH PERTH",
+    "EAST PERTH", "WEST PERTH", "NORTH PERTH", "NORTH ADELAIDE", "GLENELG", "PRAHRAN", "SOUTH BANK", "KANGAROO POINT",
+    "SPRING HILL", "PADDINGTON", "WOOLLOOMOOLOO", "DARLINGHURST", "REDFERN", "NEWTOWN", "BALMAIN", "LEICHHARDT",
+    "ULTIMO", "PYRMONT", "HAYMARKET", "THE ROCKS", "MILSONS POINT", "WOOLLOONGABBA", "TOOWONG", "INDOOROOPILLY",
+    "CHERMSIDE", "SOUTHPORT", "SURFERS PARADISE", "BROADBEACH", "FREMANTLE", "SUBIACO", "NORTHBRIDGE", "GLEBE",
+))
+NZ_TOWNS = town_set((
+    "AUCKLAND", "WELLINGTON", "CHRISTCHURCH", "HAMILTON", "TAURANGA", "DUNEDIN", "PALMERSTON NORTH", "NAPIER",
+    "HASTINGS", "NELSON", "ROTORUA", "NEW PLYMOUTH", "WHANGAREI", "INVERCARGILL", "WHANGANUI", "GISBORNE",
+    "QUEENSTOWN", "TIMARU", "BLENHEIM", "TAUPO", "PORIRUA", "LOWER HUTT", "UPPER HUTT", "HUTT", "PONSONBY",
+    "GREY LYNN", "NEWMARKET", "PARNELL", "TE ARO", "KARORI", "KELBURN", "THORNDON", "MOUNT VICTORIA", "MOUNT EDEN",
+    "MOUNT MAUNGANUI", "ST HELIERS", "ST HELENS",
+    "EAST TAMAKI", "MANUKAU", "ONEHUNGA", "PAPAKURA", "TAKAPUNA", "DEVONPORT", "HENDERSON", "NEW LYNN", "AVONDALE",
+    "RICCARTON", "ADDINGTON", "SYDENHAM", "SUMNER", "PAPANUI", "LYTTELTON", "ASHBURTON", "RANGIORA", "KAIAPOI",
+    "OAMARU", "GREYMOUTH", "WESTPORT", "MASTERTON", "PETONE", "ISLAND BAY", "MIRAMAR",
+))
+
+
+def _postcode_in_state(postcode: str, state: str) -> bool:
+    """True when the 4-digit postcode lies in one of the ranges of the (already normalised) state code."""
+    if not postcode or not state or not postcode.isdigit():
+        return False
+    p_int = int(postcode)
+    return any(p_min <= p_int <= p_max and s_exp == state for p_min, p_max, s_exp in AU_POSTCODE_RANGES)
+
+
+_PLACE_NAME_PREFIXES = frozenset({"MOUNT", "MT", "PORT", "LAKE", "NORTH", "SOUTH", "EAST", "WEST", "NEW", "ST", "SAINT", "CAPE", "POINT"})
+
+
+def _au_region_suffix(rest: List[str], postal: str) -> Optional[Tuple[int, str]]:
+    """State words (code or full name) directly before the postcode, accepted only when the postcode is in range."""
+    for n in (3, 2, 1):
+        if len(rest) > n:
+            key = " ".join(rest[-n:]).upper().replace(".", "")
+            code = AU_STATES.get(key)
+            # "Mount Victoria 3000": a full state name that is the tail of a place name is the suburb, not the state
+            if key != code and rest[-n - 1].upper() in _PLACE_NAME_PREFIXES:
+                continue
+            if code and _postcode_in_state(postal, code):
+                return n, code
+    return None
+
+
+def _four_digits(candidate: str) -> bool:
+    return _RE_FOUR_DIGITS.fullmatch(candidate) is not None
+
+
+def _split_commaless_au_nz(
+    street1: Optional[str],
+    city: Optional[str],
+    state: Optional[str],
+    postal_code: Optional[str],
+    country_tail: "re.Pattern[str]",
+    towns: set,
+    region_suffix: Optional[Callable[[List[str], str], Optional[Tuple[int, str]]]],
+) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """Comma-less split of an unstructured single-line AU / NZ input; returns the possibly updated fields."""
+    if street1 and not (city or state or postal_code) and "," not in street1:
+        split = split_commaless_region_postal_city(street1, _four_digits, region_suffix, towns, country_tail)
+        if split is not None:
+            return split
+    return street1, city, state, postal_code
+
 
 # Slash unit pattern: e.g. "5/100 GEORGE ST", "U5/100 GEORGE ST", "LEVEL 15/225 GEORGE ST"
 RE_AU_SLASH_UNIT = re.compile(
@@ -89,16 +170,26 @@ class AustraliaGrammar(CountryGrammar):
             return m.group(1)
         return ""
 
+    def standardize(
+        self,
+        street1: Optional[str] = None,
+        street2: Optional[str] = None,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        postal_code: Optional[str] = None,
+        country: Optional[str] = None,
+        raw_street_address: Optional[str] = None,
+    ) -> ParsedAddressComponents:
+        """Standardize; a comma-less "14 Gray Court Adelaide SA 5000" is split at its state and postcode first."""
+        street1, city, state, postal_code = _split_commaless_au_nz(
+            street1, city, state, postal_code, _RE_AU_TRAILING_COUNTRY, AU_TOWNS, _au_region_suffix
+        )
+        return super().standardize(street1, street2, city, state, postal_code, country, raw_street_address)
+
     def validate_postcode_state(self, postcode: str, state: str) -> bool:
         """Check if 4-digit postcode falls into the designated state range."""
-        if not postcode or not state or not postcode.isdigit():
-            return False
-        p_int = int(postcode)
-        st_norm = AU_STATES.get(state.upper(), state.upper())
-        for p_min, p_max, s_exp in AU_POSTCODE_RANGES:
-            if p_min <= p_int <= p_max and s_exp == st_norm:
-                return True
-        return False
+        st_norm = (state or "").upper()
+        return _postcode_in_state(postcode, AU_STATES.get(st_norm, st_norm))
 
     def extract_premise_and_thoroughfare(
         self, street_line: str
@@ -282,3 +373,26 @@ class AustraliaGrammar(CountryGrammar):
             raw_tokens=raw_tokens,
             confidence_score=0.95,
         )
+
+
+class NewZealandGrammar(UniversalInternationalGrammar):
+    """New Zealand: the universal grammar plus a comma-less "134 Willis Street Wellington 6011" split."""
+
+    country_iso3: ClassVar[str] = "NZL"
+    supported_countries: ClassVar[Tuple[str, ...]] = ("NZL", "NZ", "NEW ZEALAND", "AOTEAROA")
+
+    def standardize(
+        self,
+        street1: Optional[str] = None,
+        street2: Optional[str] = None,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        postal_code: Optional[str] = None,
+        country: Optional[str] = None,
+        raw_street_address: Optional[str] = None,
+    ) -> ParsedAddressComponents:
+        """Standardize; New Zealand has no state, so only city and the 4-digit postcode are split off."""
+        street1, city, state, postal_code = _split_commaless_au_nz(
+            street1, city, state, postal_code, _RE_NZ_TRAILING_COUNTRY, NZ_TOWNS, None
+        )
+        return super().standardize(street1, street2, city, state, postal_code, country, raw_street_address)

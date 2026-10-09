@@ -104,6 +104,7 @@ class MenaAfricaGrammar(CountryGrammar):
     """Regional grammar family for Middle East & Africa jurisdictions."""
 
     country_iso3: ClassVar[str] = "ARE"
+    split_commaless_line: ClassVar[bool] = True
     supported_countries: ClassVar[Tuple[str, ...]] = (
         "ARE", "UNITED ARAB EMIRATES", "UAE",
         "SAU", "SAUDI ARABIA", "KSA",

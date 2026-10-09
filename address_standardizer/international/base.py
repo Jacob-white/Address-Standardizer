@@ -3,6 +3,7 @@
 import abc
 from dataclasses import dataclass, field
 import re
+import unicodedata
 from typing import ClassVar, Dict, List, Optional, Set, Tuple
 
 from address_standardizer._patterns import (
@@ -83,20 +84,39 @@ def normalize_dashes(text: str) -> str:
     return text.translate(_DASH_TRANSLATION)
 
 
-def _postal_run(run: str, country_iso: str) -> Optional[str]:
-    """Postal code recognised in a short word run: the country's pattern, plus Portugal's space-separated "1150 011"."""
+_ARG_COUNTRIES = ("ARG", "AR", "ARGENTINA")
+_PRT_COUNTRIES = ("PRT", "PT", "PORTUGAL")
+_RE_ARG_CPA_WORD = re.compile(r"[A-Za-z]\d{4}(?:[A-Za-z]{3})?")
+_RE_NUMBER_WORD = re.compile(r"\d+[A-Za-z]?")
+_IND_COUNTRIES = ("IND", "IN", "INDIA")
+
+
+def _postal_run(run: str, country_iso: str, prev: str = "", nxt: str = "") -> Optional[str]:
+    """Postal code recognised in a short word run: the country's pattern, plus Portugal's space-separated "1150 011",
+    Argentina's "X5000" CPA and the bare four-digit Argentine/Portuguese codes (only right after a house number)."""
     from address_standardizer.international.postal import extract_postal_code
 
-    if country_iso in ("PRT", "PT", "PORTUGAL") and re.fullmatch(r"\d{4} \d{3}", run):
+    if country_iso in _PRT_COUNTRIES and re.fullmatch(r"\d{4} \d{3}", run):
         return run
-    return extract_postal_code(run, country_iso)
+    if country_iso in _IND_COUNTRIES and re.fullmatch(r"[1-9]\d{2} \d{3}", run):  # PIN written "560 001"
+        return run
+    found = extract_postal_code(run, country_iso)
+    if found:
+        return found
+    if country_iso in _ARG_COUNTRIES and _RE_ARG_CPA_WORD.fullmatch(run):
+        return run
+    if country_iso in _ARG_COUNTRIES + _PRT_COUNTRIES and re.fullmatch(r"\d{4}", run) and (
+        _RE_NUMBER_WORD.fullmatch(prev) and not re.fullmatch(r"\d{3}", nxt)  # ("1150 011" is one postal code)
+    ):
+        return run
+    return None
 
 
 def _squash(value: str) -> str:
     return re.sub(r"[\W_]", "", value).upper()
 
 
-_RE_HOUSE_NUMBER_WORD = re.compile(r"^\d+[A-Za-z]?(?:[/-]\d+[A-Za-z]?)?$")
+_RE_HOUSE_NUMBER_WORD = re.compile(r"^\d+[A-Za-z]?(?:[/-](?:\d+[A-Za-z]?|[A-Za-z]))?$")
 _LOCALITY_CONNECTORS = frozenset({"DE", "DA", "DO", "DAS", "DOS", "DEL", "DI", "OF", "THE", "LA", "LE", "EL"})
 
 
@@ -105,16 +125,109 @@ def _split_trailing_postal_locality(words: List[str], country_iso: str) -> Optio
     for width in (1, 2):
         run = words[len(words) - width:]
         rest = words[:len(words) - width]
-        pc = _postal_run(" ".join(run), country_iso) if len(rest) >= 3 else None
+        pc = _postal_run(" ".join(run), country_iso, rest[-1] if rest else "") if len(rest) >= 3 else None
         if not pc or _squash(pc) != _squash("".join(run)):
             continue
         numbers = [i for i, w in enumerate(rest) if _RE_HOUSE_NUMBER_WORD.match(w)]
         if not numbers or not 1 <= len(rest) - numbers[-1] - 1 <= 3:
             continue
         city_words = rest[numbers[-1] + 1:]
+        # ("83 Tilok Utis 2 road ...": a street-type word right after the number means the number is part of the name)
+        if RE_NON_ALPHANUMERIC.sub("", city_words[0]).upper() in _SUFFIX_TYPE_WORDS:
+            continue
         if city_words[0].upper() in _LOCALITY_CONNECTORS or not re.search(r"[^\W\d_]", " ".join(rest[:numbers[-1]])):
             continue
         return " ".join(rest[:numbers[-1] + 1]), " ".join(city_words), " ".join(run)
+    return None
+
+
+_RE_LEADING_NUMBER_WORD = re.compile(r"^(?:NO\.?)?\d+[A-Za-z]?(?:[/-]\d+[A-Za-z]?)*$", re.IGNORECASE)
+# Arabic street-type words open the street ("25 شارع شريف باشا القاهرة"): the city is then the last word.
+_PREFIX_TYPE_WORDS = frozenset({"شارع", "طريق", "ميدان", "حارة", "زقاق", "كورنيش", "الشارع"})
+_CITY_FIRST_WORDS = frozenset({"مدينة", "مدينه", "NEW", "PORT", "SAINT", "SAN", "SIDI", "MADINAT"})
+_THAI_PREFIX_TYPES = ("ถนน", "ซอย")
+_LATIN_PREFIX_TYPES = frozenset({"SOI", "THANON"})  # Thai streets written "Soi Buakhao"
+
+
+def _is_city_word(word: str) -> bool:
+    """A name word: letters (including combining marks, e.g. Thai vowels) plus hyphens, apostrophes and dots; no digits."""
+    return (
+        any(ch.isalpha() for ch in word)
+        and all(ch.isalpha() or unicodedata.category(ch).startswith("M") or ch in "-'’." for ch in word)
+    )
+
+
+def _postal_end_run(words: List[str], country_iso: str) -> Optional[Tuple[List[str], List[str]]]:
+    """(street+city words, postal words) when the line ends with one or two words forming the country's postal code."""
+    for width in (1, 2):
+        run = words[len(words) - width:]
+        rest = words[:len(words) - width]
+        if len(rest) < 3:
+            continue
+        pc = _postal_run(" ".join(run), country_iso, rest[-1])
+        if pc and _squash(pc) == _squash("".join(run)):
+            return rest, run
+    return None
+
+
+def _city_words_ok(tail: List[str]) -> bool:
+    first = RE_NON_ALPHANUMERIC.sub("", tail[0]).upper()
+    return 1 <= len(tail) <= 3 and first not in _DIRECTIONAL_OR_MODIFIER and all(_is_city_word(w) for w in tail)
+
+
+def _split_number_first_postal_last(words: List[str], country_iso: str) -> Optional[Tuple[str, str, str]]:
+    """"12 High Road City POSTCODE": the street ends at its last street-type word (Road, Marg, ...), or, for
+    streets that open with a type word (Arabic "شارع", Thai "ถนน"), the city is what follows the street name.
+    None when no anchor is found: precision over recall."""
+    ends = _postal_end_run(words, country_iso)
+    if ends is None or not _RE_LEADING_NUMBER_WORD.match(ends[0][0]):
+        return None
+    rest, run = ends
+    postal = " ".join(run)
+    for k in range(len(rest) - 2, 1, -1):
+        word = RE_NON_ALPHANUMERIC.sub("", rest[k]).upper()
+        if word not in _SUFFIX_TYPE_WORDS:
+            continue
+        tail = rest[k + 1:]
+        if _city_words_ok(tail):  # (k <= len(rest) - 2: the tail is never empty)
+            return " ".join(rest[:k + 1]), " ".join(tail), postal
+        return None
+    head = rest[1]
+    if head in _PREFIX_TYPE_WORDS and len(rest) >= 4:
+        city = rest[-1]
+        if _is_city_word(city) and RE_NON_ALPHANUMERIC.sub("", rest[-2]).upper() not in _CITY_FIRST_WORDS:
+            return " ".join(rest[:-1]), city, postal
+        return None
+    end = 0
+    if head.upper() in _LATIN_PREFIX_TYPES and len(rest) >= 4:
+        end = 4 if rest[3:] and rest[3].isdigit() else 3
+    elif head.startswith(_THAI_PREFIX_TYPES) and len(head) > 3:
+        end = 2
+    tail = rest[end:]
+    if end and tail and _city_words_ok(tail):
+        return " ".join(rest[:end]), " ".join(tail), postal
+    return None
+
+
+def _split_postal_first(words: List[str], country_iso: str) -> Optional[Tuple[str, str, str]]:
+    """"1054 Budapest Zoltán utca 16": postal code, one-word city, then a street that ends with its house number."""
+    for width in (1, 2):
+        run = words[:width]
+        rest = words[width:]
+        if len(rest) < 3:
+            continue
+        pc = _postal_run(" ".join(run), country_iso, "", rest[0])
+        if pc and _squash(pc) == _squash("".join(run)):
+            break
+    else:
+        return None
+    city, street = rest[0], rest[1:]
+    if (
+        _is_city_word(city)
+        and _RE_HOUSE_NUMBER_WORD.match(street[-1])
+        and re.search(r"[^\W\d_]", " ".join(street[:-1]))
+    ):
+        return " ".join(street), city, " ".join(run)
     return None
 
 
@@ -123,9 +236,15 @@ def split_commaless_locality(text: str, country_iso: str) -> Optional[Tuple[str,
 
     The postal code is a one- or two-word run that the country's postal pattern recognises *and* that is followed by
     a locality of one to four words; the nearest such run to the end of the line wins. Everything before it must hold
-    a letter (a street) so that a lone "Postcode City" is left to the caller.
+    a letter (a street) so that a lone "Postcode City" is left to the caller. When no such run exists the other
+    layouts are tried: number-first with the code last ("98 Hill Road Mumbai 400050") and code-first
+    ("1054 Budapest Zoltán utca 16").
     """
     words = (text or "").split()
+    if len(words) > 1 and words[1] in _PREFIX_TYPE_WORDS:  # "122 شارع 26 يوليو Cairo 11211": "26" is not the house number
+        number_first = _split_number_first_postal_last(words, country_iso)
+        if number_first is not None:
+            return number_first
     trailing = _split_trailing_postal_locality(words, country_iso)
     if trailing is not None:
         return trailing
@@ -133,15 +252,15 @@ def split_commaless_locality(text: str, country_iso: str) -> Optional[Tuple[str,
         for width in (1, 2):
             run = words[start:start + width]
             locality = words[start + width:]
-            if len(run) < width or not 1 <= len(locality) <= 4:
+            if len(run) < width or not 1 <= len(locality) <= 5:
                 continue
-            pc = _postal_run(" ".join(run), country_iso)
+            pc = _postal_run(" ".join(run), country_iso, words[start - 1], locality[0])
             if not pc or _squash(pc) != _squash("".join(run)):
                 continue
             street = " ".join(words[:start])
             if re.search(r"[^\W\d_]", street) and re.search(r"[^\W\d_]", " ".join(locality)):
                 return street, " ".join(locality), " ".join(run)
-    return None
+    return _split_number_first_postal_last(words, country_iso) or _split_postal_first(words, country_iso)
 
 
 # Articles/particles that are part of a name and never street types ("Al Olaya", "El Camino").
@@ -156,6 +275,12 @@ UNAMBIGUOUS_STREET_TYPES = frozenset({
     "CRESCENT", "CRES", "WAY", "GARDENS", "GDNS",
 })
 _TRAILING_MODIFIERS = frozenset({"LOWER", "UPPER", "LR", "UPR", "CENTRAL", "EXTENSION", "EXT"})
+_DIRECTIONAL_OR_MODIFIER = frozenset(DIRECTIONALS) | _TRAILING_MODIFIERS
+# Street types that end a street name written number-first ("98 Hill Road Mumbai 400050").
+_SUFFIX_TYPE_WORDS = UNAMBIGUOUS_STREET_TYPES | frozenset({
+    "CLOSE", "GROVE", "MEWS", "QUAY", "PARADE", "RISE", "WALK", "MALL", "MARG", "PATH", "CROSS", "ROW", "BYPASS",
+    "LOOP", "SOI", "MOO",
+})
 
 
 def street_type_index(words: List[str]) -> Set[int]:
@@ -190,8 +315,14 @@ def may_abbreviate_street_type(clean_word: str, idx: int, type_indices: Set[int]
 _LEADING_STREET_TYPES = frozenset({"AV", "AVE", "AVENUE", "AVDA", "AVENIDA", "AVN", "BLVD", "BOULEVARD", "BLV"})
 
 
-def split_intl_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
-    """Helper to detect and split secondary unit in international street string, and normalize suffixes."""
+def split_intl_secondary_unit(street1: str, street2: str, *, native_types: bool = False) -> Tuple[str, str]:
+    """Helper to detect and split secondary unit in international street string, and normalize suffixes.
+
+    `native_types=True` is for non-English street lines (Romance, Germanic, Eastern European, Latin American): the
+    English/US suffix table is then not applied to the terminal or inner words, so a French "Rue de la Course" is not
+    abbreviated to "CRSE" and "Rue de la Station" does not become "STA"; only the leading Avenida/Boulevard-style
+    type words that those countries write first are still abbreviated.
+    """
     st1 = (street1 or "").upper()
     st2 = (street2 or "").upper()
 
@@ -268,7 +399,7 @@ def split_intl_secondary_unit(street1: str, street2: str) -> Tuple[str, str]:
         elif w_clean in _LEADING_STREET_TYPES and len(words) > 1 and (idx == 0 or (idx == 1 and words[0][:1].isdigit())):
             # Spanish/Portuguese-style addresses put the type first ("Av. Vallarta 1300").
             norm_words.append(STREET_SUFFIXES.get(w_clean, w))
-        elif w_clean in STREET_SUFFIXES and may_abbreviate_street_type(w_clean, idx, type_indices):
+        elif not native_types and w_clean in STREET_SUFFIXES and may_abbreviate_street_type(w_clean, idx, type_indices):
             # Only the terminal word is a street type; abbreviating place-name words inside the street name
             # ("Orchard Road" -> "ORCH RD", "Mill Lane" -> "ML LN") corrupts real street names.
             norm_words.append(STREET_SUFFIXES[w_clean])
@@ -424,6 +555,7 @@ class UniversalInternationalGrammar(CountryGrammar):
     """Universal fallback grammar for jurisdictions without a specialized grammar."""
 
     country_iso3: ClassVar[str] = "ZZZ"
+    split_commaless_line: ClassVar[bool] = True
     supported_countries: ClassVar[Tuple[str, ...]] = ()
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -451,6 +583,7 @@ class UniversalInternationalGrammar(CountryGrammar):
 
         norm_s1 = ""
         norm_s2 = ""
+        dep_locality: Optional[str] = None
 
         # Comma-delimited single string parsing when city_raw is empty
         if not city_raw and s1_raw and "," in s1_raw:
@@ -537,6 +670,15 @@ class UniversalInternationalGrammar(CountryGrammar):
                     norm_s1 = norm_s1_base
                     norm_s2 = norm_s2_base
         else:
+            if city_raw and "," in s1_raw:
+                # "217/27 Moo 9 Beach Rd., Nongprue, Banglamung" + city: letters-only parts after a numbered street
+                # are the sub-locality (dependent locality), not part of the street.
+                s1_parts = [p.strip() for p in s1_raw.split(",") if p.strip()]
+                if len(s1_parts) >= 2 and s1_parts[0][0].isdigit() and not any(
+                    ch.isdigit() for ch in ",".join(s1_parts[1:])
+                ):
+                    dep_locality = ", ".join(s1_parts[1:]).upper()
+                    s1_raw = s1_parts[0]
             norm_s1_base = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", s1_raw).strip().upper())
             norm_s2_base = RE_WHITESPACE.sub(" ", RE_COMMA_DOT.sub(" ", s2_raw).strip().upper())
             norm_s1, norm_s2 = split_intl_secondary_unit(norm_s1_base, norm_s2_base)
@@ -558,6 +700,7 @@ class UniversalInternationalGrammar(CountryGrammar):
             street_name=norm_s1 if norm_s1 else None,
             unit_type=unit_t,
             unit_number=unit_n,
+            dependent_locality=dep_locality,
             city=norm_city if norm_city else None,
             state=norm_state if norm_state else None,
             postal_code=norm_postal if norm_postal else None,

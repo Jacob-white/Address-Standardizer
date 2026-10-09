@@ -48,7 +48,7 @@ from address_standardizer._patterns import (
     RE_PR_HIGHWAY,
     FROZEN_DIRECTIONAL_VALUES,
     FROZEN_US_STATE_CODES,
-    ROUTE_PREFIXES,
+    is_route_number_prefix,
     MULTI_WORD_CITIES,
     STANDALONE_SEC_UNITS,
     get_fuzzy_suffix,
@@ -232,7 +232,7 @@ def _rule_based_us_street_parse(address_str: str, enable_fuzzy: bool = True) -> 
             # Check route prefix exclusion
             prev = norm_tokens[-1] if norm_tokens else ""
             prev2 = f"{norm_tokens[-2]} {prev}" if len(norm_tokens) >= 2 else ""
-            if prev not in ROUTE_PREFIXES and prev2 not in ROUTE_PREFIXES and j + 1 < len(rem_tokens) and (rem_tokens[j+1] in STREET_SUFFIXES or (enable_fuzzy and get_fuzzy_suffix(rem_tokens[j+1]))):
+            if not is_route_number_prefix(prev, prev2) and j + 1 < len(rem_tokens) and (rem_tokens[j+1] in STREET_SUFFIXES or (enable_fuzzy and get_fuzzy_suffix(rem_tokens[j+1]))):
                 norm_tokens.append(num_to_ordinal(int(t)))
             else:
                 norm_tokens.append(t)
@@ -289,6 +289,22 @@ def _ordinal_floor_to_unit(match: "re.Match[str]") -> str:
 
 
 _RE_NUMBERED_STREET = re.compile(r"^\d+[A-Za-z]?\s+[A-Za-z]")
+# "..., IL, Chicago 60614": state and city written the wrong way round before the ZIP.
+_RE_SWAPPED_STATE_CITY = re.compile(
+    r",\s*([A-Za-z][A-Za-z .]*?)\s*,\s*([A-Za-z][A-Za-z .'\-]*?)\s+(\d{5}(?:-\d{4})?)\s*$"
+)
+
+
+def _unswap_state_city(text: str) -> str:
+    """Rewrite "..., IL, Chicago 60614" as "..., Chicago, IL 60614"; anything else (a city that already ends in a
+    state code, a first part that is not a US state) is returned untouched."""
+    m = _RE_SWAPPED_STATE_CITY.search(text)
+    if not m or m.group(1).strip(" .").upper() not in US_STATES:
+        return text
+    city = m.group(2)
+    if city.split()[-1].upper() in FROZEN_US_STATE_CODES:
+        return text
+    return f"{text[:m.start()]}, {city}, {m.group(1).strip(' .')} {m.group(3)}"
 
 
 def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_raw: str = "") -> Tuple[str, str, bool, str, str, str]:
@@ -296,6 +312,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
     clean_input = _pre_normalize_address_string(address_str)
     # "Third Fl" / "3rd Floor" is a unit, not a place name + the state FL: rewrite to "FL 3" before the CRF sees it.
     clean_input = _RE_ORDINAL_FLOOR.sub(_ordinal_floor_to_unit, clean_input)
+    clean_input = _unswap_state_city(clean_input)
 
     # Check for Puerto Rico Urbanization prefix
     urb_prefix = ""
@@ -510,7 +527,7 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
             elif clean.isdigit() and 1 <= int(clean) <= 999:
                 prev = street_parts[-1] if street_parts else ""
                 prev2 = f"{street_parts[-2]} {prev}" if len(street_parts) >= 2 else ""
-                if prev not in ROUTE_PREFIXES and prev2 not in ROUTE_PREFIXES:
+                if not is_route_number_prefix(prev, prev2):
                     street_parts.append(num_to_ordinal(int(clean)))
                 else:
                     street_parts.append(clean)
@@ -851,7 +868,7 @@ _ROUTE_NAME_WORDS = frozenset({
     "COUNTY", "CO", "STATE", "ST", "ROUTE", "RTE", "RT", "HIGHWAY", "HWY", "INTERSTATE", "US", "FM", "RM", "CR", "SR",
     "FARM", "MARKET", "RANCH", "FOREST", "FOREST SERVICE", "FS", "NATIONAL", "TOWNSHIP", "TWP", "BYPASS",
 })
-_RE_FARM_TO_MARKET = re.compile(r"\bFARM[\s-]+TO[\s-]+MARKET\s+(?:ROAD|RD)\s+(\d+)\b", re.IGNORECASE)
+_RE_FARM_TO_MARKET = re.compile(r"\bFARM[\s-]+TO[\s-]+MARKET\s+(?:(?:ROAD|RD)\s+)?(\d+)\b", re.IGNORECASE)
 _RE_TRAILING_HOUSE_NUMBER = re.compile(r"^(?P<street>[A-Za-z][A-Za-z.'\- ]*?)\s+(?P<num>\d{1,6}[A-Za-z]?)$")
 
 

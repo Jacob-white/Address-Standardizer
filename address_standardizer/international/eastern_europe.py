@@ -40,7 +40,7 @@ RE_EE_HOUSE_NUM = re.compile(
 )
 
 # Countries whose single-line addresses are written "[postcode] City, Street type-name, number" (city first, no marker).
-_CITY_FIRST_COUNTRIES = frozenset({"RUS", "UKR", "BGR", "SRB"})
+_CITY_FIRST_COUNTRIES = frozenset({"RUS", "UKR", "BGR", "SRB", "HUN"})
 
 # Cyrillic street-type words (lower case, trailing dot removed): full words and common abbreviations.
 _CYR_STREET_TYPES = frozenset({
@@ -58,6 +58,11 @@ _RE_STANDALONE_HOUSE = re.compile(
     r"^\d+(?:[/\-]\d+)*(?:[\s\-]?[^\W\d_]{1,2}\.?\d*)?(?:\s+[^\W\d_]{1,6}\.?\s?\d+)*$"
 )
 _RE_LEADING_POSTAL = re.compile(r"^(\d{5,6})[\s,]+(.+)$")
+# A comma part that opens with a postal code and a (letter) city name: "15000 Praha 5", "4029 Debrecen", "110 00 Praha 1".
+# Such a part is never a bare house number even though "Praha 5" resembles "15 с2".
+_RE_POSTAL_THEN_NAME = re.compile(r"^(?:\d{2}-\d{3}|\d{3}\s?\d{2}|\d{4,6})\s+[^\W\d_]{3,}")
+# Hungary writes "<postcode> City, Street type-name number[.]": a four-digit postcode opens the first part.
+_RE_HU_POSTAL_FIRST = re.compile(r"^(\d{4})\s+([^\W\d_].*)$")
 
 
 def _type_word_index(words: List[str]) -> int:
@@ -113,8 +118,10 @@ class EasternEuropeGrammar(CountryGrammar):
     """Regional grammar family for Eastern Europe & Cyrillic jurisdictions."""
 
     country_iso3: ClassVar[str] = "POL"
+    split_commaless_line: ClassVar[bool] = True
     supported_countries: ClassVar[Tuple[str, ...]] = (
         "POL", "POLAND", "POLSKA", "PL",
+        "HUN", "HUNGARY", "MAGYARORSZAG", "MAGYARORSZÁG", "HU",
         "CZE", "CZECH REPUBLIC", "CZECHIA", "CESKA REPUBLIKA", "ČESKÁ REPUBLIKA", "CZ",
         "ROU", "ROMANIA", "ROMÂNIA", "RO",
         "GRC", "GREECE", "HELLAS", "ELLADA", "ΕΛΛΑΔΑ", "ΕΛΛΆΔΑ", "ΕΛΛΑΣ", "ΕΛΛΆΣ", "GR",
@@ -192,6 +199,8 @@ class EasternEuropeGrammar(CountryGrammar):
         c = country_cand.strip().upper()
         if c in ("POL", "POLAND", "POLSKA", "PL"):
             return "POL"
+        if c in ("HUN", "HUNGARY", "MAGYARORSZAG", "MAGYARORSZÁG", "HU"):
+            return "HUN"
         if c in ("CZE", "CZECH REPUBLIC", "CZECHIA", "CESKA REPUBLIKA", "ČESKÁ REPUBLIKA", "CZ"):
             return "CZE"
         if c in ("ROU", "ROMANIA", "ROMÂNIA", "RO"):
@@ -258,11 +267,21 @@ class EasternEuropeGrammar(CountryGrammar):
                 unit_number = " ".join(sec_units)
 
             # A trailing bare house number belongs to the street part before it ("Street, 12" is not a city).
-            if len(rem_parts) >= 2 and _RE_STANDALONE_HOUSE.match(rem_parts[-1]):
+            if (
+                len(rem_parts) >= 2
+                and _RE_STANDALONE_HOUSE.match(rem_parts[-1])
+                and not _RE_POSTAL_THEN_NAME.match(rem_parts[-1])
+            ):
                 house_part = rem_parts.pop()
                 rem_parts[-1] = f"{rem_parts[-1]}, {house_part}"
 
-            if (
+            m_hu = _RE_HU_POSTAL_FIRST.match(rem_parts[0]) if country_iso == "HUN" and len(rem_parts) >= 2 else None
+            if m_hu:
+                # "1054 Budapest, Zoltán utca 16": postcode, city, then the street (type word after the name).
+                postal_raw = m_hu.group(1)
+                city_raw = m_hu.group(2)
+                street_line = ", ".join(rem_parts[1:]).rstrip(".")
+            elif (
                 len(rem_parts) >= 2
                 and country_iso in _CITY_FIRST_COUNTRIES
                 and not _is_street_like(rem_parts[0])
@@ -328,7 +347,7 @@ class EasternEuropeGrammar(CountryGrammar):
                 unit_number = f"{inline_unit} {unit_number}"
 
         # Extract secondary unit via split_intl_secondary_unit (kept alongside any street2 unit)
-        st1_base, st2_base = split_intl_secondary_unit(street_line, "")
+        st1_base, st2_base = split_intl_secondary_unit(street_line, "", native_types=True)
         if st2_base and not unit_number:
             s2_p = st2_base.split(maxsplit=1)
             unit_type = s2_p[0]

@@ -240,6 +240,16 @@ def parse_street2_unit(
     return None, unit_text(s)
 
 
+_RE_POSTAL_CITY = re.compile(r"^(\d{5}(?:-\d{3})?|\d{4}[- ]\d{3})\s+(.*)$")
+# Portugal also writes the bare four-digit postal area before the city: "4000 Porto".
+_RE_POSTAL_CITY_PRT = re.compile(r"^(\d{5}(?:-\d{3})?|\d{4}[- ]\d{3}|\d{4})\s+([^\W\d_].*)$")
+
+
+def _postal_city_re(country_iso: str) -> "re.Pattern[str]":
+    """Pattern for a "<postcode> <city>" comma part in the given country."""
+    return _RE_POSTAL_CITY_PRT if country_iso in ("PRT", "PT", "PORTUGAL") else _RE_POSTAL_CITY
+
+
 class RomanceGrammar(CountryGrammar):
     """Romance and Latin American address grammar with prefix road types and colonias."""
 
@@ -375,14 +385,14 @@ class RomanceGrammar(CountryGrammar):
             elif len(rem_parts) >= 3:
                 # e.g. "Av. Insurgentes Sur 1602", "03940 Ciudad de México", "CDMX"
                 # OR "142 Boulevard Saint-Germain", "Quartier Latin", "75006 Paris"
-                m_pc_last = re.match(r"^(\d{5}(?:-\d{3})?|\d{4}[- ]\d{3})\s+(.*)$", rem_parts[-1])
+                m_pc_last = _postal_city_re(country_iso).match(rem_parts[-1])
                 if m_pc_last:
                     postal_raw = m_pc_last.group(1)
                     city_raw = m_pc_last.group(2)
                     street_line = ", ".join(rem_parts[:-1])
                 else:
                     state_raw = rem_parts[-1]
-                    m_pc = re.match(r"^(\d{5}(?:-\d{3})?|\d{4}[- ]\d{3})\s+(.*)$", rem_parts[-2])
+                    m_pc = _postal_city_re(country_iso).match(rem_parts[-2])
                     if m_pc:
                         postal_raw = m_pc.group(1)
                         city_raw = m_pc.group(2)
@@ -391,7 +401,7 @@ class RomanceGrammar(CountryGrammar):
                     street_line = ", ".join(rem_parts[:-2])
             elif len(rem_parts) == 2:
                 # e.g. "Calle Mayor 45", "28013 Madrid"
-                m_pc = re.match(r"^(\d{5}(?:-\d{3})?|\d{4}[- ]\d{3})\s+(.*)$", rem_parts[1])
+                m_pc = _postal_city_re(country_iso).match(rem_parts[1])
                 if m_pc:
                     postal_raw = m_pc.group(1)
                     city_raw = m_pc.group(2)
@@ -442,7 +452,7 @@ class RomanceGrammar(CountryGrammar):
             street_line, RE_ROMANCE_SEC_STRICT, RE_ROMANCE_SEC_STRICT, allow_whole=False
         )
         sec_units.extend(inline_units)
-        st1_base, st2_base = split_intl_secondary_unit(street_line, "")
+        st1_base, st2_base = split_intl_secondary_unit(street_line, "", native_types=True)
         if st2_base and not (sec_units or s2_type or s2_number):
             st2_parts = st2_base.split(maxsplit=1)
             unit_type = st2_parts[0]

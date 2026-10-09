@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import re
-from typing import ClassVar, List, Optional, Set, Tuple
+from typing import Callable, ClassVar, List, Optional, Set, Tuple
 
 from address_standardizer._patterns import (
     RE_COMMA_DOT,
@@ -12,6 +12,7 @@ from address_standardizer._patterns import (
     is_invalid_thoroughfare,
 )
 from address_standardizer.international.base import (
+    UNAMBIGUOUS_STREET_TYPES,
     may_abbreviate_street_type,
     street_type_index,
     CountryGrammar,
@@ -218,8 +219,14 @@ def is_uk_building_name(text: str) -> bool:
     return bool(tokens & UK_BUILDING_INDICATORS)
 
 
+def _is_name_directional(words: List[str], idx: int) -> bool:
+    """A leading North/South/East/West followed by a further name word ("North Western Arcade", "West Register
+    Street") belongs to the street name; Royal Mail does not abbreviate it ("North Street" -> "N ST" is kept)."""
+    return idx == 0 and len(words) >= 3 and RE_NON_ALPHANUMERIC.sub("", words[1]).upper() not in STREET_SUFFIXES
+
+
 # Royal Mail has no abbreviation for these; "Prospect Hill" must not become "PROSPECT HL".
-_UK_KEEP_FULL = frozenset({"HILL", "HILLS"})
+_UK_KEEP_FULL = frozenset({"HILL", "HILLS", "ARCADE"})
 
 DISALLOWED_OUTWARD_POS1 = {"Q", "V", "X"}
 DISALLOWED_OUTWARD_POS2 = {"I", "J", "Z"}
@@ -253,11 +260,110 @@ def is_valid_uk_postcode(raw_code: str) -> bool:
     return True
 
 
+# Further well-known towns/cities, used only to find where the city starts in a comma-less line.
+_UK_SPLIT_EXTRA_TOWNS: Set[str] = {
+    "BARNSLEY", "BASINGSTOKE", "BEDFORD", "BRACKNELL", "BURNLEY", "CHELTENHAM", "CRAWLEY", "DARLINGTON", "DUDLEY",
+    "EASTBOURNE", "GATESHEAD", "GUILDFORD", "HARROGATE", "HASTINGS", "HIGH WYCOMBE", "HUDDERSFIELD", "KEIGHLEY",
+    "MAIDSTONE", "MIDDLESBROUGH", "NEWRY", "OLDHAM", "POOLE", "ROCHDALE", "SCUNTHORPE", "SOLIHULL", "STAFFORD",
+    "TELFORD", "TORQUAY", "WALSALL", "WARRINGTON", "WATFORD", "WEST BROMWICH", "WIGAN", "WINDSOR", "WORTHING",
+    "LISBURN", "LONDONDERRY", "BANGOR", "NEWTOWNABBEY", "EAST KILBRIDE", "PAISLEY", "FALKIRK", "KIRKCALDY",
+}
+
+# Words that end a street name in a comma-less "10 High Street Leeds LS1 4AB" (never "ST": "St Ives" is a town).
+_COMMALESS_TYPE_WORDS = (UNAMBIGUOUS_STREET_TYPES - {"ST"}) | {
+    "CLOSE", "GROVE", "MEWS", "QUAY", "ARCADE", "PARADE", "RISE", "WALK", "MALL", "CRESCENT", "TERRACE", "SQUARE",
+}
+_RE_CITY_WORD = re.compile(r"[^\W\d_][\w'.\-]*")
+_RE_HAS_LETTER = re.compile(r"[^\W\d_]")
+
+
+_RE_UK_TRAILING_COUNTRY = re.compile(
+    r"\s+(?:UNITED\s+KINGDOM|GREAT\s+BRITAIN|NORTHERN\s+IRELAND|ENGLAND|SCOTLAND|WALES|UK|GBR|GB)\s*$", re.IGNORECASE
+)
+
+
+def trailing_postal_width(words: "List[str]", is_postal: "Callable[[str], bool]") -> Optional[int]:
+    """Number of trailing words (2 or 1) that form a postal code, with at least one word left over; else None."""
+    for width in (2, 1):
+        if len(words) > width + 1 and is_postal(" ".join(words[-width:])):
+            return width
+    return None
+
+
+def split_commaless_postal_city(
+    text: str,
+    is_postal: "Callable[[str], bool]",
+    towns: "Set[str]",
+    country_tail: "re.Pattern[str]" = _RE_UK_TRAILING_COUNTRY,
+    type_words: "Set[str] | frozenset[str]" = _COMMALESS_TYPE_WORDS,
+    suffix_directionals: "Set[str] | frozenset[str]" = frozenset(),
+    prefix_types: "Set[str] | frozenset[str]" = frozenset(),
+) -> Optional[Tuple[str, str, str]]:
+    """Split a comma-less "10 High Street Leeds LS1 4AB" into (street, city, postal code); None when there is no
+    trailing postal code. Precision over recall: the city is only returned when it is a known town (longest suffix)
+    or the one-to-three plain words after the last street-type word; otherwise the city stays empty (inside street).
+
+    ``type_words`` are the words that end a street name; ``suffix_directionals`` (Canada: WEST, OUEST...) are
+    directions that belong to the street when they directly follow the type word and are followed by the city;
+    ``prefix_types`` (Canada: RUE, AVENUE...) are type words that, standing right after the house number, begin the
+    street name rather than end it and therefore are no boundary.
+    """
+    words = country_tail.sub("", text).split()
+    width = trailing_postal_width(words, is_postal)
+    if width is None:
+        return None
+    postal = " ".join(words[-width:])
+    rest = words[:-width]
+    if not _RE_HAS_LETTER.search(" ".join(rest)):
+        return None
+    for n in (4, 3, 2, 1):
+        if len(rest) > n and " ".join(rest[-n:]).upper() in towns and _RE_HAS_LETTER.search(" ".join(rest[:-n])):
+            return " ".join(rest[:-n]), " ".join(rest[-n:]), postal
+    anchors = [
+        i for i, w in enumerate(rest)
+        if RE_NON_ALPHANUMERIC.sub("", w).upper() in type_words
+        and not (RE_NON_ALPHANUMERIC.sub("", w).upper() in prefix_types and not _RE_HAS_LETTER.search(" ".join(rest[:i])))
+    ]
+    if anchors:
+        end = anchors[-1] + 1
+        tail = rest[end:]
+        first = RE_NON_ALPHANUMERIC.sub("", tail[0]).upper() if tail else ""
+        if first in suffix_directionals and len(tail) >= 2:
+            end += 1
+            tail = tail[1:]
+            first = RE_NON_ALPHANUMERIC.sub("", tail[0]).upper()
+        if (
+            1 <= len(tail) <= 3
+            and first not in DIRECTIONALS
+            and first not in ("LOWER", "UPPER")
+            and all(_RE_CITY_WORD.fullmatch(w) for w in tail)
+        ):
+            return " ".join(rest[:end]), " ".join(tail), postal
+    return " ".join(rest), "", postal
+
+
 class UKGrammar(CountryGrammar):
     """Royal Mail PAF / BS 7666 compliant United Kingdom grammar."""
 
     country_iso3: ClassVar[str] = "GBR"
     supported_countries: ClassVar[Tuple[str, ...]] = ("GBR", "UK", "UNITED KINGDOM", "JEY", "GGY", "IMN")
+
+    def standardize(
+        self,
+        street1: Optional[str] = None,
+        street2: Optional[str] = None,
+        city: Optional[str] = None,
+        state: Optional[str] = None,
+        postal_code: Optional[str] = None,
+        country: Optional[str] = None,
+        raw_street_address: Optional[str] = None,
+    ) -> UKParsedAddressComponents:
+        """Standardize; a comma-less "10 High Street Leeds LS1 4AB" is split at its trailing postcode first."""
+        if street1 and not (city or state or postal_code) and "," not in street1:
+            split = split_commaless_postal_city(street1, is_valid_uk_postcode, UK_POST_TOWNS | _UK_SPLIT_EXTRA_TOWNS)
+            if split is not None:
+                street1, city, postal_code = split
+        return super().standardize(street1, street2, city, state, postal_code, country, raw_street_address)
 
     def normalize_postal_code(self, raw_code: str) -> str:
         if not raw_code:
@@ -341,7 +447,7 @@ class UKGrammar(CountryGrammar):
                 w_clean = RE_NON_ALPHANUMERIC.sub("", w).upper()
                 if w_clean in STREET_SUFFIXES and w_clean not in _UK_KEEP_FULL and may_abbreviate_street_type(w_clean, idx, type_idx):
                     norm_words.append(STREET_SUFFIXES[w_clean])
-                elif w_clean in DIRECTIONALS:
+                elif w_clean in DIRECTIONALS and not _is_name_directional(words, idx):
                     norm_words.append(DIRECTIONALS[w_clean])
                 else:
                     norm_words.append(w.upper())

@@ -20,6 +20,7 @@ from address_standardizer.international.base import (
     split_intl_secondary_unit,
 )
 from address_standardizer.international.diacritics import (
+    fold_to_ascii_key,
     normalize_to_canonical_unicode,
 )
 from address_standardizer.international.romance import (
@@ -93,6 +94,37 @@ BR_STATES = frozenset({
     "PERNAMBUCO", "PIAUÍ", "PIAUI", "RIO DE JANEIRO", "RIO GRANDE DO NORTE", "RIO GRANDE DO SUL",
     "RONDÔNIA", "RONDONIA", "RORAIMA", "SANTA CATARINA", "SÃO PAULO", "SAO PAULO", "SERGIPE", "TOCANTINS",
 })
+
+# Brazilian state name (accent-folded, upper case) -> UF code, for "Curitiba - Paraná" style city/state parts.
+BR_STATE_UF: Dict[str, str] = {
+    "ACRE": "AC", "ALAGOAS": "AL", "AMAPA": "AP", "AMAZONAS": "AM", "BAHIA": "BA", "CEARA": "CE",
+    "DISTRITO FEDERAL": "DF", "ESPIRITO SANTO": "ES", "GOIAS": "GO", "MARANHAO": "MA", "MATO GROSSO": "MT",
+    "MATO GROSSO DO SUL": "MS", "MINAS GERAIS": "MG", "PARA": "PA", "PARAIBA": "PB", "PARANA": "PR",
+    "PERNAMBUCO": "PE", "PIAUI": "PI", "RIO DE JANEIRO": "RJ", "RIO GRANDE DO NORTE": "RN",
+    "RIO GRANDE DO SUL": "RS", "RONDONIA": "RO", "RORAIMA": "RR", "SANTA CATARINA": "SC", "SAO PAULO": "SP",
+    "SERGIPE": "SE", "TOCANTINS": "TO",
+}
+_RE_CITY_DASH_NAME = re.compile(r"^(.*?)\s+-\s+(.+)$")
+
+# Well-known Mexican cities (accent-folded, upper case) -> state name, used only when the address names no state.
+# Cities whose state is ambiguous or whose state has several common spellings (the capital, Estado de México) are
+# left out on purpose.
+MX_CITY_STATE: Dict[str, str] = {
+    "GUADALAJARA": "JALISCO", "ZAPOPAN": "JALISCO", "TLAQUEPAQUE": "JALISCO", "TONALA": "JALISCO",
+    "PUERTO VALLARTA": "JALISCO",
+    "MONTERREY": "NUEVO LEÓN", "SAN PEDRO GARZA GARCIA": "NUEVO LEÓN", "SAN NICOLAS DE LOS GARZA": "NUEVO LEÓN",
+    "APODACA": "NUEVO LEÓN",
+    "PUEBLA": "PUEBLA", "TIJUANA": "BAJA CALIFORNIA", "MEXICALI": "BAJA CALIFORNIA", "ENSENADA": "BAJA CALIFORNIA",
+    "CANCUN": "QUINTANA ROO", "PLAYA DEL CARMEN": "QUINTANA ROO", "MERIDA": "YUCATÁN",
+    "LEON": "GUANAJUATO", "GUANAJUATO": "GUANAJUATO", "IRAPUATO": "GUANAJUATO", "CELAYA": "GUANAJUATO",
+    "QUERETARO": "QUERÉTARO", "SAN LUIS POTOSI": "SAN LUIS POTOSÍ", "AGUASCALIENTES": "AGUASCALIENTES",
+    "CHIHUAHUA": "CHIHUAHUA", "CIUDAD JUAREZ": "CHIHUAHUA", "HERMOSILLO": "SONORA", "CULIACAN": "SINALOA",
+    "MAZATLAN": "SINALOA", "MORELIA": "MICHOACÁN", "OAXACA": "OAXACA", "VERACRUZ": "VERACRUZ",
+    "XALAPA": "VERACRUZ", "VILLAHERMOSA": "TABASCO", "TUXTLA GUTIERREZ": "CHIAPAS", "SALTILLO": "COAHUILA",
+    "TORREON": "COAHUILA", "TAMPICO": "TAMAULIPAS", "REYNOSA": "TAMAULIPAS", "CUERNAVACA": "MORELOS",
+    "PACHUCA": "HIDALGO", "ACAPULCO": "GUERRERO", "ZACATECAS": "ZACATECAS", "DURANGO": "DURANGO",
+    "CAMPECHE": "CAMPECHE", "COLIMA": "COLIMA", "TLAXCALA": "TLAXCALA",
+}
 
 # Brazilian CEP: 12345-678 or 12345678
 RE_BRA_CEP = re.compile(r"^\b(\d{5})-?(\d{3})\b$")
@@ -214,6 +246,12 @@ class LatinAmericaGrammar(CountryGrammar):
 
         # Only Argentina has four-digit postal codes; elsewhere a bare four-digit number is a house number.
         pc_digits = r"\d{4,7}" if country_iso == "ARG" else r"\d{5,7}"
+        # Argentine CPA is "X5000" (province letter + 4 digits) or the full "X5000ABC"; a short 3-digit code opening
+        # the locality part ("500 Córdoba") is a mistyped postcode there. Elsewhere only the full CPA shape is read.
+        cpa = r"[A-Z]\d{4}(?:[A-Z]{3})?" if country_iso == "ARG" else r"[A-Z]\d{4}[A-Z]{3}"
+        lead_digits = r"\d{3,7}" if country_iso == "ARG" else r"\d{5,7}"
+        lead_pc = rf"\d{{5}}(?:-\d{{3}})?|{cpa}|{lead_digits}"
+        end_pc = rf"\d{{5}}(?:-\d{{3}})?|{cpa}|{pc_digits}"
 
         unit_type: Optional[str] = None
         unit_number: Optional[str] = None
@@ -270,9 +308,14 @@ class LatinAmericaGrammar(CountryGrammar):
                 last_p = rem_parts[-1]
                 # Check for "São Paulo - SP"
                 m_city_st = re.match(r"^(.*?)\s*-\s*([A-Za-z]{2})$", last_p)
-                if m_city_st and not state_raw:
+                state_code = m_city_st.group(2).strip() if m_city_st else ""
+                if not m_city_st:
+                    # "Curitiba - Paraná": a spaced hyphen followed by a full Brazilian state name.
+                    m_city_st = _RE_CITY_DASH_NAME.match(last_p)
+                    state_code = BR_STATE_UF.get(fold_to_ascii_key(m_city_st.group(2)), "") if m_city_st else ""
+                if m_city_st and state_code and not state_raw:
                     city_raw = m_city_st.group(1).strip()
-                    state_raw = m_city_st.group(2).strip()
+                    state_raw = state_code
                     rem_parts = rem_parts[:-1]
 
             # "street, number - barrio, city" (Brazil / Mexico style): the number belongs to the street line and the
@@ -299,8 +342,8 @@ class LatinAmericaGrammar(CountryGrammar):
                 # e.g. "Av. Insurgentes Sur 1602", "03940 Ciudad de México", "CDMX"
                 # OR "Carrera 7 # 71-21", "Bogotá 110221"
                 # OR "Huérfanos 48", "Santiago", "Región Metropolitana 8320000"
-                m_pc_last_start = re.match(r"^(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3})\s+(.*)$", rem_parts[-1], re.IGNORECASE)
-                m_pc_last_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|@)$".replace("@", pc_digits), rem_parts[-1], re.IGNORECASE)
+                m_pc_last_start = re.match(rf"^({lead_pc})\s+(.*)$", rem_parts[-1], re.IGNORECASE)
+                m_pc_last_end = re.match(rf"^(.*?)\s+({end_pc})$", rem_parts[-1], re.IGNORECASE)
                 if m_pc_last_start:
                     postal_raw = m_pc_last_start.group(1)
                     city_raw = m_pc_last_start.group(2)
@@ -330,8 +373,8 @@ class LatinAmericaGrammar(CountryGrammar):
                         street_line = ", ".join(rem_parts[:-2])
                     else:
                         state_raw = rem_parts[-1]
-                        m_pc_mid_start = re.match(r"^(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3})\s+(.*)$", rem_parts[-2], re.IGNORECASE)
-                        m_pc_mid_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|@)$".replace("@", pc_digits), rem_parts[-2], re.IGNORECASE)
+                        m_pc_mid_start = re.match(rf"^({lead_pc})\s+(.*)$", rem_parts[-2], re.IGNORECASE)
+                        m_pc_mid_end = re.match(rf"^(.*?)\s+({end_pc})$", rem_parts[-2], re.IGNORECASE)
                         if m_pc_mid_start:
                             postal_raw = m_pc_mid_start.group(1)
                             city_raw = m_pc_mid_start.group(2)
@@ -343,8 +386,8 @@ class LatinAmericaGrammar(CountryGrammar):
                         street_line = ", ".join(rem_parts[:-2])
             elif len(rem_parts) == 2:
                 # e.g. "Balcarce 50", "C1064AAB Buenos Aires" OR "Carrera 7 # 71-21", "Bogotá 110221"
-                m_pc_start = re.match(r"^(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|@)\s+(.*)$".replace("@", pc_digits), rem_parts[1], re.IGNORECASE)
-                m_pc_end = re.match(r"^(.*?)\s+(\d{5}(?:-\d{3})?|[A-Z]\d{4}[A-Z]{3}|@)$".replace("@", pc_digits), rem_parts[1], re.IGNORECASE)
+                m_pc_start = re.match(rf"^({lead_pc})\s+(.*)$", rem_parts[1], re.IGNORECASE)
+                m_pc_end = re.match(rf"^(.*?)\s+({end_pc})$", rem_parts[1], re.IGNORECASE)
                 if m_pc_start:
                     postal_raw = m_pc_start.group(1)
                     city_raw = m_pc_start.group(2)
@@ -387,7 +430,7 @@ class LatinAmericaGrammar(CountryGrammar):
             street_line, RE_LATAM_SEC_STRICT, RE_LATAM_SEC_STRICT, allow_whole=False
         )
         sec_units.extend(inline_units)
-        st1_base, st2_base = split_intl_secondary_unit(street_line, "")
+        st1_base, st2_base = split_intl_secondary_unit(street_line, "", native_types=True)
         if st2_base and not (sec_units or s2_type or s2_number):
             st2_parts = st2_base.split(maxsplit=1)
             unit_type = st2_parts[0]
@@ -404,6 +447,8 @@ class LatinAmericaGrammar(CountryGrammar):
         norm_city = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", city_raw).strip().upper())
         norm_state = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", state_raw).strip().upper())
         norm_dep_loc = normalize_to_canonical_unicode(dep_locality.upper()) if dep_locality else None
+        if country_iso == "MEX" and not norm_state:
+            norm_state = MX_CITY_STATE.get(fold_to_ascii_key(norm_city), "")
 
         return ParsedAddressComponents(
             street_number=st_num,
