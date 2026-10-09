@@ -297,6 +297,11 @@ def _cmd_parse(args: argparse.Namespace) -> None:
     st1 = args.street1
     if not st1 and args.address:
         st1 = " ".join(args.address)
+    ref_provider = None
+    if args.reference_db:
+        from address_standardizer.reference import GeoNamesPostalProvider
+
+        ref_provider = GeoNamesPostalProvider(args.reference_db)
     res = standardize_address(
         street1=st1,
         street2=args.street2,
@@ -304,6 +309,7 @@ def _cmd_parse(args: argparse.Namespace) -> None:
         state=args.state,
         postal_code=args.postal_code,
         country=args.country,
+        reference_provider=ref_provider,
     )
     data = res.as_dict()
     if res.dependent_locality:
@@ -311,6 +317,9 @@ def _cmd_parse(args: argparse.Namespace) -> None:
     if res.building_name:
         data["building_name"] = res.building_name
     data["country_iso3"] = getattr(res, "country_iso3", None) or res.country or ""
+    if ref_provider is not None:
+        data["reference_validation"] = res.reference_validation.as_dict()
+        ref_provider.close()
 
     if args.enable_geocoding:
         engine_to_close = None
@@ -790,6 +799,13 @@ def _cmd_autocomplete(args: argparse.Namespace) -> None:
             _emit_cli_output("\n".join(lines))
 
 
+def _cmd_data(args: argparse.Namespace) -> None:
+    """Handler for the `data` subcommand (reference-data fetch / build / info)."""
+    from address_standardizer.reference._cli import run_data_command
+
+    run_data_command(args, _emit_cli_output)
+
+
 def _cmd_serve(args: argparse.Namespace) -> None:
     """Handler for the `serve` subcommand."""
     try:
@@ -818,6 +834,7 @@ _COMMAND_HANDLERS = {
     "cache": _cmd_cache,
     "autocomplete": _cmd_autocomplete,
     "serve": _cmd_serve,
+    "data": _cmd_data,
 }
 
 
@@ -902,6 +919,7 @@ def main():
     parse_parser.add_argument("--audit", action="store_true", help="Include stewardship audit record details")
     parse_parser.add_argument("--audit-db", help="SQLite file for the audit ledger, so records persist between runs (default: in-memory; env ADDRESS_STANDARDIZER_AUDIT_DB)")
     parse_parser.add_argument("--no-cache", action="store_true", help="Bypass multi-tier reference cache")
+    parse_parser.add_argument("--reference-db", help="GeoNames postal index (see `data build geonames`): validate postal code / city / state and add reference_validation (single address only; docs/reference_data.md)")
     parse_parser.add_argument("--correct-state-from-zip", action="store_true", help="Replace a US state that contradicts the ZIP with the ZIP's state (reported as WARN_STATE_CORRECTED_FROM_ZIP). Default: keep the given state, flag ERR_ZIP_STATE_MISMATCH and mark the address UNDELIVERABLE.")
 
     # Command: batch CSV processing
@@ -1028,6 +1046,10 @@ def main():
     serve_parser.add_argument("--port", type=_port_number, default=8000, help="Bind port (default: 8000)")
     serve_parser.add_argument("--workers", type=_positive_int, default=1, help="Number of worker processes (default: 1)")
     serve_parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+
+    from address_standardizer.reference._cli import add_data_parser
+
+    add_data_parser(subparsers)
 
     raw_args = sys.argv[1:]
     normalized_args = []

@@ -13,6 +13,7 @@ import json
 import threading
 import uuid
 import sqlite3
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Union
@@ -587,6 +588,13 @@ class StewardshipAuditLedger:
 _DEFAULT_AUDIT_LEDGER = StewardshipAuditLedger()
 
 
+# Per-context ledger override (set per request by the HTTP service when tenant isolation is enabled).
+LEDGER_OVERRIDE: ContextVar[Optional[StewardshipAuditLedger]] = ContextVar(
+    "address_standardizer_ledger_override", default=None
+)
+
+
 def get_audit_ledger() -> StewardshipAuditLedger:
-    """Returns the process default StewardshipAuditLedger singleton."""
-    return _DEFAULT_AUDIT_LEDGER
+    """Returns the active ledger: the per-context override if one is set, else the process default singleton."""
+    override = LEDGER_OVERRIDE.get()
+    return override if override is not None else _DEFAULT_AUDIT_LEDGER

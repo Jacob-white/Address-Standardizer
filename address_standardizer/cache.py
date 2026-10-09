@@ -14,7 +14,13 @@ import sqlite3
 import threading
 import time
 from collections import OrderedDict
+from contextvars import ContextVar
 from typing import Dict, Any, Optional
+
+# Tenant namespace for cache keys (set per request by the HTTP service when tenant isolation is enabled).
+# Names never contain "|", and the prefix is always the first "|"-delimited segment of the key, so a tenant
+# cannot forge another tenant's keys through address text (address fields have "|" escaped).
+CACHE_NAMESPACE: ContextVar[str] = ContextVar("address_standardizer_cache_namespace", default="")
 
 
 def make_cache_key(
@@ -56,6 +62,9 @@ def make_cache_key(
         parts.append("GEOCODE")
     if allow_locality:
         parts.append("ALLOW_LOCALITY")
+    namespace = CACHE_NAMESPACE.get()
+    if namespace:
+        parts.insert(0, "@" + namespace)
     return "|".join(parts)
 
 

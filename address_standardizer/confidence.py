@@ -63,9 +63,11 @@ class ConfidenceResult:
     s_geo: float
     s_cross_field: float
     failure_reason_codes: List[str]
+    # Only set when a fitted calibrator is passed to compute_confidence_score(); never changes composite_score.
+    calibrated_score: Optional[float] = None
 
     def as_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             "composite_score": self.composite_score,
             "routing_tier": self.routing_tier,
             "s_parse": self.s_parse,
@@ -74,6 +76,9 @@ class ConfidenceResult:
             "s_cross_field": self.s_cross_field,
             "failure_reason_codes": list(self.failure_reason_codes),
         }
+        if self.calibrated_score is not None:
+            d["calibrated_score"] = self.calibrated_score
+        return d
 
 
 PROPER_THOROUGHFARES_NO_SUFFIX = {
@@ -454,11 +459,19 @@ def compute_confidence_score(
     raw_input: Optional[Dict[str, Any]] = None,
     dpv_confirmed: Optional[str] = None,
     cascade_precision: Optional[str] = None,
+    calibrator: Optional[Any] = None,
 ) -> ConfidenceResult:
-    """Convenience functional interface to compute confidence score and routing tier."""
-    return _DEFAULT_SCORER.score(
+    """Convenience functional interface to compute confidence score and routing tier.
+
+    ``calibrator`` (optional, default off) is a fitted ``address_standardizer.calibration.Calibrator``; when given,
+    ``result.calibrated_score`` holds the calibrated value. ``composite_score`` and routing are never altered.
+    """
+    result = _DEFAULT_SCORER.score(
         std_address=std_address,
         raw_input=raw_input,
         dpv_confirmed=dpv_confirmed,
         cascade_precision=cascade_precision,
     )
+    if calibrator is not None:
+        result.calibrated_score = calibrator.calibrate(result.composite_score)
+    return result

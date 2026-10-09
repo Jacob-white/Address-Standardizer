@@ -258,6 +258,7 @@ def standardize_address(
     allow_locality: bool = False,
     finalize: bool = True,
     correct_state_from_zip: Optional[bool] = None,
+    reference_provider: Optional[Any] = None,
     **kwargs: Any,
 ) -> StandardizedAddress:
     """
@@ -273,7 +274,20 @@ def standardize_address(
     kept, ``ERR_ZIP_STATE_MISMATCH`` is reported and deliverability is UNDELIVERABLE (DPV footnote A1). Set
     ``correct_state_from_zip=True`` (or ``ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP=1``) to replace the state with
     the ZIP's state instead; the change is reported as ``WARN_STATE_CORRECTED_FROM_ZIP``. Off by default.
+
+    ``reference_provider`` (a ``address_standardizer.reference.ReferenceProvider``) additionally validates the result
+    against reference data: it is attached as ``std.reference_validation`` and its reason codes are appended to
+    ``failure_reason_codes``. The default ``None`` changes nothing and costs nothing.
     """
+    if reference_provider is not None:
+        from address_standardizer.reference.validation import apply_reference_validation
+
+        base = standardize_address(
+            street1=street1, street2=street2, city=city, state=state, postal_code=postal_code, country=country,
+            is_vacant=is_vacant, enable_fuzzy=enable_fuzzy, enable_geocoding=enable_geocoding, use_cache=use_cache,
+            allow_locality=allow_locality, finalize=finalize, correct_state_from_zip=correct_state_from_zip, **kwargs,
+        )
+        return apply_reference_validation(base, reference_provider)
     import os
 
     # Callers (pandas, CSV readers) pass NaN, floats and bytes; normalize to text once, up front.

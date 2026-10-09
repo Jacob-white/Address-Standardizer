@@ -32,6 +32,14 @@ from address_standardizer.autocomplete import (
     autocomplete_address,
 )
 from address_standardizer.cache import get_cache_stats
+from address_standardizer.service.middleware import (
+    GuardMiddleware,
+    ObservabilityMiddleware,
+    install_error_handlers,
+)
+from address_standardizer.service.readiness import run_checks
+from address_standardizer.service.runtime import ServiceRuntime
+from address_standardizer.service.telemetry import LatencyHistogram, bounded_increment, route_label as _route_label
 from address_standardizer.standardizer import standardize_address
 
 logger = logging.getLogger("address_standardizer.server")
@@ -53,13 +61,26 @@ class MetricsCollector:
         self.status_counts: Dict[int, int] = {}
         self.total_addresses_processed = 0
         self.total_latency_seconds = 0.0
+        self.key_counts: Dict[str, int] = {}
+        self.latency = LatencyHistogram()
 
     # Endpoint labels are route templates (or "unmatched"), never raw client paths, so cardinality is bounded.
     MAX_ENDPOINT_LABELS = 64
+    MAX_KEY_LABELS = 64  # per-API-key request counters; further key names are folded into "other"
 
-    def record_request(self, endpoint: str, status_code: int, duration: float, address_count: int = 1) -> None:
+    def record_request(
+        self,
+        endpoint: str,
+        status_code: int,
+        duration: float,
+        address_count: int = 1,
+        key_name: Optional[str] = None,
+    ) -> None:
         with self._lock:
             self.total_requests += 1
+            self.latency.observe(duration)
+            if key_name is not None:
+                bounded_increment(self.key_counts, key_name, self.MAX_KEY_LABELS)
             if endpoint not in self.endpoint_counts and len(self.endpoint_counts) >= self.MAX_ENDPOINT_LABELS:
                 endpoint = "other"
             self.endpoint_counts[endpoint] = self.endpoint_counts.get(endpoint, 0) + 1
@@ -84,6 +105,12 @@ class MetricsCollector:
             "average_latency_ms": round(avg_lat_ms, 3),
             "requests_by_endpoint": dict(self.endpoint_counts),
             "requests_by_status": dict(self.status_counts),
+            "requests_by_key": dict(self.key_counts),
+            "latency_seconds": {
+                "buckets": [[le, n] for le, n in self.latency.cumulative()],
+                "sum": round(self.latency.sum, 6),
+                "count": self.latency.count,
+            },
         }
 
     def prometheus_format(self) -> str:
@@ -106,6 +133,14 @@ class MetricsCollector:
             lines.append(f'address_standardizer_endpoint_requests_total{{endpoint="{_escape_label(ep)}"}} {cnt}')
         for st, cnt in snap["requests_by_status"].items():
             lines.append(f'address_standardizer_status_requests_total{{code="{st}"}} {cnt}')
+        for name, cnt in snap["requests_by_key"].items():
+            lines.append(f'address_standardizer_key_requests_total{{key="{_escape_label(name)}"}} {cnt}')
+        lines.append("# HELP address_standardizer_request_duration_seconds Request latency histogram.")
+        lines.append("# TYPE address_standardizer_request_duration_seconds histogram")
+        for le, cnt in snap["latency_seconds"]["buckets"]:
+            lines.append(f'address_standardizer_request_duration_seconds_bucket{{le="{le}"}} {cnt}')
+        lines.append(f"address_standardizer_request_duration_seconds_sum {snap['latency_seconds']['sum']}")
+        lines.append(f"address_standardizer_request_duration_seconds_count {snap['latency_seconds']['count']}")
         return "\n".join(lines) + "\n"
 
 
@@ -313,7 +348,10 @@ def _standardize_from_req(req: StandardizeRequest) -> Dict[str, Any]:
         allow_locality=req.allow_locality,
         correct_state_from_zip=req.correct_state_from_zip,
     )
-    return std.as_dict(include_metadata=req.include_metadata, include_rooftop=True)
+    from address_standardizer.reference.validation import attach_server_reference_validation
+
+    # Adds "reference_validation" only when ADDRESS_STANDARDIZER_REFERENCE_DB is configured (docs/reference_data.md).
+    return attach_server_reference_validation(std, std.as_dict(include_metadata=req.include_metadata, include_rooftop=True))
 
 
 def _process_item_to_dict(
@@ -359,14 +397,13 @@ def _process_item_to_dict(
 # Application Factory
 # ============================================================================
 
-def _route_label(request: Request) -> str:
-    """Matched route template (e.g. "/v1/batch"), or "unmatched" for 404s: never the raw client path."""
-    route = request.scope.get("route")
-    return getattr(route, "path", None) or "unmatched"
+def create_app(runtime: Optional[ServiceRuntime] = None) -> FastAPI:
+    """Create and configure the FastAPI application daemon.
 
-
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application daemon."""
+    Production features (auth, rate limits, tenancy, tracing, ...) are configured from the environment at creation
+    time (see docs/operations.md) or by passing a prebuilt ``ServiceRuntime``.
+    """
+    runtime = runtime or ServiceRuntime.from_env()
     docs_enabled = os.environ.get("ADDRESS_STANDARDIZER_DISABLE_DOCS", "").strip().lower() not in ("1", "true", "yes")
     app = FastAPI(
         title="Address Standardizer Microservice API",
@@ -379,6 +416,10 @@ def create_app() -> FastAPI:
         docs_url="/docs" if docs_enabled else None,
         redoc_url="/redoc" if docs_enabled else None,
     )
+
+    app.state.service = runtime
+    install_error_handlers(app)
+    app.add_middleware(GuardMiddleware, runtime=runtime)  # innermost: CORS wraps it so 401/403/429 carry CORS headers
 
     # Origins come from configuration. The default is open (no cookies/auth are used), but credentialed
     # cross-origin requests are only allowed for an explicit allow-list.
@@ -401,9 +442,17 @@ def create_app() -> FastAPI:
             raise
         duration = time.perf_counter() - start
         count = getattr(request.state, "address_count", 1)
-        metrics.record_request(_route_label(request), response.status_code, duration, address_count=count)
+        metrics.record_request(
+            _route_label(request),
+            response.status_code,
+            duration,
+            address_count=count,
+            key_name=getattr(request.state, "key_name", None),
+        )
         response.headers["X-Response-Time-Ms"] = f"{duration * 1000.0:.3f}"
         return response
+
+    app.add_middleware(ObservabilityMiddleware, runtime=runtime)  # outermost: request ID, tracing, access log
 
     # ------------------------------------------------------------------------
     # Routes
@@ -423,6 +472,14 @@ def create_app() -> FastAPI:
             },
             "uptime_seconds": round(time.time() - SERVER_START_TIME, 2),
         }
+
+    @app.get("/ready", summary="Readiness probe", tags=["Diagnostics"])
+    def ready():
+        """Readiness: 200 when the cache, audit ledger and reference database are usable, else 503 (names only)."""
+        ok, checks = run_checks()
+        return JSONResponse(
+            {"status": "ready" if ok else "not_ready", "checks": checks}, status_code=200 if ok else 503
+        )
 
     @app.get("/metrics", summary="Service telemetry and metrics", tags=["Diagnostics"])
     async def get_metrics(
@@ -467,6 +524,7 @@ def create_app() -> FastAPI:
         format: Optional[str] = Query(None, description="Optional format: 'json' or 'ndjson'"),
     ):
         """Batch standardize a collection of addresses with support for JSON arrays and streaming NDJSON."""
+        deadline = request.app.state.service.new_deadline()
         content_type = request.headers.get("content-type", "")
         accept_header = request.headers.get("accept", "")
 
@@ -490,6 +548,9 @@ def create_app() -> FastAPI:
 
             def ndjson_generator() -> Iterator[str]:
                 for index, line in enumerate(ndjson_lines):
+                    if deadline.expired():
+                        yield json.dumps({"error": "timeout", "index": index}) + "\n"
+                        return
                     try:
                         item = json.loads(line)
                         res = _process_item_to_dict(item)
@@ -546,6 +607,9 @@ def create_app() -> FastAPI:
         if is_ndjson_resp:
             def stream_array_as_ndjson() -> Iterator[str]:
                 for index, item in enumerate(addresses_list):
+                    if deadline.expired():
+                        yield json.dumps({"error": "timeout", "index": index}) + "\n"
+                        return
                     try:
                         res = _process_item_to_dict(
                             item,
@@ -564,6 +628,8 @@ def create_app() -> FastAPI:
         def _process_all() -> List[Dict[str, Any]]:
             out: List[Dict[str, Any]] = []
             for index, item in enumerate(addresses_list):
+                if deadline.expired():
+                    raise HTTPException(status_code=504, detail="Batch processing exceeded the time limit")
                 try:
                     out.append(
                         _process_item_to_dict(

@@ -220,6 +220,15 @@ When a US ZIP belongs to a different state than the one supplied:
 
 An explicit `correct_state_from_zip=False` overrides the environment variable.
 
+### Reference-data validation (optional)
+
+`standardize_address(..., reference_provider=provider)` additionally checks the postal code, city and (US/CA) state against a
+reference dataset and sets `std.reference_validation` (statuses `confirmed`, `postal_unknown`, `place_mismatch`,
+`state_mismatch`, `not_checked`); its reason codes (`ERR_POSTAL_UNKNOWN`, `ERR_POSTAL_STATE_MISMATCH`,
+`WARN_POSTAL_PLACE_MISMATCH`) are appended to `failure_reason_codes`. Default `None`: no change. CLI: `data fetch|build|info`,
+`parse --reference-db PATH`. REST: set `ADDRESS_STANDARDIZER_REFERENCE_DB` to add a `reference_validation` object to
+`/v1/standardize` responses. Full guide, licenses and limits: [reference_data.md](reference_data.md).
+
 ---
 
 ## 5. Python API: batch and streaming
@@ -436,6 +445,7 @@ served at `/docs`, `/redoc` and `/openapi.json`. Responses carry an `X-Response-
 | `POST /v1/autocomplete` | Typeahead suggestions (JSON body) |
 | `GET /v1/autocomplete` | Typeahead suggestions (query string) |
 | `GET /health` | Health, version, engine and cache telemetry |
+| `GET /ready` | Readiness: 200 when cache, audit ledger and reference DB are usable, else 503 (see [operations.md](operations.md)) |
 | `GET /metrics` | Request metrics (JSON or Prometheus text) |
 
 ### `POST /v1/standardize`
@@ -643,15 +653,21 @@ Notes:
 | `ADDRESS_STANDARDIZER_AUDIT_MAX_ROWS` | Row cap of the default in-memory audit ledger. | `100000` |
 | `ADDRESS_STANDARDIZER_CORRECT_STATE_FROM_ZIP` | `1`, `true`, `yes` or `on` turns on ZIP-based state correction when no explicit argument is given. The CLI flag sets it for the process. | off |
 | `ADDRESS_STANDARDIZER_ALLOW_LOCALITY` | The value `1` makes every `standardize_address` call allow locality-only results. | off |
+| `ADDRESS_STANDARDIZER_API_KEYS`, `ADDRESS_STANDARDIZER_API_KEYS_FILE` | Turn on API-key authentication (`X-API-Key` or `Authorization: Bearer`; 401 missing, 403 unknown). `/health` and `/ready` stay open. See [operations.md](operations.md). | unset (open) |
+| `ADDRESS_STANDARDIZER_RATE_LIMIT`, `..._RATE_LIMIT_BURST`, `..._DAILY_QUOTA` | Per-key (or per-IP) token bucket such as `100/minute` and per-day quota; excess returns HTTP 429 with `Retry-After`. Per process. | unset |
+| `ADDRESS_STANDARDIZER_TENANT_ISOLATION`, `..._TENANT_AUDIT_DIR` | Per-key cache namespace and audit ledger. | off |
+| `ADDRESS_STANDARDIZER_REQUEST_TIMEOUT_SECONDS` | Cooperative `/v1/batch` time budget (504 / NDJSON timeout line). | unset |
+| `ADDRESS_STANDARDIZER_ACCESS_LOG`, `..._OTEL`, `..._SECURITY_HEADERS` | JSON access log (`address_standardizer.access`), optional OpenTelemetry spans, security response headers. | on |
+| `ADDRESS_STANDARDIZER_AUTH_OPEN_PATHS`, `..._TRUST_FORWARDED_FOR`, `..._RATE_LIMIT_MAX_BUCKETS` | Unauthenticated paths, proxy-aware client IP, limiter memory cap. See [operations.md](operations.md). | see guide |
 | `SPATIAL_DB_PATH` | Path of the SQLite spatial database the default spatial engine opens. | unset |
 
 ---
 
 ## 13. Client SDKs
 
-TypeScript, .NET and Go clients for the REST API live under [`sdks/`](../sdks/README.md); see that README and the
+TypeScript, .NET and Go clients for the REST API live under [`sdks/`](https://github.com/Jacob-white/Address-Standardizer/tree/main/sdks#readme); see that README and the
 README in each SDK directory for installation and usage.
 
 ---
 
-Address Standardizer is owned and maintained by HobbyHabbit LLC under the MIT License; see [LICENSE](../LICENSE).
+Address Standardizer is owned and maintained by HobbyHabbit LLC under the MIT License; see [LICENSE](https://github.com/Jacob-white/Address-Standardizer/blob/main/LICENSE).

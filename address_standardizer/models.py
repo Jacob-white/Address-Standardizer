@@ -393,6 +393,15 @@ class StandardizedAddress:
         self._fips_code = value
 
     @property
+    def reference_validation(self) -> Optional[Any]:
+        """Set only when ``standardize_address(..., reference_provider=...)`` was used."""
+        return getattr(self, "_reference_validation", None)
+
+    @reference_validation.setter
+    def reference_validation(self, value: Optional[Any]):
+        self._reference_validation = value
+
+    @property
     def country_iso3(self) -> str:
         return getattr(self, "_country_iso3", getattr(self, "country", "USA") or "USA")
 
@@ -501,6 +510,8 @@ class StandardizedAddress:
             else:
                 d["spatial_result"] = None
             d["country_iso3"] = self.country_iso3
+            if self.reference_validation is not None:
+                d["reference_validation"] = self.reference_validation.as_dict()
         return d
 
     def as_extended_dict(self) -> Dict[str, Any]:
