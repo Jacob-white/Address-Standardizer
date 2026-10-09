@@ -63,7 +63,7 @@ COUNTRIES: Dict[str, Dict[str, Any]] = {
            "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{pc}"]},
     "AU": {"iso3": "AUS", "name": "Australia", "script": "Latin", "lang": "en", "city_keys": ["addr:city", "addr:suburb"],
            "bboxes": [(-33.90, 151.17, -33.85, 151.23), (-37.84, 144.94, -37.79, 145.00)],
-           "holdout_bboxes": [(-33.83,151.00,-33.80,151.04), (-37.83,145.00,-37.80,145.04), (-27.49,153.00,-27.45,153.04), (-34.94,138.58,-34.91,138.62)],
+           "holdout_bboxes": [(-33.83,151.00,-33.80,151.04), (-37.83,145.02,-37.80,145.06), (-27.49,153.00,-27.45,153.04), (-34.94,138.58,-34.91,138.62)],
            "street1": "{hn} {street}", "segments": ["{street1}", "{city}", "{state} {pc}"]},
     "NZ": {"iso3": "NZL", "name": "New Zealand", "script": "Latin", "lang": "en",
            "bboxes": [(-36.88, 174.74, -36.83, 174.80)],

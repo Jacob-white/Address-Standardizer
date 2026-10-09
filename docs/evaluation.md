@@ -160,3 +160,41 @@ bin is 66.2%. It does not discriminate well among the high-scoring renderings. A
 reduces held-out ECE from 0.289 to 0.048 (Brier 0.289 to 0.150), but most of that gain is learning the sample's base rate,
 and it depends on the style mix (about one rendering in eight is a no-comma or swapped stress style). Treat `calibration.json` as a
 demonstration of the mechanism, not a production calibrator.
+
+## Held-out evaluation
+
+**Why it exists.** `osm_sample.json` and its `baseline.json`/`REPORT.md` were used to diagnose and fix engine failures,
+so the engine's score on them (93.7% all-fields exact on 2,417 renderings after those fixes) is partly *in-sample* and
+must not be quoted as accuracy on unseen addresses. `osm_holdout.json` is a second corpus that nothing has been tuned
+against, to be reported as the **generalisation estimate**.
+
+**Methodology.** Same pipeline, labels, renderings, comparison rules and runner as above; only the areas change.
+`build_osm_corpus.py --holdout` reads each country's `holdout_bboxes` (different cities or non-overlapping districts
+from its development `bboxes`; a test enforces that no holdout box overlaps a development box), uses a different default
+seed (20261201) and samples 30 records per country. It adds countries the sample never had: AU, AR, CL, CZ, EG, FI, HU,
+IN, MX, NO, RO, SA, SG, TR, ZA (Hong Kong was configured but has no tagged postcodes). A test also checks that no OSM
+object appears in both files. Without `--holdout` the builder behaves exactly as before.
+
+**Rebuild** (needs network the first time; boxes that return HTTP 500/504 are skipped and are retried on the next run,
+the cache serves everything already fetched):
+
+```bash
+PYTHONPATH=. python benchmarks/eval/build_osm_corpus.py --holdout --fetch-limit 200 --delay 4
+PYTHONPATH=. python benchmarks/eval/run_eval.py --corpus benchmarks/eval/osm_holdout.json \
+    --out-md benchmarks/eval/REPORT_HOLDOUT.md   # then add the in-sample comparison header
+```
+
+**Headline (2026-10-09, 1,195 records, 40 countries, 10,211 renderings).** All-fields exact **85.4%** held-out versus
+93.7% in-sample (-8.3 points); per field house_number 96.2% (100.0% in-sample), street 87.8% (94.4%), city 89.5% (95.2%),
+state 90.8% (95.8%), postcode 93.3% (97.0%), country 100%. The countries that drop most are those with the
+least in-sample coverage or new city shapes: Japan 21% (100% in-sample), Hungary 12.5%, Turkey 47%, India 58%, Czechia
+79%, Canada 67% (Montréal). Full tables, side-by-side comparison and the observed failure categories are in
+`benchmarks/eval/REPORT_HOLDOUT.md`.
+
+**Rules.**
+
+- Holdout data is **never used for tuning**: no engine change, abbreviation table, comparison rule or baseline is derived
+  from it, and `baseline.json` is never written from it. Its failures may be read to choose what to work on next.
+- Once a fix is made from holdout findings, that area is no longer held out. Cut a fresh holdout (new
+  `holdout_bboxes`, new seed) before reporting a new generalisation number, and keep the old file for history.
+- Quote the held-out figure, with its interval and the OSM-label caveats above, whenever an accuracy number is needed.
