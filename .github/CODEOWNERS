@@ -1,0 +1,8 @@
+# Owner inferred from the repository remote (github.com/Jacob-white/Address-Standardizer).
+# Replace or extend with a team handle when more maintainers join.
+* @Jacob-white
+
+# Release and supply-chain files deserve an explicit owner even if the default above changes.
+/.github/ @Jacob-white
+/scripts/check_versions.py @Jacob-white
+/docs/RELEASING.md @Jacob-white

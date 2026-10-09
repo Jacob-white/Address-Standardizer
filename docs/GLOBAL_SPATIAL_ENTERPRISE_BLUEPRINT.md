@@ -379,7 +379,7 @@ When the input does not provide an explicit `country` argument, the engine execu
 #### 2.3.1 United Kingdom & Commonwealth (GBR, JEY, GGY, IMN)
 - **Reference Standard:** Royal Mail Postcode Address File (PAF), British Standard BS 7666.
 - **Mathematical Postal Code Formulation:**
-  $$\text{UK Postcode} = \underbrace{[A-Z]\{1,2\}[0-9][A-Z0-9]?}_{\text{Outward Code (Area + District)}}\quad \underbrace{[0-9][A-Z]\{2\}}_{\text{Inward Code (Sector + Unit)}}$$
+  $$\text{UK Postcode} = \underbrace{\lbrack A-Z\rbrack \{1,2\}\lbrack 0-9\rbrack \lbrack A-Z0-9\rbrack ?}_{\text{Outward Code (Area + District)}}\quad \underbrace{\lbrack 0-9\rbrack \lbrack A-Z\rbrack \{2\}}_{\text{Inward Code (Sector + Unit)}}$$
   Regex pattern:
   ```regex
   ^(GIR\s*0AA|[A-Z]{1,2}[0-9][A-Z0-9]?)\s*([0-9][A-Z]{2})$
@@ -409,7 +409,7 @@ When the input does not provide an explicit `country` argument, the engine execu
 #### 2.3.2 Canada (CAN)
 - **Reference Standard:** Canada Post Postal Guide / Directives d'adressage de Postes Canada.
 - **Postal Code Formulation:**
-  $$\text{Canadian Postal Code} = \underbrace{[A-CEGHJ-NPR-TVXY][0-9][A-CEGHJ-NPR-TV-Z]}_{\text{Forward Sortation Area (FSA)}}\ \underbrace{[0-9][A-CEGHJ-NPR-TV-Z][0-9]}_{\text{Local Delivery Unit (LDU)}}$$
+  $$\text{Canadian Postal Code} = \underbrace{\lbrack A-CEGHJ-NPR-TVXY\rbrack \lbrack 0-9\rbrack \lbrack A-CEGHJ-NPR-TV-Z\rbrack }_{\text{Forward Sortation Area (FSA)}}\ \underbrace{\lbrack 0-9\rbrack \lbrack A-CEGHJ-NPR-TV-Z\rbrack \lbrack 0-9\rbrack }_{\text{Local Delivery Unit (LDU)}}$$
   Regex pattern:
   ```regex
   ^([A-CEGHJ-NPR-TVXY][0-9][A-CEGHJ-NPR-TV-Z])\s*([0-9][A-CEGHJ-NPR-TV-Z][0-9])$

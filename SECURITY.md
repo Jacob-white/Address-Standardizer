@@ -40,6 +40,18 @@ To help our security team triage and remediate issues rapidly, please include:
 - **Remediation & Patch Deployment**: Critical issues are prioritized for patch release within **7 days**.
 - **Coordinated Public Disclosure**: We follow a standard 90-day disclosure timeline, allowing users sufficient time to deploy updates before details are made public.
 
+### D. Preferred Channel and Scope
+- **Preferred**: a private [GitHub security advisory](https://github.com/Jacob-white/Address-Standardizer/security/advisories/new);
+  it keeps the report, the fix and the CVE request in one place. Email is the fallback.
+- **In scope**: the Python package, the native extension, the HTTP service and Docker image, the TypeScript, .NET and Go
+  SDKs, and the release pipeline (for example a way to publish or tamper with release artifacts).
+- **Out of scope**: incorrect address parsing without a security impact (open a normal bug report), denial of service
+  that requires an unbounded request size on a deployment that did not apply the documented limits, vulnerabilities in
+  third-party dependencies with no exploitable path through this project (report upstream), and social engineering.
+- **Please include no real personal data** in reports; use synthetic addresses.
+- **Release integrity**: release artifacts carry build provenance attestations and the Python package ships a CycloneDX
+  SBOM (see `docs/RELEASING.md`). Verify with `gh attestation verify <file> --repo Jacob-white/Address-Standardizer`.
+
 > [!IMPORTANT]
 > **Please do NOT file public GitHub issues for suspected security vulnerabilities.** Always use private communication channels to protect downstream users and production systems.
 

@@ -1,0 +1,76 @@
+site_name: Address Standardizer
+site_description: Multi-national address standardization, offline geocoding and entity resolution.
+site_url: https://jacob-white.github.io/Address-Standardizer/
+repo_url: https://github.com/Jacob-white/Address-Standardizer
+repo_name: Jacob-white/Address-Standardizer
+edit_uri: edit/main/docs/
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_source: false
+            show_root_heading: true
+            heading_level: 3
+            docstring_style: google
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+      # GitHub-style heading anchors so the existing "#4-zip--state-policy" style links resolve.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+# docs/README.md is the GitHub-facing index; the site uses index.md.
+exclude_docs: |
+  README.md
+
+nav:
+  - Home: index.md
+  - Guides:
+      - Quickstart: quickstart.md
+      - API reference: api_reference.md
+      - HTTP endpoints: api_endpoints.md
+      - Python API (generated): python_api.md
+  - Data and quality:
+      - Reference data (validation): reference_data.md
+      - Evaluation and calibration: evaluation.md
+  - Operations:
+      - Running the service: operations.md
+  - Project:
+      - Releasing: RELEASING.md
+      - Versioning: VERSIONING.md
+      - Review follow-ups: REVIEW_FOLLOWUPS.md
+  - Architecture:
+      - Commercial parity plan: COMMERCIAL_PARITY_ARCHITECTURE_PLAN.md
+      - Global spatial blueprint: GLOBAL_SPATIAL_ENTERPRISE_BLUEPRINT.md
+      - Enterprise technical blueprint: ENTERPRISE_STRATEGIC_TECHNICAL_BLUEPRINT.md
+      - Optimization plan: ARCHITECTURE_OPTIMIZATION_PLAN.md

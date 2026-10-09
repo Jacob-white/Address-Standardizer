@@ -65,3 +65,6 @@ obj/
 
 # Rust build output
 target/
+
+# Built documentation site
+site/

@@ -9,7 +9,10 @@ name: Release
 #   * the full CI workflow must pass on the tag;
 #   * artifacts are BUILT in a job that holds no publish credentials and are PUBLISHED from those exact files;
 #   * every publish job waits on the `release` environment (configure required reviewers there);
-#   * publishing is sequential (PyPI, then npm, then NuGet) so a failure stops the chain instead of racing.
+#   * publishing is sequential (PyPI, then npm, then NuGet) so a failure stops the chain instead of racing;
+#   * CHANGELOG.md must have a section for the tagged version (checked in `verify`, used as the release notes);
+#   * build provenance attestations (and a CycloneDX SBOM for the Python package) are created before publishing and
+#     attached to the GitHub release, which is created last, after all registries accepted the packages.
 
 on:
   push:
@@ -63,6 +66,15 @@ jobs:
           pip install build twine
           python -m build --outdir dist/python
           twine check dist/python/*
+      - name: CycloneDX SBOM for the Python package (wheel plus its resolved server-extra dependencies)
+        run: |
+          pip install cyclonedx-bom
+          python -m venv .sbom-venv
+          .sbom-venv/bin/pip install "$(ls "$PWD"/dist/python/*.whl)[server]"
+          mkdir -p dist/sbom
+          cyclonedx-py environment "$PWD/.sbom-venv/bin/python" --pyproject pyproject.toml --of JSON \
+            -o dist/sbom/address-standardizer-python.cdx.json
+          test -s dist/sbom/address-standardizer-python.cdx.json
       - name: npm package
         working-directory: sdks/typescript
         run: |
@@ -77,8 +89,31 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  pypi:
+  attest:
+    # Signed SLSA build provenance for every artifact, created BEFORE anything is published so a failure blocks the
+    # release. Only this job holds attestation/OIDC permissions; it has no registry credentials.
     needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-artifacts
+          path: dist/
+      - uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: |
+            dist/python/*
+            dist/npm/*
+            dist/nuget/*
+            dist/sbom/*
+
+  pypi:
+    needs: [build, attest]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: release
@@ -132,3 +167,31 @@ jobs:
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: dotnet nuget push "dist/nuget/*.nupkg" --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json
+
+  github-release:
+    # Runs only after every registry accepted the release. Notes come from the CHANGELOG section for this version.
+    needs: nuget
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-artifacts
+          path: dist/
+      - name: Extract release notes from CHANGELOG.md
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python scripts/check_versions.py "$TAG" --notes-out release-notes.md
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md \
+            dist/python/* dist/npm/* dist/nuget/* dist/sbom/*

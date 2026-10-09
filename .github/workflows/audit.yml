@@ -1,0 +1,66 @@
+name: Dependency audit
+
+# Weekly vulnerability scan of every ecosystem in the repo. A finding fails the run (visible in the Actions tab and
+# through failed-workflow notifications); no issue is opened. Dependabot handles the fix PRs.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: pip install pip-audit
+      - name: Resolve the project with all runtime extras, then audit the environment
+        run: |
+          pip install -e ".[server,arrow,ml]"
+          pip-audit --skip-editable
+      - name: Audit the pinned requirement files
+        run: |
+          pip-audit -r requirements.txt
+          pip-audit -r requirements-dev.txt
+
+  npm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - name: npm audit (TypeScript SDK)
+        working-directory: sdks/typescript
+        run: npm audit --audit-level=low
+
+  cargo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: cargo install cargo-audit --locked
+      - run: cargo audit
+
+  nuget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Vulnerable NuGet packages (direct and transitive)
+        # `dotnet list package --vulnerable` always exits 0, so fail on its report text.
+        run: |
+          dotnet restore sdks/dotnet/AddressStandardizer.Client.csproj
+          dotnet list sdks/dotnet/AddressStandardizer.Client.csproj package --vulnerable --include-transitive | tee nuget-audit.txt
+          if grep -q "has the following vulnerable packages" nuget-audit.txt; then exit 1; fi

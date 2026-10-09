@@ -1,0 +1,58 @@
+name: Bug report
+description: Wrong or surprising output, a crash, or broken tooling
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not paste real personal addresses.** Use a synthetic address, a well-known public landmark or business
+        address, or change the house number and name while keeping the shape of the input. Suspected security
+        problems must not be filed here; see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pip show address-standardizer`, or the SDK package version.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did you see it
+      options: [Python API, CLI, HTTP service, TypeScript SDK, .NET SDK, Go SDK, Docker image, Docs, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Minimal input (synthetic)
+      description: The smallest input that reproduces it, including the country and any flags.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected output
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual output
+      description: Relevant fields (street1, city, state, postal_code, failure_reason_codes, ...) or the traceback.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: OS, Python (or Node, .NET, Go) version, and whether the native extension is active.
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: The input above contains no real personal data and is not a security issue.
+          required: true

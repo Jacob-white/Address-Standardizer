@@ -623,5 +623,5 @@ multi-unit building, hence `REQUIRES_SECONDARY`. The column arguments of `standa
 ## Next steps
 
 - [API reference](api_reference.md): every public function, class, REST endpoint, CLI command and field.
-- [Client SDKs](../sdks/README.md): TypeScript, .NET and Go clients for the HTTP service.
-- [Security policy](../SECURITY.md).
+- [Client SDKs](https://github.com/Jacob-white/Address-Standardizer/tree/main/sdks#readme): TypeScript, .NET and Go clients for the HTTP service.
+- [Security policy](https://github.com/Jacob-white/Address-Standardizer/blob/main/SECURITY.md).

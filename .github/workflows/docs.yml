@@ -1,0 +1,48 @@
+name: Docs
+
+# Builds the MkDocs site with --strict (broken links and nav entries fail the build). Pull requests only build;
+# publishing to GitHub Pages is a deliberate owner action (see docs/RELEASING.md), so nothing here deploys.
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "scripts/export_openapi.py"
+      - "address_standardizer/server.py"
+      - "address_standardizer/models.py"
+      - "pyproject.toml"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[server,docs]"
+      - name: Regenerate the OpenAPI export from the server
+        run: python scripts/export_openapi.py
+      - name: Build the site (strict)
+        run: mkdocs build --strict
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: docs-site
+          path: site/
+          retention-days: 7
