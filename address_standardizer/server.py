@@ -20,6 +20,8 @@ from typing import Any, Dict, Iterator, List, Optional, Union
 from fastapi import FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 
@@ -159,6 +161,44 @@ def _escape_label(value: str) -> str:
 
 
 metrics = MetricsCollector()
+
+
+class MetricsMiddleware:
+    """Records request metrics and adds ``X-Response-Time-Ms`` (pure ASGI; reads the module-level ``metrics``)."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        scope.setdefault("state", {})
+        request = Request(scope)
+        start = time.perf_counter()
+        recorded = False
+
+        async def send_with_metrics(message: Message) -> None:
+            nonlocal recorded
+            if message["type"] == "http.response.start":
+                recorded = True
+                duration = time.perf_counter() - start
+                metrics.record_request(
+                    _route_label(request),
+                    message["status"],
+                    duration,
+                    address_count=getattr(request.state, "address_count", 1),
+                    key_name=getattr(request.state, "key_name", None),
+                )
+                MutableHeaders(scope=message)["X-Response-Time-Ms"] = f"{duration * 1000.0:.3f}"
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_metrics)
+        except Exception:
+            if not recorded:
+                metrics.record_request(_route_label(request), 500, time.perf_counter() - start)
+            raise
 
 
 def _max_batch_size() -> int:
@@ -515,25 +555,7 @@ def create_app(runtime: Optional[ServiceRuntime] = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.middleware("http")
-    async def metrics_middleware(request: Request, call_next):
-        start = time.perf_counter()
-        try:
-            response = await call_next(request)
-        except Exception:
-            metrics.record_request(_route_label(request), 500, time.perf_counter() - start)
-            raise
-        duration = time.perf_counter() - start
-        count = getattr(request.state, "address_count", 1)
-        metrics.record_request(
-            _route_label(request),
-            response.status_code,
-            duration,
-            address_count=count,
-            key_name=getattr(request.state, "key_name", None),
-        )
-        response.headers["X-Response-Time-Ms"] = f"{duration * 1000.0:.3f}"
-        return response
+    app.add_middleware(MetricsMiddleware)
 
     app.add_middleware(ObservabilityMiddleware, runtime=runtime)  # outermost: request ID, tracing, access log
 

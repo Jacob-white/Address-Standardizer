@@ -231,6 +231,14 @@
             "title": "Allow Locality",
             "type": "boolean"
           },
+          "alternatives": {
+            "default": 0,
+            "description": "Add up to N next-best interpretations of an ambiguous input as `alternatives`.",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Alternatives",
+            "type": "integer"
+          },
           "city": {
             "anyOf": [
               {
@@ -272,6 +280,12 @@
             "default": true,
             "description": "Enable offline rooftop/TIGER geocoding",
             "title": "Enable Geocoding",
+            "type": "boolean"
+          },
+          "include_explanation": {
+            "default": false,
+            "description": "Add `explanation` (ordered change records) and `field_confidence` (per-field, heuristic) to the response.",
+            "title": "Include Explanation",
             "type": "boolean"
           },
           "include_metadata": {
@@ -350,6 +364,21 @@
           "address_status": {
             "title": "Address Status",
             "type": "string"
+          },
+          "alternatives": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternatives"
           },
           "building_key": {
             "anyOf": [
@@ -467,6 +496,35 @@
               }
             ],
             "title": "Dpv Footnotes"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation"
+          },
+          "field_confidence": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Confidence"
           },
           "fips_code": {
             "anyOf": [

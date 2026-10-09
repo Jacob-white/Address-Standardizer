@@ -173,6 +173,8 @@ Input payload for single address standardization.
 | `allow_locality` | `boolean` | no | Allow locality-only / city-level fallback |
 | `correct_state_from_zip` | `boolean` | no | Replace a US state that contradicts the ZIP with the ZIP's state (reported as WARN_STATE_CORRECTED_FROM_ZIP). Off by default: a mismatching state is kept and the address is flagged ERR_ZIP_STATE_MISMATCH / UNDELIVERABLE. |
 | `include_metadata` | `boolean` | no | Include delivery intelligence and spatial metadata |
+| `include_explanation` | `boolean` | no | Add `explanation` (ordered change records) and `field_confidence` (per-field, heuristic) to the response. |
+| `alternatives` | `integer` | no | Add up to N next-best interpretations of an ambiguous input as `alternatives`. |
 
 ### `StandardizeResponse`
 
@@ -212,6 +214,9 @@ Standardized USPS Pub 28 / ISO address output schema.
 | `rooftop_address` | `string` or `null` | no |  |
 | `full_rooftop_address` | `string` or `null` | no |  |
 | `care_of` | `string` or `null` | no |  |
+| `explanation` | array of `object` or `null` | no |  |
+| `field_confidence` | `object` or `null` | no |  |
+| `alternatives` | array of `object` or `null` | no |  |
 
 ### `ValidationError`
 
