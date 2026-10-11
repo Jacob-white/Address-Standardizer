@@ -1,6 +1,6 @@
 # Data licence and attribution
 
-`osm_sample.json`, `osm_holdout.json`, `osm_holdout_v2.json` (and any corpus produced by `build_osm_corpus.py`) is a **derived database of OpenStreetMap data**.
+`osm_sample.json`, `osm_holdout.json`, `osm_holdout_v2.json`, `osm_holdout_v3.json` (and any corpus produced by `build_osm_corpus.py`) is a **derived database of OpenStreetMap data**.
 
 > Contains information from OpenStreetMap, (c) OpenStreetMap contributors, made available under the
 > [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/1-0/).
@@ -16,6 +16,9 @@ What this means for you:
   `osm_sample.json`, and is likewise OSM-derived and NOT human-reviewed.
 - `osm_holdout_v2.json` is a third, sealed evaluation set (areas disjoint from both of the above, built with
   `build_osm_corpus.py --holdout-v2`). It is licensed, attributed and traceable in exactly the same way, and is
+  likewise OSM-derived and NOT human-reviewed.
+- `osm_holdout_v3.json` is a fourth, sealed evaluation set (areas disjoint from all of the above, built with
+  `build_osm_corpus.py --holdout-v3`). It is licensed, attributed and traceable in exactly the same way, and is
   likewise OSM-derived and NOT human-reviewed.
 - The sample is a derivative database under ODbL: if you redistribute it or a database derived from it, you must
   keep this attribution, offer the result under ODbL, and keep it open. The ODbL applies to the data in

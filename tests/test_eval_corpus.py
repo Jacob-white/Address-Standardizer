@@ -257,6 +257,32 @@ def test_build_corpus_holdout_v2_flag_selects_v2_bboxes_only():
     assert bc.build_corpus(["ID"], 2, 5, "unused", fetcher=fetcher, holdout=True) == [] and not seen
 
 
+def test_holdout_v3_bboxes_are_disjoint_from_every_earlier_set_and_each_other():
+    v3 = {k: c["holdout_v3_bboxes"] for k, c in bc.COUNTRIES.items() if c.get("holdout_v3_bboxes")}
+    assert len(v3) >= 40
+    for iso2, boxes in v3.items():
+        earlier = (bc.COUNTRIES[iso2].get("bboxes", []) + bc.COUNTRIES[iso2].get("holdout_bboxes", [])
+                   + bc.COUNTRIES[iso2].get("holdout_v2_bboxes", []))
+        for i, box in enumerate(boxes):
+            for other in earlier + boxes[:i]:
+                assert not _overlap(box, other), f"{iso2} v3 box {box} overlaps {other}"
+
+
+def test_build_corpus_holdout_v3_flag_selects_v3_bboxes_only():
+    seen = []
+
+    def fetcher(query):
+        seen.append(query)
+        return _payload(5)
+
+    cfg = bc.COUNTRIES["US"]
+    bc.build_corpus(["US"], 2, 5, "unused", fetcher=fetcher, holdout_v3=True)
+    assert len(seen) == len(cfg["holdout_v3_bboxes"])
+    earlier = [bc.build_query(b, "addr:city", 150)
+               for b in cfg["holdout_bboxes"] + cfg["bboxes"] + cfg["holdout_v2_bboxes"]]
+    assert not set(seen) & set(earlier)
+
+
 def test_committed_holdout_v2_is_well_formed_licensed_and_disjoint_from_earlier_sets():
     data = json.loads((EVAL_DIR / "osm_holdout_v2.json").read_text(encoding="utf-8"))
     recs = data["records"]
@@ -280,6 +306,30 @@ def test_committed_holdout_v2_is_well_formed_licensed_and_disjoint_from_earlier_
     assert "ODbL" in data["_meta"]["license"]
     license_text = (EVAL_DIR / "DATA_LICENSE.md").read_text(encoding="utf-8")
     assert "osm_holdout_v2.json" in license_text and "NOT human-reviewed" in license_text
+
+
+def test_committed_holdout_v3_is_well_formed_licensed_and_disjoint_from_earlier_sets():
+    data = json.loads((EVAL_DIR / "osm_holdout_v3.json").read_text(encoding="utf-8"))
+    recs = data["records"]
+    assert data["_meta"].get("holdout_v3") is True and data["_meta"]["seed"] == bc.HOLDOUT_V3_SEED
+    assert len(recs) >= 1000
+    per_country = {}
+    for r in recs:
+        per_country[r["country"]] = per_country.get(r["country"], 0) + 1
+    assert len(per_country) >= 40
+    assert {r["script"] for r in recs} - {"Latin"}
+    assert len({r["id"] for r in recs}) == len(recs)
+    for r in recs:
+        assert r["labels"]["street"] and r["labels"]["house_number"] and r["labels"]["postcode"]
+        assert r["inputs"]["structured"]["fields"]["street1"]
+        assert r["source"].startswith("osm:")
+    for name in ("osm_sample.json", "osm_holdout.json", "osm_holdout_v2.json"):
+        other = json.loads((EVAL_DIR / name).read_text(encoding="utf-8"))
+        assert not {r["source"] for r in recs} & {r["source"] for r in other["records"]}, name
+        assert not {r["id"] for r in recs} & {r["id"] for r in other["records"]}, name
+    assert "ODbL" in data["_meta"]["license"]
+    license_text = (EVAL_DIR / "DATA_LICENSE.md").read_text(encoding="utf-8")
+    assert "osm_holdout_v3.json" in license_text and "NOT human-reviewed" in license_text
 
 
 def test_committed_holdout_is_well_formed_licensed_and_disjoint_from_sample():
