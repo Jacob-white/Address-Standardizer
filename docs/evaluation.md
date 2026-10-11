@@ -261,3 +261,21 @@ house numbers truncated in the label, three-digit Colombian/Peruvian "postcodes"
 On v2 (now development) the all-fields exact match moved from 92.2% to about 95.9%. That number is **not** a
 generalisation estimate. The honest one comes from `osm_holdout_v3.json`: built from areas disjoint from every earlier
 set (`holdout_v3_bboxes`, seed 20270302), committed before any engine change from this round, run through the engine once.
+
+### Held-out v3: measured (once)
+
+`osm_holdout_v3.json` (1,182 records, seed 20270302) was committed before the round-2 engine commit and measured exactly
+once. Six boxes (UA, MX, HK, CZ, PH, UY) were never fetched because Overpass returned HTTP 500 after retries; they are not
+backfilled. Result: **94.5% all-fields exact match** (95% CI 94.0% - 94.9%, n = 10,106 renderings); see
+`benchmarks/eval/REPORT_HOLDOUT_V3.md`.
+
+| Set | Role | All-fields exact |
+| :--- | :--- | :--- |
+| `osm_holdout_v2.json` | consumed, now development | ~95.9% |
+| `osm_holdout_v3.json` | sealed, measured once | **94.5%** |
+
+Generalisation improved from 92.2% (v2, before the round) to 94.5% (v3, after it), and the development-to-held-out gap
+shrank to about 1.4 points. The two figures are on different sets, so the improvement is indicative, not a paired
+comparison. Countries under 95% on v3: JP (28.1%), PE (30.9%), ID (67.9%), MX (70.6%), EC (80.5%), BR (87.9%), TW, PH, IN,
+SA, SG. Weakest field: `state` (78.4% accuracy, 93.1% precision). Part of that is OSM label noise (see above), but it has
+not been separated from real engine misses, so no share is claimed. v3 is now consumed too; further tuning needs a v4.
