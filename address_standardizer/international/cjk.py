@@ -161,8 +161,9 @@ RE_KR_DISTRICT = re.compile(r"^((?:[중동서남북]구)|(?:\S{2,}?[시군구]))
 _JP_DASH = r"[-一ー\u2010-\u2015\u2212]"
 RE_JP_CHOME_BLOCK = re.compile(rf"(?<=[^\d\s])(\d+丁目(?:\d+(?:{_JP_DASH}\d+)*(?:番地?(?:\d+号?)?|号)?)?)$")
 RE_JP_DASHED_BLOCK = re.compile(rf"(?<=[^\d\s\-一ー目])(\d+(?:{_JP_DASH}\d+)+)$")
-# A lone number glued to a road/street name ("石山通1001", "国道230号1281", "末広通り6").
-RE_JP_PLAIN_BLOCK = re.compile(r"(?<=[通り号町道線筋字])(\d+)$")
+# A lone number glued to a road/street/district name ("石山通1001", "国道230号1281", "末広通り6", "榴岡1"): any Japanese
+# letter before it (kanji, hiragana, katakana, long-vowel mark).
+RE_JP_PLAIN_BLOCK = re.compile(r"(?<!第)(?<=[\u3040-\u30ff\u3400-\u4dbf\u4e01-\u9fff])(\d+)$")
 # Hokkaido grid addresses ("北1条西17丁目16"): the 条/丁目 blocks name the block, only the trailing number is the house.
 RE_JP_GRID_BLOCK = re.compile(rf"^(.*\d+条[東西南北]\s*\d+丁目)\s*(\d+(?:{_JP_DASH}\d+)*)?$")
 RE_JP_GRID_SPACE = re.compile(r"(\d+条[東西南北])\s+(\d+丁目)")

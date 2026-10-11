@@ -30,7 +30,7 @@ from address_standardizer.international.base import (
 from address_standardizer.international.diacritics import (
     normalize_to_canonical_unicode,
 )
-from address_standardizer.tables import COUNTRY_MAP, GLOBAL_METRO_TO_COUNTRY
+from address_standardizer.tables import COUNTRY_NAME_MAP, GLOBAL_METRO_TO_COUNTRY
 
 # PO Box patterns (English and Arabic)
 RE_PO_BOX = re.compile(
@@ -218,7 +218,7 @@ class MenaAfricaGrammar(CountryGrammar):
                 and parts[-1].strip() not in UAE_EMIRATES
                 and (
                     parts[-1].upper() in self.supported_countries
-                    or parts[-1].upper() in COUNTRY_MAP
+                    or parts[-1].upper() in COUNTRY_NAME_MAP
                     or parts[-1].strip() in ARABIC_COUNTRY_MAP
                 )
             ):

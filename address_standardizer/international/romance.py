@@ -10,7 +10,7 @@ from address_standardizer.international.base import (
     split_intl_secondary_unit,
 )
 from address_standardizer.international.diacritics import normalize_to_canonical_unicode
-from address_standardizer.tables import COUNTRY_MAP, GLOBAL_METRO_TO_COUNTRY
+from address_standardizer.tables import COUNTRY_NAME_MAP, GLOBAL_METRO_TO_COUNTRY
 
 # Road type abbreviations for Romance languages
 ROMANCE_ROAD_TYPES: Dict[str, str] = {
@@ -122,7 +122,7 @@ RE_STANDALONE_NUMBER = re.compile(
     r"^(?:N[º°o]?\.?\s*)?(\d+[A-Za-z]?(?:\s?[/-]\s?\d+[A-Za-z]?)?(?:\s+[A-Za-z]{1,2}\d+)?|S/N)$", re.IGNORECASE
 )
 # A house number glued in front of a locality: "108 São Paulo" (but not "20 de Noviembre", "5 do Sul").
-RE_LEADING_NUMBER_LOCALITY = re.compile(r"^(\d+[A-Za-z]?(?:\s+[A-Za-z]{1,2}\d+)?)\s+(?!(?:de|del|da|do|das|dos|di)\b)([^\W\d_].*)$", re.IGNORECASE)
+RE_LEADING_NUMBER_LOCALITY = re.compile(r"^(\d+[A-Za-z]?(?:\s+[A-Za-z]{1,2}\d+)?|S/N)\s+(?!(?:de|del|da|do|das|dos|di)\b)([^\W\d_].*)$", re.IGNORECASE)
 # "7 - 9": the dash joins a house-number range, it does not introduce a barrio.
 RE_NUMBER_RANGE_DASH = re.compile(r"(\d[A-Za-z]?)\s+[-–]\s+(\d+[A-Za-z]?)\s*$")
 
@@ -250,6 +250,22 @@ def _postal_city_re(country_iso: str) -> "re.Pattern[str]":
     return _RE_POSTAL_CITY_PRT if country_iso in ("PRT", "PT", "PORTUGAL") else _RE_POSTAL_CITY
 
 
+# Dotted Italian street-type abbreviations at the start of a street ("V. Dante", "C.so Sardegna"): the dot is required,
+# a bare "V" is too ambiguous.
+_IT_COUNTRIES = frozenset({"ITA", "IT", "ITALY", "ITALIA"})
+_RE_IT_ABBREV = re.compile(r"^(V\.le|V\.lo|C\.so|P\.zza|P\.za|L\.go|V\.)(?=\s|\.|[A-Za-z])\.?\s*", re.IGNORECASE)
+_IT_ABBREV = {"V.": "Via", "C.SO": "Corso", "P.ZA": "Piazza", "P.ZZA": "Piazza", "V.LE": "Viale", "L.GO": "Largo",
+              "V.LO": "Vicolo"}
+
+
+def expand_italian_street_abbreviation(line: str) -> str:
+    """"V. Dante 53" -> "Via Dante 53"; only a dotted abbreviation at the very start is expanded."""
+    m = _RE_IT_ABBREV.match(line)
+    if not m:
+        return line
+    return f"{_IT_ABBREV[m.group(1).upper()]} {line[m.end():]}"
+
+
 class RomanceGrammar(CountryGrammar):
     """Romance and Latin American address grammar with prefix road types and colonias."""
 
@@ -327,6 +343,8 @@ class RomanceGrammar(CountryGrammar):
         state_raw = metadata.get("state", "")
         postal_raw = metadata.get("postal_code", "")
         country_iso = metadata.get("country", self.country_iso3)
+        if str(country_iso).upper() in _IT_COUNTRIES:
+            s1_raw = expand_italian_street_abbreviation(s1_raw)
 
         unit_type: Optional[str] = None
         unit_number: Optional[str] = None
@@ -339,7 +357,7 @@ class RomanceGrammar(CountryGrammar):
             parts_comma = [p.strip() for p in s1_raw.split(",") if p.strip()]
             if len(parts_comma) >= 2 and (
                 parts_comma[-1].upper() in self.supported_countries
-                or parts_comma[-1].upper() in COUNTRY_MAP
+                or parts_comma[-1].upper() in COUNTRY_NAME_MAP
                 or parts_comma[-1].upper()
                 in ("USA", "US", "UNITED STATES", "CANADA", "UK", "UNITED KINGDOM", "FRANCE", "SPAIN", "MEXICO", "COLOMBIA", "ARGENTINA", "BRAZIL")
             ):

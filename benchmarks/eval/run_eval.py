@@ -54,6 +54,8 @@ _TYPE_CANON = {
     # Romance / Slavic / other common abbreviations
     "c": "calle", "pza": "plaza", "pz": "plaza", "piazza": "plaza", "r": "rua", "tv": "travessa", "pc": "praca",
     "ul": "ulica", "al": "aleja",
+    # Colombian grid street types (the engine writes the standard abbreviation, OSM the full word)
+    "cra": "carrera", "cr": "carrera", "diag": "diagonal", "transv": "transversal", "circ": "circular",
     "ул": "улица", "пр": "проспект", "просп": "проспект", "пер": "переулок", "бул": "бульвар", "вул": "вулиця",
     "пров": "провулок",
 }
@@ -109,6 +111,9 @@ def _canon_token(tok: str) -> str:
     # German/Dutch compound suffix: "hauptstr" / "hauptstrasse" -> "hauptstrasse"
     if len(tok) > 3 and tok.endswith("str"):
         return tok + "asse"
+    # Dutch "kruisstr" / "kruisstraat": same abbreviation rule, compared in the one canonical form
+    if len(tok) > 6 and tok.endswith("straat"):
+        return tok[:-6] + "strasse"
     return tok
 
 

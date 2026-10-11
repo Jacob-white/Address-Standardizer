@@ -34,7 +34,7 @@ from address_standardizer.international.romance import (
     parse_street2_unit,
     split_number_from_locality,
 )
-from address_standardizer.tables import COUNTRY_MAP, GLOBAL_METRO_TO_COUNTRY
+from address_standardizer.tables import COUNTRY_NAME_MAP, GLOBAL_METRO_TO_COUNTRY
 
 # Road type abbreviations for Latin America (Spanish & Portuguese)
 LATAM_ROAD_TYPES: Dict[str, str] = {
@@ -125,6 +125,38 @@ MX_CITY_STATE: Dict[str, str] = {
     "PACHUCA": "HIDALGO", "ACAPULCO": "GUERRERO", "ZACATECAS": "ZACATECAS", "DURANGO": "DURANGO",
     "CAMPECHE": "CAMPECHE", "COLIMA": "COLIMA", "TLAXCALA": "TLAXCALA",
 }
+
+# Argentine provincial capitals and major cities -> province (same rules as MX_CITY_STATE). Buenos Aires itself is left
+# out: the autonomous city (CABA) is not part of Buenos Aires Province, and the address rarely says which is meant.
+AR_CITY_STATE: Dict[str, str] = {
+    "ROSARIO": "SANTA FE", "SANTA FE": "SANTA FE", "RAFAELA": "SANTA FE", "VENADO TUERTO": "SANTA FE",
+    "MENDOZA": "MENDOZA", "SAN RAFAEL": "MENDOZA", "CORDOBA": "CÓRDOBA", "RIO CUARTO": "CÓRDOBA",
+    "VILLA MARIA": "CÓRDOBA", "VILLA CARLOS PAZ": "CÓRDOBA", "LA PLATA": "BUENOS AIRES",
+    "MAR DEL PLATA": "BUENOS AIRES", "BAHIA BLANCA": "BUENOS AIRES", "TANDIL": "BUENOS AIRES",
+    "QUILMES": "BUENOS AIRES", "LANUS": "BUENOS AIRES", "LOMAS DE ZAMORA": "BUENOS AIRES",
+    "SAN MIGUEL DE TUCUMAN": "TUCUMÁN", "TUCUMAN": "TUCUMÁN", "SALTA": "SALTA", "SAN JUAN": "SAN JUAN",
+    "RESISTENCIA": "CHACO", "NEUQUEN": "NEUQUÉN", "SANTIAGO DEL ESTERO": "SANTIAGO DEL ESTERO",
+    "CORRIENTES": "CORRIENTES", "POSADAS": "MISIONES", "PARANA": "ENTRE RÍOS", "FORMOSA": "FORMOSA",
+    "SAN LUIS": "SAN LUIS", "LA RIOJA": "LA RIOJA", "CATAMARCA": "CATAMARCA",
+    "SAN SALVADOR DE JUJUY": "JUJUY", "JUJUY": "JUJUY", "USHUAIA": "TIERRA DEL FUEGO",
+    "RIO GALLEGOS": "SANTA CRUZ", "COMODORO RIVADAVIA": "CHUBUT", "TRELEW": "CHUBUT", "RAWSON": "CHUBUT",
+    "SAN CARLOS DE BARILOCHE": "RÍO NEGRO", "BARILOCHE": "RÍO NEGRO", "VIEDMA": "RÍO NEGRO",
+    "SANTA ROSA": "LA PAMPA",
+}
+
+# Chilean regional capitals and major cities -> region (official "Región de ..." names).
+CL_CITY_STATE: Dict[str, str] = {
+    "TEMUCO": "REGIÓN DE LA ARAUCANÍA", "CONCEPCION": "REGIÓN DEL BIOBÍO", "CHILLAN": "REGIÓN DE ÑUBLE",
+    "VALPARAISO": "REGIÓN DE VALPARAÍSO", "VINA DEL MAR": "REGIÓN DE VALPARAÍSO",
+    "ANTOFAGASTA": "REGIÓN DE ANTOFAGASTA", "CALAMA": "REGIÓN DE ANTOFAGASTA", "LA SERENA": "REGIÓN DE COQUIMBO",
+    "COQUIMBO": "REGIÓN DE COQUIMBO", "RANCAGUA": "REGIÓN DEL LIBERTADOR GENERAL BERNARDO O'HIGGINS",
+    "TALCA": "REGIÓN DEL MAULE", "CURICO": "REGIÓN DEL MAULE", "ARICA": "REGIÓN DE ARICA Y PARINACOTA",
+    "IQUIQUE": "REGIÓN DE TARAPACÁ", "PUERTO MONTT": "REGIÓN DE LOS LAGOS", "OSORNO": "REGIÓN DE LOS LAGOS",
+    "VALDIVIA": "REGIÓN DE LOS RÍOS", "PUNTA ARENAS": "REGIÓN DE MAGALLANES Y DE LA ANTÁRTICA CHILENA",
+    "COPIAPO": "REGIÓN DE ATACAMA",
+}
+
+LATAM_CITY_STATE: Dict[str, Dict[str, str]] = {"MEX": MX_CITY_STATE, "ARG": AR_CITY_STATE, "CHL": CL_CITY_STATE}
 
 # Brazilian CEP: 12345-678 or 12345678
 RE_BRA_CEP = re.compile(r"^\b(\d{5})-?(\d{3})\b$")
@@ -245,11 +277,11 @@ class LatinAmericaGrammar(CountryGrammar):
         country_iso = self._resolve_country_iso(country_raw)
 
         # Only Argentina has four-digit postal codes; elsewhere a bare four-digit number is a house number.
-        pc_digits = r"\d{4,7}" if country_iso == "ARG" else r"\d{5,7}"
+        pc_digits = r"\d{4,8}" if country_iso == "ARG" else r"\d{5,8}"
         # Argentine CPA is "X5000" (province letter + 4 digits) or the full "X5000ABC"; a short 3-digit code opening
         # the locality part ("500 Córdoba") is a mistyped postcode there. Elsewhere only the full CPA shape is read.
         cpa = r"[A-Z]\d{4}(?:[A-Z]{3})?" if country_iso == "ARG" else r"[A-Z]\d{4}[A-Z]{3}"
-        lead_digits = r"\d{3,7}" if country_iso == "ARG" else r"\d{5,7}"
+        lead_digits = r"\d{3,8}" if country_iso == "ARG" else r"\d{5,8}"
         lead_pc = rf"\d{{5}}(?:-\d{{3}})?|{cpa}|{lead_digits}"
         end_pc = rf"\d{{5}}(?:-\d{{3}})?|{cpa}|{pc_digits}"
 
@@ -264,7 +296,7 @@ class LatinAmericaGrammar(CountryGrammar):
             parts_comma = [p.strip() for p in s1_raw.split(",") if p.strip()]
             if len(parts_comma) >= 2 and (
                 parts_comma[-1].upper() in self.supported_countries
-                or parts_comma[-1].upper() in COUNTRY_MAP
+                or parts_comma[-1].upper() in COUNTRY_NAME_MAP
             ):
                 country_iso = self._resolve_country_iso(parts_comma[-1])
                 parts_comma = parts_comma[:-1]
@@ -297,7 +329,7 @@ class LatinAmericaGrammar(CountryGrammar):
                         RE_ARG_CPA.match(part.strip())
                         and (country_iso == "ARG" or not part.strip().isdigit() or not rem_parts)
                     )
-                    or re.match(r"^\d{5,7}$", part.strip())
+                    or re.match(r"^\d{5,8}$", part.strip())
                 ):
                     postal_raw = part.strip()
                     continue
@@ -447,8 +479,8 @@ class LatinAmericaGrammar(CountryGrammar):
         norm_city = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", city_raw).strip().upper())
         norm_state = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", state_raw).strip().upper())
         norm_dep_loc = normalize_to_canonical_unicode(dep_locality.upper()) if dep_locality else None
-        if country_iso == "MEX" and not norm_state:
-            norm_state = MX_CITY_STATE.get(fold_to_ascii_key(norm_city), "")
+        if not norm_state:
+            norm_state = LATAM_CITY_STATE.get(country_iso, {}).get(fold_to_ascii_key(norm_city), "")
 
         return ParsedAddressComponents(
             street_number=st_num,

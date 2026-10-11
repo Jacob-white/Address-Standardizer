@@ -20,6 +20,7 @@ from address_standardizer._patterns import (
     RE_WHITESPACE,
     FROZEN_US_STATE_CODES,
 )
+from address_standardizer.international.gazetteer import known_city_suffix_length
 from address_standardizer.international.diacritics import (
     fold_to_ascii_key,
     normalize_to_canonical_unicode,
@@ -27,6 +28,7 @@ from address_standardizer.international.diacritics import (
 from address_standardizer.tables import (
     CANADIAN_PROVINCES,
     COUNTRY_MAP,
+    COUNTRY_NAME_MAP,
     DIRECTIONALS,
     GLOBAL_METRO_TO_COUNTRY,
     SECONDARY_UNITS,
@@ -231,6 +233,22 @@ def _split_postal_first(words: List[str], country_iso: str) -> Optional[Tuple[st
     return None
 
 
+def _split_known_city_postal_last(words: List[str], country_iso: str) -> Optional[Tuple[str, str, str]]:
+    """"6813 Jabal Omar Makkah al Mukarramah 24231": the line ends with the postal code, and the words before it end
+    with a listed major city of the country (see ``gazetteer``); everything before that city is the street."""
+    ends = _postal_end_run(words, country_iso)
+    if ends is None:
+        return None
+    rest, run = ends
+    count = known_city_suffix_length(country_iso, rest)
+    street = rest[:-count] if count else []
+    if not street or not re.search(r"[^\W\d_]", " ".join(street)):
+        return None
+    if street[-1] in _PREFIX_TYPE_WORDS or street[-1] in _THAI_PREFIX_TYPES or street[-1].upper() in _LATIN_PREFIX_TYPES:
+        return None  # "10 Soi Pattaya": a bare type word means the "city" is really the street's name
+    return " ".join(street), " ".join(rest[-count:]), " ".join(run)
+
+
 def split_commaless_locality(text: str, country_iso: str) -> Optional[Tuple[str, str, str]]:
     """Split "Street 12 POSTCODE City" (no commas) into (street, city, postal); None when it cannot be done safely.
 
@@ -241,6 +259,9 @@ def split_commaless_locality(text: str, country_iso: str) -> Optional[Tuple[str,
     ("1054 Budapest Zoltán utca 16").
     """
     words = (text or "").split()
+    known_city = _split_known_city_postal_last(words, country_iso)
+    if known_city is not None:
+        return known_city
     if len(words) > 1 and words[1] in _PREFIX_TYPE_WORDS:  # "122 شارع 26 يوليو Cairo 11211": "26" is not the house number
         number_first = _split_number_first_postal_last(words, country_iso)
         if number_first is not None:
@@ -589,7 +610,7 @@ class UniversalInternationalGrammar(CountryGrammar):
         if not city_raw and s1_raw and "," in s1_raw:
             parts_comma = [p.strip() for p in s1_raw.split(",") if p.strip()]
             if len(parts_comma) >= 2 and (
-                parts_comma[-1].upper() in COUNTRY_MAP
+                parts_comma[-1].upper() in COUNTRY_NAME_MAP
                 or parts_comma[-1].upper()
                 in ("CANADA", "UK", "UNITED KINGDOM", "CAYMAN ISLANDS")
             ):

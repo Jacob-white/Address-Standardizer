@@ -1018,3 +1018,7 @@ STATE_TO_FIPS: Dict[str, str] = {
     "WV": "54", "WI": "55", "WY": "56", "PR": "72", "VI": "78", "GU": "66",
     "AS": "60", "MP": "69",
 }
+
+# Country names/codes that may appear in free text. The numeric ISO codes in COUNTRY_MAP ("136" = Cayman Islands,
+# "250" = France, ...) are only meaningful in the dedicated country field: in free text they are house numbers.
+COUNTRY_NAME_MAP: Dict[str, str] = {name: iso for name, iso in COUNTRY_MAP.items() if not name.isdigit()}

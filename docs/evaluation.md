@@ -64,6 +64,8 @@ Comparisons are deliberately lenient only where the same address can legitimatel
 - case, accents/diacritics and punctuation are ignored (`ß` = `ss`, NFKC/NFKD folding);
 - street types and directionals are canonicalised (`St`/`Street`, `Str.`/`straße`, `N`/`North`, `Av.`/`Avenida`,
   `ул.`/`улица` ...) and English ordinal words (`Fifth` = `5th`);
+- Colombian grid street types (`Cra`/`Cr`/`Carrera`, `Diag`/`Diagonal`, `Transv`/`Transversal`, `Circ`/`Circular`) and Dutch
+  `-str.`/`-straat` are one form each (added for round 2, after v2 showed the engine's abbreviation scored as wrong);
 - Turkish dotted/dotless `i` are one letter (`ı`, `İ`, `I`, `i` all fold to `i`): the engine upper-cases
   `Kızılırmak` to `KIZILIRMAK`, which is the same street, not a different one;
 - for records labelled Canada only, French directionals equal their one-letter forms and the English words
@@ -238,3 +240,24 @@ generalisation estimate. Weakest fields on v2: `state` (66.5%, mostly Latin-Amer
 state name while the engine returns nothing or a code) and, by country, AR, CO, JP, ID, KE, MX, SA and PE. V2 is now
 consumed: any engine change motivated by its failures must be validated on a new, sealed v3, never on v2 again.
 
+## Round 2: v2 becomes a development set, v3 is sealed
+
+After v2 was measured, its failures were used to fix the engine (that is what a development set is for), so v2 is no longer
+an independent estimate. The fixes (all with tests, 100% coverage kept):
+
+- state from a known city when the address names none: Argentine provinces and Chilean regions (as Mexico already did);
+- a small gazetteer of major cities (ID, VN, KE, NG, SA, EG, TH, IN, CO, PE, AR, CL, UY, EC) to find where the city starts
+  in comma-less lines such as `6813 Jabal Omar Makkah al Mukarramah 24231`;
+- structured input with city and state swapped is repaired for Canada and Australia (the US already was);
+- Canadian `Street, Province, City Postal`; Brazilian eight-digit CEP without a hyphen and `S/N`; Italian dotted type
+  abbreviations (`V.`, `C.so`, `P.za`, `V.le`); Japanese numbers glued to a district name (`榴岡1`);
+- a real bug: a bare last number such as the house number `136` was read as ISO numeric country code 136 (Cayman Islands)
+  in the Russian, Latin-American, Romance, MENA and offshore grammars, which dropped it from the street.
+
+Not done on purpose: expanding Cyrillic abbreviations (`пр-т` to `проспект`; the engine keeps the address as written and
+existing tests pin that), and chasing labels that are OSM noise (Indonesian sub-localities inside the city tag, Japanese
+house numbers truncated in the label, three-digit Colombian/Peruvian "postcodes" that are phone prefixes).
+
+On v2 (now development) the all-fields exact match moved from 92.2% to about 95.9%. That number is **not** a
+generalisation estimate. The honest one comes from `osm_holdout_v3.json`: built from areas disjoint from every earlier
+set (`holdout_v3_bboxes`, seed 20270302), committed before any engine change from this round, run through the engine once.

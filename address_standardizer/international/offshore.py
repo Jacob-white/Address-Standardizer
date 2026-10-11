@@ -16,7 +16,7 @@ from address_standardizer.international.base import (
 )
 from address_standardizer.international.uk import split_po_box_unit
 from address_standardizer.international.diacritics import normalize_to_canonical_unicode
-from address_standardizer.tables import COUNTRY_MAP, DIRECTIONALS, STREET_SUFFIXES
+from address_standardizer.tables import COUNTRY_NAME_MAP, DIRECTIONALS, STREET_SUFFIXES
 
 RE_CYM_POSTCODE = re.compile(r"^(?:CYM[- ]*)?(?:KY([1-3])?[- ]*)?(\d{4})$", re.IGNORECASE)
 RE_VGB_POSTCODE = re.compile(r"^(VG\d{4})$", re.IGNORECASE)
@@ -175,7 +175,7 @@ class OffshoreGrammar(CountryGrammar):
             parts_comma = [p.strip() for p in s1_raw.split(",") if p.strip()]
             if len(parts_comma) >= 2 and (
                 parts_comma[-1].upper() in self.supported_countries
-                or parts_comma[-1].upper() in COUNTRY_MAP
+                or parts_comma[-1].upper() in COUNTRY_NAME_MAP
                 or parts_comma[-1].upper() in ("CAYMAN ISLANDS", "BVI", "BERMUDA", "PANAMA")
             ):
                 parts_comma = parts_comma[:-1]

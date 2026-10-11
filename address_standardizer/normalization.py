@@ -11,6 +11,7 @@ from address_standardizer.tables import (
     STREET_SUFFIXES,
     US_STATES,
     COUNTRY_MAP,
+    COUNTRY_NAME_MAP,
     CANADIAN_PROVINCES,
     CANADIAN_PROVINCE_NAMES_COMPACT,
     ZIP3_TO_STATE,
@@ -60,7 +61,7 @@ _RE_AU_STATE_POSTCODE = re.compile(r"(?:^|[,\s])(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT)
 _RE_TRAILING_CAN_PROVINCE = re.compile(r",\s*(?:ON|QC|BC|AB|MB|SK|NS|NB|NL|PE|NT|YT|NU)\s*$")
 # Names scanned out of free text (street lines, city parts). The numeric ISO codes in COUNTRY_MAP ("500" = Montserrat,
 # "250" = France, ...) are only meaningful in the dedicated country field: in free text they are house numbers.
-_COUNTRY_NAME_MAP = {name: iso for name, iso in COUNTRY_MAP.items() if not name.isdigit()}
+_COUNTRY_NAME_MAP = COUNTRY_NAME_MAP
 
 UNKNOWN_COUNTRY = "ZZZ"  # ISO 3166 user-assigned code, used when a supplied country name cannot be resolved
 _COUNTRY_PLACEHOLDERS = frozenset(
@@ -335,6 +336,14 @@ def swap_us_city_state(city: Optional[str], state: Optional[str]) -> Tuple[Optio
     any pair whose state field is a real state stay as given.
     """
     if city and state and city.strip(" .").upper() in US_STATES and state.strip(" .").upper() not in US_STATES:
+        return state, city
+    return city, state
+
+
+def swap_region_city_state(city: Optional[str], state: Optional[str], regions) -> Tuple[Optional[str], Optional[str]]:
+    """Generic form of :func:`swap_us_city_state`: swap only when ``city`` is one of the country's regions (code or
+    name, upper-case keys in ``regions``) and ``state`` is not."""
+    if city and state and city.strip(" .").upper() in regions and state.strip(" .").upper() not in regions:
         return state, city
     return city, state
 

@@ -361,6 +361,17 @@ class CanadaGrammar(CountryGrammar):
                     state_raw = parts_comma[-1]
                     city_raw = parts_comma[-2]
                     street_line = ", ".join(parts_comma[:-2])
+                elif (
+                    len(parts_comma) >= 3
+                    and province_code(parts_comma[-2])
+                    and RE_CAN_PROV_THEN_POSTAL.match(last_part)
+                ):
+                    # "Street, Nova Scotia, Halifax B3H 4A8": province before the "City Postal" part (the regex's first
+                    # group is the city here, not a province)
+                    m_city_post = RE_CAN_PROV_THEN_POSTAL.match(parts_comma[-1])
+                    state_raw = parts_comma[-2]
+                    city_raw, postal_raw = m_city_post.group(1), m_city_post.group(2)
+                    street_line = ", ".join(parts_comma[:-2])
                 else:
                     city_raw = parts_comma[-1]
                     street_line = ", ".join(parts_comma[:-1])

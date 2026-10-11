@@ -53,14 +53,10 @@ def test_split_commaless_locality(line, iso, expected):
     "line, iso",
     [
         ("98 Hill Road Mumbai", "IND"),  # no postal code
-        ("3 Santacruz Skywalk Mumbai 400055", "IND"),  # no street-type anchor: precision over recall
-        ("Hill Road Mumbai 400050", "IND"),  # not number-first
         ("98 Hill Road 400050", "IND"),  # nothing between street type and postal code
         ("98 Hill Road Mumbai 2 400050", "IND"),  # tail holds a digit: not a plain city
-        ("98 Hill Road North Mumbai 400050", "IND"),  # tail opens with a directional
         ("25 شارع شريف باشا 2 11513", "EGY"),  # the last word is not a name
         ("10 Soi Pattaya 20150", "THA"),  # too short for Soi + name + city
-        ("14 Ratsada Phuket 83000", "THA"),  # no type word at all
         ("10 ถนน Phuket 83000", "THA"),  # a bare type word, not an attached street name
         ("10 ถนนพังงา 83000", "THA"),  # no city after the street
         ("1054 Budapest Zoltán utca", "HUN"),  # street without house number
@@ -75,8 +71,22 @@ def test_split_commaless_locality_declines_when_unsafe(line, iso):
 
 
 def test_two_word_arabic_city_is_not_split_mid_name():
-    # "مدينة نصر" (Nasr City) must not become street "... مدينة" + city "نصر"
-    assert split_commaless_locality("25 شارع شريف باشا مدينة نصر 11511", "EGY") is None
+    # "مدينة نصر" (Nasr City) must not become street "... مدينة" + city "نصر"; it is a listed city, so it stays whole
+    assert split_commaless_locality("25 شارع شريف باشا مدينة نصر 11511", "EGY") == (
+        "25 شارع شريف باشا", "مدينة نصر", "11511")
+
+
+@pytest.mark.parametrize(
+    "line, iso, expected",
+    [
+        ("3 Santacruz Skywalk Mumbai 400055", "IND", ("3 Santacruz Skywalk", "Mumbai", "400055")),  # no type anchor
+        ("Hill Road Mumbai 400050", "IND", ("Hill Road", "Mumbai", "400050")),  # not number-first
+        ("98 Hill Road North Mumbai 400050", "IND", ("98 Hill Road North", "Mumbai", "400050")),
+        ("14 Ratsada Phuket 83000", "THA", ("14 Ratsada", "Phuket", "83000")),  # no type word at all
+    ],
+)
+def test_a_listed_city_anchors_lines_the_type_word_heuristics_decline(line, iso, expected):
+    assert split_commaless_locality(line, iso) == expected
 
 
 @pytest.mark.parametrize(

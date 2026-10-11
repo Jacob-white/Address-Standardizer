@@ -63,6 +63,17 @@ were previously incorrect, and matching keys for non-Latin addresses changed.
   German house-number ranges).
 - Dependency security updates: `pyo3` 0.29 (GHSA-36hh-v3qg-5jq4, GHSA-chgr-c6px-7xpp, RUSTSEC-2025-0020), Rust 1.85.
 
+### Fixed (round 2, from the consumed v2 evaluation set)
+
+- A bare last comma part that is also an ISO numeric country code (a house number such as `136`, Cayman Islands) was taken
+  as the country and dropped from the Russian, Latin-American, Romance, MENA and offshore grammars; only the dedicated
+  country field reads numeric codes now.
+- State is inferred from a known city when none is given for Argentina and Chile (as for Mexico).
+- Comma-less lines: a gazetteer of major cities (ID, VN, KE, NG, SA, EG, TH, IN, CO, PE, AR, CL, UY, EC) anchors the city
+  (`... Makkah al Mukarramah 24231`); never guesses a name that is not listed.
+- Swapped structured city/state repaired for Canada and Australia; Canadian `Street, Province, City Postal`; Brazilian
+  eight-digit CEP without hyphen and `S/N`; Italian dotted street-type abbreviations; Japanese number glued to a district.
+
 ### Fixed
 
 - US: trailing house numbers, Farm-to-Market roads, `Urb` plus unit, floor in the city field, second street line with

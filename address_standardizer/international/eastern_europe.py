@@ -26,7 +26,7 @@ from address_standardizer.international.base import (
 from address_standardizer.international.diacritics import (
     normalize_to_canonical_unicode,
 )
-from address_standardizer.tables import COUNTRY_MAP, GLOBAL_METRO_TO_COUNTRY
+from address_standardizer.tables import COUNTRY_NAME_MAP, GLOBAL_METRO_TO_COUNTRY
 
 # Secondary unit indicators (Polish, Czech, Romanian, Greek, Cyrillic, Latin)
 RE_EE_SECONDARY = re.compile(
@@ -236,7 +236,7 @@ class EasternEuropeGrammar(CountryGrammar):
             # Strip trailing country if present
             if len(parts) >= 2 and (
                 parts[-1].upper() in self.supported_countries
-                or parts[-1].upper() in COUNTRY_MAP
+                or parts[-1].upper() in COUNTRY_NAME_MAP
             ):
                 country_iso = self._resolve_country_iso(parts[-1])
                 parts = parts[:-1]
