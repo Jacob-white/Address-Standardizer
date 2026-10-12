@@ -46,6 +46,8 @@ class KeyStore:
             else:
                 if len(secret) < MIN_KEY_LENGTH:
                     raise ValueError(f"API key entry #{number} is shorter than {MIN_KEY_LENGTH} characters")
+                # API keys are long random tokens, not user-chosen passwords: a plain SHA-256 is the right primitive
+                # (a slow password KDF would add per-request latency and no protection for a high-entropy secret).
                 entries.append((name, hashlib.sha256(secret.encode("utf-8")).digest()))
         return cls(entries)
 

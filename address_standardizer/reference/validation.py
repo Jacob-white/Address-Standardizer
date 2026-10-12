@@ -7,6 +7,7 @@ agrees with it. What it does NOT check: that the street or house number exists, 
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 import threading
@@ -16,6 +17,8 @@ from typing import Any, Dict, List, Optional
 from address_standardizer.international.countries import CountryRegistry
 from address_standardizer.reference._match import names_match
 from address_standardizer.reference.base import ReferencePlace, ReferenceProvider
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "ERR_POSTAL_UNKNOWN",
@@ -205,7 +208,7 @@ def attach_server_reference_validation(std_address: Any, response: Dict[str, Any
     """Add a ``reference_validation`` object to a REST response, only when ``ADDRESS_STANDARDIZER_REFERENCE_DB`` is set.
 
     With the variable unset the response is returned untouched. If the database cannot be opened the object is still
-    added, with status ``not_checked`` and the reason in ``detail``, so a misconfiguration is visible, not silent.
+    added, with status ``not_checked`` and the reason in ``detail``, so a misconfiguration is visible, not silent (the cause is logged, not returned).
     """
     path = os.environ.get(REFERENCE_DB_ENV)
     if not path:
@@ -217,9 +220,12 @@ def attach_server_reference_validation(std_address: Any, response: Dict[str, Any
             provider = _server_providers.get(path)
             if provider is None:
                 provider = _server_providers[path] = GeoNamesPostalProvider(path)
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError):
+        # The exception text can carry a server filesystem path, so it goes to the log, not the response.
+        logger.exception("Reference database %s could not be opened", REFERENCE_DB_ENV)
         response["reference_validation"] = {
-            "status": "not_checked", "reason_codes": [], "detail": f"reference database unavailable: {exc}",
+            "status": "not_checked", "reason_codes": [],
+            "detail": "reference database unavailable (see the server log)",
         }
         return response
     response["reference_validation"] = validate_against_reference(std_address, provider).as_dict()

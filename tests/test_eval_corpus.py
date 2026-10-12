@@ -5,6 +5,7 @@ import json
 import re
 import urllib.error
 from pathlib import Path
+from urllib.parse import urlparse
 
 import pytest
 
@@ -50,7 +51,7 @@ def test_fetch_caches_sets_user_agent_and_backs_off(tmp_path):
                             sleep=sleeps.append, opener=opener)
     assert len(out["elements"]) == 3
     assert seen[0].full_url == "https://a/x" and seen[1].full_url == "https://b/y"
-    assert seen[1].get_header("User-agent") == bc.USER_AGENT and "github.com" in bc.USER_AGENT
+    assert seen[1].get_header("User-agent") == bc.USER_AGENT and urlparse(re.search(r"https?://[^\s;)]+", bc.USER_AGENT).group()).hostname == "github.com"
     assert sleeps == [2.0]
     # second call is served from the cache without touching the network
     again = bc.fetch_overpass("Q1", str(tmp_path), opener=lambda *a, **k: pytest.fail("network used"))

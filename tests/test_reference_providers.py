@@ -1,8 +1,10 @@
 """Reference layer: GeoNames index builder, downloader, provider, composite provider, adapter interfaces."""
 
 import io
+import re
 import sqlite3
 import zipfile
+from urllib.parse import urlparse
 
 import pytest
 
@@ -133,7 +135,7 @@ class TestProvider:
         assert provider.name == "geonames-postal"
         assert provider.license == "CC-BY-4.0"
         assert provider.as_of == "2026-01-01"
-        assert "geonames.org" in provider.source
+        assert urlparse(re.search(r"https?://[^\s)]+", provider.source).group()).hostname == "download.geonames.org"
         info = provider.info()
         assert info["attribution"] == ATTRIBUTION and "Creative Commons" in ATTRIBUTION
         assert info["countries"] == ["CA", "FR", "GB", "NL", "US"]

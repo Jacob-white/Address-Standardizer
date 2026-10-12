@@ -96,6 +96,7 @@ class TestExplainOverRest:
         payload = {**ADDRESS, "include_explanation": True}
         body = make_client().post("/v1/standardize", json=payload).json()
         assert body["explanation"] and body["reference_validation"]["status"] == "not_checked"
+        assert "missing.sqlite" not in body["reference_validation"]["detail"]  # no server path in the response
 
 
 class TestReviewSurfaceIsOffByDefault:
