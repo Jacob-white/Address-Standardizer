@@ -73,6 +73,9 @@ def deserialize_value(payload: str) -> Any:
             building_key=data.get("building_key"),
             phonetic_key=data.get("phonetic_key"),
             is_registered_agent_hub=data.get("is_registered_agent_hub", False),
+            dependent_locality=data.get("dependent_locality"),
+            building_name=data.get("building_name"),
+            care_of=data.get("care_of"),
             rooftop_address=data.get("rooftop_address"),
         )
         std.confidence_score = data.get("confidence_score")
@@ -86,6 +89,25 @@ def deserialize_value(payload: str) -> Any:
         std.dpv_footnotes = data.get("dpv_footnotes") or []
         std.corporate_risk_score = data.get("corporate_risk_score", 0.0)
         std.corporate_risk_flags = data.get("corporate_risk_flags") or []
+
+        if "deliverability" in data and data["deliverability"] is not None:
+            std.deliverability = data["deliverability"]
+        if "latitude" in data and data["latitude"] is not None:
+            std.latitude = data["latitude"]
+        if "longitude" in data and data["longitude"] is not None:
+            std.longitude = data["longitude"]
+        if "precision" in data and data["precision"] is not None:
+            std.precision = data["precision"]
+        if "accuracy_radius_meters" in data and data["accuracy_radius_meters"] is not None:
+            std.accuracy_radius_meters = data["accuracy_radius_meters"]
+        if "census_tract" in data and data["census_tract"] is not None:
+            std.census_tract = data["census_tract"]
+        if "fips_code" in data and data["fips_code"] is not None:
+            std.fips_code = data["fips_code"]
+        if "is_locality_only" in data and data["is_locality_only"] is not None:
+            std.is_locality_only = data["is_locality_only"]
+        if "is_city_level" in data and data["is_city_level"] is not None:
+            std.is_city_level = data["is_city_level"]
 
         if data.get("audit_record_payload"):
             from address_standardizer.audit import StewardshipAuditRecord

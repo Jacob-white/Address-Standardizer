@@ -111,6 +111,21 @@ def test_codec_round_trips_standardized_addresses_and_plain_values():
     assert deserialize_value(serialize_value(object())).startswith("<object object")
     assert deserialize_value("[1, 2]") == [1, 2]
 
+    # Verify building_name and full metadata round-trip through serialize_value / deserialize_value
+    std_bldg = standardize_address(
+        street1="Ugland House, South Church St, Floor 4",
+        city="George Town",
+        state="Grand Cayman",
+        postal_code="KY1-1104",
+        country="CYM",
+        use_cache=False,
+    )
+    assert std_bldg.building_name == "UGLAND HOUSE"
+    payload_bldg = serialize_value(std_bldg)
+    back_bldg = deserialize_value(payload_bldg)
+    assert back_bldg.building_name == "UGLAND HOUSE"
+    assert back_bldg.as_dict(include_metadata=True) == std_bldg.as_dict(include_metadata=True)
+
 
 # -- Redis backend ----------------------------------------------------------------------------------------------------
 
