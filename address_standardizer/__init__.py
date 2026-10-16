@@ -146,8 +146,6 @@ except ImportError:
     create_app = None
 
 
-__version__ = "3.3.0"
-
 __all__ = [
     "StandardizedAddress",
     "standardize_address",

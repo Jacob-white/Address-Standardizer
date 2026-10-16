@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def main() -> int:
     versions = {
         "pyproject.toml": re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text(encoding="utf-8"), re.M).group(1),
+        "Cargo.toml": re.search(r'^version = "([^"]+)"', (ROOT / "Cargo.toml").read_text(encoding="utf-8"), re.M).group(1),
         "sdks/typescript/package.json": json.loads((ROOT / "sdks/typescript/package.json").read_text(encoding="utf-8"))["version"],
         "sdks/dotnet/AddressStandardizer.Client.csproj": re.search(
             r"<Version>([^<]+)</Version>", (ROOT / "sdks/dotnet/AddressStandardizer.Client.csproj").read_text(encoding="utf-8")

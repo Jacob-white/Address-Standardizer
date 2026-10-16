@@ -229,7 +229,7 @@ def _finalize_standardized_address(
     if cache_key is not None:
         cache = get_default_cache()
         if cache.is_enabled():
-            cache.set(cache_key, copy.copy(std))
+            cache.set(cache_key, copy.deepcopy(std))
     return std
 
 
@@ -370,7 +370,10 @@ def standardize_address(
         )
         cached = cache.get(cache_key)
         if cached is not None:
-            return copy.copy(cached)
+            hit = copy.deepcopy(cached)
+            if hit.audit_record is not None:
+                get_audit_ledger().ensure_recorded(hit.audit_record)
+            return hit
 
     def _finish(std: StandardizedAddress) -> StandardizedAddress:
         if not finalize:

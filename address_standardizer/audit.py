@@ -272,6 +272,10 @@ class StewardshipAuditLedger:
                 "LIMIT max(0, (SELECT count(*) FROM address_stewardship_audit_ledger) - ?))",
                 (self._max_rows,),
             )
+            conn.execute(
+                "DELETE FROM address_stewardship_audit_history WHERE audit_id NOT IN ("
+                "SELECT audit_id FROM address_stewardship_audit_ledger)"
+            )
 
     def ensure_recorded(self, audit_record: StewardshipAuditRecord) -> StewardshipAuditRecord:
         """Idempotent append: record the entry unless a row with the same ``audit_id`` already exists.
@@ -467,59 +471,61 @@ class StewardshipAuditLedger:
         ``review_status`` (default MODIFIED) lets the review UI record an approval (APPROVED: the proposed values are
         committed) or a rejection (REJECTED: nothing is committed, ``final_committed_payload`` is left empty).
         """
-        existing = self.get_record(audit_id)
-        if not existing:
-            raise KeyError(f"Audit record not found: {audit_id}")
-
-        committed = dict(existing.final_committed_payload)
-        committed.update(overrides)
-
-        # Re-run normalization in real time as specified by Blueprint Section 1.4.4 step 3
-        from address_standardizer.standardizer import standardize_address
-        re_norm = standardize_address(
-            street1=committed.get("street1"),
-            street2=committed.get("street2"),
-            city=committed.get("city"),
-            state=committed.get("state"),
-            postal_code=committed.get("postal_code"),
-            country=committed.get("country"),
-        )
-
-        final_payload = {} if review_status == ReviewStatus.REJECTED else {
-            "street1": re_norm.street1,
-            "street2": re_norm.street2,
-            "city": re_norm.city,
-            "state": re_norm.state,
-            "postal_code": re_norm.postal_code,
-            "country": re_norm.country,
-        }
-
-        now_utc = datetime.now(timezone.utc).isoformat()
-
-        updated = StewardshipAuditRecord(
-            audit_id=existing.audit_id,
-            record_id=existing.record_id,
-            batch_id=existing.batch_id,
-            timestamp_utc=existing.timestamp_utc,
-            agent_or_system_id=existing.agent_or_system_id,
-            action_type=ActionType.MANUAL_OVERRIDE,
-            confidence_score=1.0000,
-            failure_reason_codes=existing.failure_reason_codes,
-            normalized_address_key=re_norm.normalized_address_key,
-            building_key=re_norm.building_key,
-            phonetic_key=re_norm.phonetic_key,
-            is_registered_agent_hub=re_norm.is_registered_agent_hub,
-            is_private_residence=re_norm.is_private_residence,
-            dpv_confirmation_code=existing.dpv_confirmation_code,
-            raw_input_payload=existing.raw_input_payload,
-            proposed_standardized_payload=existing.proposed_standardized_payload,
-            final_committed_payload=final_payload,
-            steward_commentary=commentary,
-            review_status=review_status,
-            reviewed_by=steward_id,
-            reviewed_at=now_utc,
-        )
         with self._lock:
+            existing = self.get_record(audit_id)
+            if not existing:
+                raise KeyError(f"Audit record not found: {audit_id}")
+
+            committed = dict(existing.final_committed_payload)
+            committed.update(overrides)
+
+            # Re-run normalization in real time as specified by Blueprint Section 1.4.4 step 3
+            from address_standardizer.standardizer import standardize_address
+            re_norm = standardize_address(
+                street1=committed.get("street1"),
+                street2=committed.get("street2"),
+                city=committed.get("city"),
+                state=committed.get("state"),
+                postal_code=committed.get("postal_code"),
+                country=committed.get("country"),
+                finalize=False,
+                use_cache=False,
+            )
+
+            final_payload = {} if review_status == ReviewStatus.REJECTED else {
+                "street1": re_norm.street1,
+                "street2": re_norm.street2,
+                "city": re_norm.city,
+                "state": re_norm.state,
+                "postal_code": re_norm.postal_code,
+                "country": re_norm.country,
+            }
+
+            now_utc = datetime.now(timezone.utc).isoformat()
+
+            updated = StewardshipAuditRecord(
+                audit_id=existing.audit_id,
+                record_id=existing.record_id,
+                batch_id=existing.batch_id,
+                timestamp_utc=existing.timestamp_utc,
+                agent_or_system_id=existing.agent_or_system_id,
+                action_type=ActionType.MANUAL_OVERRIDE,
+                confidence_score=1.0000,
+                failure_reason_codes=existing.failure_reason_codes,
+                normalized_address_key=re_norm.normalized_address_key,
+                building_key=re_norm.building_key,
+                phonetic_key=re_norm.phonetic_key,
+                is_registered_agent_hub=re_norm.is_registered_agent_hub,
+                is_private_residence=re_norm.is_private_residence,
+                dpv_confirmation_code=existing.dpv_confirmation_code,
+                raw_input_payload=existing.raw_input_payload,
+                proposed_standardized_payload=existing.proposed_standardized_payload,
+                final_committed_payload=final_payload,
+                steward_commentary=commentary,
+                review_status=review_status,
+                reviewed_by=steward_id,
+                reviewed_at=now_utc,
+            )
             conn = self._get_conn()
             with conn:
                 conn.execute(
@@ -562,6 +568,8 @@ class StewardshipAuditLedger:
             conn = self._get_conn()
             with conn:
                 conn.execute("DELETE FROM address_stewardship_audit_ledger")
+                conn.execute("DELETE FROM address_stewardship_audit_history")
+            self._inserts_since_prune = 0
 
     def _row_to_record(self, row: sqlite3.Row) -> StewardshipAuditRecord:
         return StewardshipAuditRecord(

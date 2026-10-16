@@ -93,7 +93,11 @@ class VerificationCascade:
         # Stage 1: Local Rooftop Reference / DPV Lookup
         keys_to_check: List[str] = []
         if normalized_address_key:
-            keys_to_check.append(normalized_address_key.strip().upper())
+            norm_key_clean = normalized_address_key.strip().upper()
+            keys_to_check.append(norm_key_clean)
+            parts = norm_key_clean.split("|")
+            if len(parts) == 6 and parts[1]:
+                keys_to_check.append(f"{parts[0]}||{'|'.join(parts[2:])}")
         elif street1:
             from address_standardizer.standardizer import (
                 generate_normalized_address_key,

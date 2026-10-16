@@ -30,9 +30,10 @@ class KeyStore:
     @classmethod
     def parse(cls, text: str) -> "KeyStore":
         entries: List[Tuple[str, bytes]] = []
-        for raw in text.replace("\n", ",").split(","):
+        cleaned_lines = [line.partition("#")[0] for line in text.splitlines()]
+        for raw in ",".join(cleaned_lines).split(","):
             item = raw.strip()
-            if not item or item.startswith("#"):
+            if not item:
                 continue
             number = len(entries) + 1
             name, sep, secret = item.partition(":")

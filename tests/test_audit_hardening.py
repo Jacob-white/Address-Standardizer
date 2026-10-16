@@ -72,3 +72,29 @@ def test_in_memory_ledger_is_bounded():
     for i in range(1000):
         ledger.record(_rec(record_id=str(i)))
     assert len(ledger.list_records()) <= 300 + 256
+
+
+def test_in_memory_ledger_prunes_orphaned_history():
+    ledger = StewardshipAuditLedger(max_rows=10)
+    ledger.record(_rec(audit_id="A-PRUNE", record_id="0"))
+    ledger.apply_manual_override("A-PRUNE", "steward", {"street1": "100 New St"})
+    assert len(ledger.history("A-PRUNE")) == 1
+
+    for i in range(1, 600):
+        ledger.record(_rec(record_id=str(i)))
+
+    assert ledger.get_record("A-PRUNE") is None
+    assert ledger.history("A-PRUNE") == []
+
+
+def test_audit_clear_resets_history_and_prune_counter():
+    ledger = StewardshipAuditLedger(max_rows=100)
+    ledger.record(_rec(audit_id="A-CLEAR", record_id="0"))
+    ledger.apply_manual_override("A-CLEAR", "steward", {"street1": "100 New St"})
+    assert len(ledger.history("A-CLEAR")) == 1
+    assert ledger._inserts_since_prune > 0
+
+    ledger.clear()
+    assert ledger.get_record("A-CLEAR") is None
+    assert ledger.history("A-CLEAR") == []
+    assert ledger._inserts_since_prune == 0

@@ -57,7 +57,10 @@ def deserialize_value(payload: str) -> Any:
     """Rebuilds a cached value from its JSON payload (raises on a payload that cannot be rebuilt)."""
     data = json.loads(payload)
     if isinstance(data, dict) and data.get("__class__") == "StandardizedAddress":
-        from address_standardizer.models import StandardizedAddress
+        from address_standardizer.models import StandardizedAddress, LocalityOnlyStatus
+        status = data["address_status"]
+        if status in ("locality_only", "city_level"):
+            status = LocalityOnlyStatus("locality_only")
         std = StandardizedAddress(
             street1=data["street1"],
             street2=data["street2"],
@@ -66,7 +69,7 @@ def deserialize_value(payload: str) -> Any:
             postal_code=data["postal_code"],
             country=data["country"],
             normalized_address_key=data.get("normalized_address_key"),
-            address_status=data["address_status"],
+            address_status=status,
             raw_street_address=data["raw_street_address"],
             is_us=data["is_us"],
             is_private_residence=data.get("is_private_residence", False),
@@ -92,6 +95,12 @@ def deserialize_value(payload: str) -> Any:
 
         if "deliverability" in data and data["deliverability"] is not None:
             std.deliverability = data["deliverability"]
+        if "secondary_prompt_required" in data and data["secondary_prompt_required"] is not None:
+            std.secondary_prompt_required = data["secondary_prompt_required"]
+        if "prompt_message" in data and data["prompt_message"] is not None:
+            std.prompt_message = data["prompt_message"]
+        if "suggested_secondary_units" in data and data["suggested_secondary_units"] is not None:
+            std.suggested_secondary_units = data["suggested_secondary_units"]
         if "latitude" in data and data["latitude"] is not None:
             std.latitude = data["latitude"]
         if "longitude" in data and data["longitude"] is not None:

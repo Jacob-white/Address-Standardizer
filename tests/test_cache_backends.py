@@ -299,3 +299,186 @@ def test_multi_tier_get_does_not_hold_a_lock_across_l2(backend):
     cache._l1.clear()
     assert cache.get("k") == "v"  # served from L2 and promoted
     assert cache._l1.get("k") == "v"
+
+
+def test_deserialize_value_fidelity_and_edge_cases():
+    from address_standardizer.models import LocalityOnlyStatus
+    from address_standardizer.audit import get_audit_ledger, StewardshipAuditRecord, ActionType
+    from address_standardizer.cascade import CascadeResult, CascadePrecision
+    from address_standardizer.models import SpatialResolutionResult
+
+    # Test LocalityOnlyStatus wrapping and secondary prompts
+    base_data = {
+        "__class__": "StandardizedAddress",
+        "street1": "",
+        "street2": "",
+        "city": "CHICAGO",
+        "state": "IL",
+        "postal_code": "60601",
+        "country": "USA",
+        "address_status": "locality_only",
+        "raw_street_address": "CHICAGO IL 60601",
+        "is_us": True,
+        "secondary_prompt_required": True,
+        "prompt_message": "Requires Suite",
+        "suggested_secondary_units": ["STE", "APT"],
+        "deliverability": "DELIVERABLE",
+        "latitude": 41.88,
+        "longitude": -87.62,
+        "precision": "ROOFTOP",
+        "accuracy_radius_meters": 10.0,
+        "census_tract": "17031010100",
+        "fips_code": "17031",
+        "is_locality_only": True,
+        "is_city_level": True,
+        "country_iso3": "USA",
+    }
+    std1 = deserialize_value(json.dumps(base_data))
+    assert isinstance(std1.address_status, LocalityOnlyStatus)
+    assert std1.address_status == "locality_only"
+    assert std1.address_status == "city_level"
+    assert std1.secondary_prompt_required is True
+    assert std1.prompt_message == "Requires Suite"
+    assert std1.suggested_secondary_units == ["STE", "APT"]
+    assert std1.census_tract == "17031010100"
+    assert std1.fips_code == "17031"
+    assert std1.is_locality_only is True
+    assert std1.is_city_level is True
+    assert std1.country_iso3 == "USA"
+
+    # Test city_level variant
+    base_data["address_status"] = "city_level"
+    std2 = deserialize_value(json.dumps(base_data))
+    assert isinstance(std2.address_status, LocalityOnlyStatus)
+
+    # Test fallback audit_id
+    ledger = get_audit_ledger()
+    rec = StewardshipAuditRecord(
+        audit_id="aud-1234",
+        record_id="rec-1",
+        batch_id="b-1",
+        timestamp_utc="2026-01-01T00:00:00Z",
+        agent_or_system_id="test",
+        action_type=ActionType.AUTO_PASS,
+        confidence_score=0.99,
+        failure_reason_codes=[],
+        normalized_address_key="K1",
+        building_key="B1",
+        phonetic_key="P1",
+        is_registered_agent_hub=False,
+        is_private_residence=False,
+        dpv_confirmation_code="Y",
+        raw_input_payload={},
+        proposed_standardized_payload={},
+        final_committed_payload={},
+    )
+    ledger.ensure_recorded(rec)
+    data_with_audit_id = dict(base_data)
+    data_with_audit_id["audit_id"] = "aud-1234"
+    std_aud = deserialize_value(json.dumps(data_with_audit_id))
+    assert std_aud.audit_record is not None
+    assert std_aud.audit_record.audit_id == "aud-1234"
+
+    # Test cascade dict payload
+    data_with_cascade = dict(base_data)
+    data_with_cascade["cascade"] = {
+        "latitude": 41.88,
+        "longitude": -87.62,
+        "precision": CascadePrecision.FALLBACK_TIGER,
+        "accuracy_radius_meters": 25.0,
+        "source": "CENTERLINE",
+        "stage": 2,
+        "census_tract": "17031",
+    }
+    std_casc = deserialize_value(json.dumps(data_with_cascade))
+    assert isinstance(std_casc.cascade_result, CascadeResult)
+    assert std_casc.cascade_result.stage == 2
+
+    # Test cascade_result_payload
+    data_with_cascade_payload = dict(base_data)
+    data_with_cascade_payload["cascade_result_payload"] = dict(data_with_cascade["cascade"])
+    std_casc_payload = deserialize_value(json.dumps(data_with_cascade_payload))
+    assert isinstance(std_casc_payload.cascade_result, CascadeResult)
+
+    # Test spatial_result_payload
+    data_with_spatial_payload = dict(base_data)
+    data_with_spatial_payload["spatial_result_payload"] = {
+        "latitude": 41.88,
+        "longitude": -87.62,
+        "precision": "CONFIRMED_ROOFTOP",
+        "accuracy_radius_meters": 5.0,
+        "stage": 1,
+        "source": "ROOFTOP",
+        "h3_res10": "8a283082a677fff",
+        "parcel_id": "P-100",
+        "execution_time_ms": 1.23,
+        "metadata": {"test": "val"},
+    }
+    std_sp_payload = deserialize_value(json.dumps(data_with_spatial_payload))
+    assert isinstance(std_sp_payload.spatial_result, SpatialResolutionResult)
+    assert std_sp_payload.spatial_result.parcel_id == "P-100"
+
+    # Test spatial_result dict
+    data_with_spatial = dict(base_data)
+    data_with_spatial["spatial_result"] = dict(data_with_spatial_payload["spatial_result_payload"])
+    std_sp = deserialize_value(json.dumps(data_with_spatial))
+    assert isinstance(std_sp.spatial_result, SpatialResolutionResult)
+    assert std_sp.spatial_result.parcel_id == "P-100"
+
+    # Test None branches for optional properties
+    null_data = {
+        "__class__": "StandardizedAddress",
+        "street1": "100 MAIN ST",
+        "street2": "",
+        "city": "NEW YORK",
+        "state": "NY",
+        "postal_code": "10001",
+        "country": "USA",
+        "address_status": "standardized",
+        "raw_street_address": "100 MAIN ST",
+        "is_us": True,
+        "deliverability": None,
+        "secondary_prompt_required": None,
+        "prompt_message": None,
+        "suggested_secondary_units": None,
+        "latitude": None,
+        "longitude": None,
+        "precision": None,
+        "accuracy_radius_meters": None,
+        "census_tract": None,
+        "fips_code": None,
+        "is_locality_only": None,
+        "is_city_level": None,
+    }
+    std_null = deserialize_value(json.dumps(null_data))
+    assert std_null.street1 == "100 MAIN ST"
+
+    minimal_data = {
+        "__class__": "StandardizedAddress",
+        "street1": "100 MAIN ST",
+        "street2": "",
+        "city": "NEW YORK",
+        "state": "NY",
+        "postal_code": "10001",
+        "country": "USA",
+        "address_status": "standardized",
+        "raw_street_address": "100 MAIN ST",
+        "is_us": True,
+    }
+    std_min = deserialize_value(json.dumps(minimal_data))
+    assert std_min.street1 == "100 MAIN ST"
+
+    # Test serialize_value with cascade_result and spatial_result
+    std_to_ser = standardize_address("100 Main St, New York, NY 10001", use_cache=False)
+    std_to_ser.cascade_result = std_casc.cascade_result
+    std_to_ser.spatial_result = std_sp.spatial_result
+    ser_payload = serialize_value(std_to_ser)
+    assert "cascade_result_payload" in ser_payload
+    assert "spatial_result_payload" in ser_payload
+
+    # Test fallback un-serializable object
+    class NonSerializable:
+        pass
+    ser_val = serialize_value(NonSerializable())
+    deser_val = deserialize_value(ser_val)
+    assert deser_val.startswith("<")
