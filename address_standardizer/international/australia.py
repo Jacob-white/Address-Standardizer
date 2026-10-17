@@ -154,6 +154,11 @@ class AustraliaGrammar(CountryGrammar):
         "AU",
         "AUSTRALIA",
         "COMMONWEALTH OF AUSTRALIA",
+        "CCK", "COCOS ISLANDS", "COCOS (KEELING) ISLANDS",
+        "CXR", "CHRISTMAS ISLAND",
+        "NFK", "NORFOLK ISLAND",
+        "HMD", "HEARD ISLAND AND MCDONALD ISLANDS",
+        "ATA", "ANTARCTICA",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -227,6 +232,10 @@ class AustraliaGrammar(CountryGrammar):
         state_raw = metadata.get("state") or ""
         post_raw = metadata.get("postal_code") or ""
         raw_full = metadata.get("raw_street_address") or ""
+        country_raw = metadata.get("country", self.country_iso3)
+        from address_standardizer.international.countries import CountryRegistry
+        info = CountryRegistry.get(country_raw)
+        country_iso = info.alpha3 if (info and info.alpha3 in self.supported_countries) else self.country_iso3
 
         combined = s1.strip() if s1 else raw_full.strip()
         if not combined and s2:
@@ -369,7 +378,7 @@ class AustraliaGrammar(CountryGrammar):
             city=city_raw.strip().upper() if city_raw else "",
             state=norm_state,
             postal_code=norm_post or "",
-            country_iso3=self.country_iso3,
+            country_iso3=country_iso,
             raw_tokens=raw_tokens,
             confidence_score=0.95,
         )
@@ -379,7 +388,12 @@ class NewZealandGrammar(UniversalInternationalGrammar):
     """New Zealand: the universal grammar plus a comma-less "134 Willis Street Wellington 6011" split."""
 
     country_iso3: ClassVar[str] = "NZL"
-    supported_countries: ClassVar[Tuple[str, ...]] = ("NZL", "NZ", "NEW ZEALAND", "AOTEAROA")
+    supported_countries: ClassVar[Tuple[str, ...]] = (
+        "NZL", "NZ", "NEW ZEALAND", "AOTEAROA",
+        "COK", "COOK ISLANDS",
+        "NIU", "NIUE",
+        "TKL", "TOKELAU",
+    )
 
     def standardize(
         self,

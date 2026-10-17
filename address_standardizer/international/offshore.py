@@ -54,16 +54,25 @@ class OffshoreGrammar(CountryGrammar):
 
     country_iso3: ClassVar[str] = "CYM"
     supported_countries: ClassVar[Tuple[str, ...]] = (
-        "CYM",
-        "CAYMAN",
-        "CAYMAN ISLANDS",
-        "VGB",
-        "BRITISH VIRGIN ISLANDS",
-        "BVI",
-        "BMU",
-        "BERMUDA",
-        "PAN",
-        "PANAMA",
+        "CYM", "CAYMAN", "CAYMAN ISLANDS",
+        "VGB", "BRITISH VIRGIN ISLANDS", "BVI",
+        "BMU", "BERMUDA",
+        "PAN", "PANAMA",
+        "TCA", "TURKS AND CAICOS", "TURKS AND CAICOS ISLANDS",
+        "AIA", "ANGUILLA",
+        "MSR", "MONTSERRAT",
+        "BHS", "BAHAMAS",
+        "BRB", "BARBADOS",
+        "JAM", "JAMAICA",
+        "TTO", "TRINIDAD AND TOBAGO",
+        "ATG", "ANTIGUA AND BARBUDA",
+        "BLZ", "BELIZE",
+        "DMA", "DOMINICA",
+        "GRD", "GRENADA",
+        "GUY", "GUYANA",
+        "KNA", "SAINT KITTS AND NEVIS",
+        "LCA", "SAINT LUCIA",
+        "VCT", "SAINT VINCENT AND THE GRENADINES",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -178,6 +187,10 @@ class OffshoreGrammar(CountryGrammar):
                 or parts_comma[-1].upper() in COUNTRY_NAME_MAP
                 or parts_comma[-1].upper() in ("CAYMAN ISLANDS", "BVI", "BERMUDA", "PANAMA")
             ):
+                from address_standardizer.international.countries import CountryRegistry
+                info = CountryRegistry.get(parts_comma[-1])
+                if info and info.alpha3 in self.supported_countries:
+                    country_iso = info.alpha3
                 parts_comma = parts_comma[:-1]
 
             rem_parts: List[str] = []

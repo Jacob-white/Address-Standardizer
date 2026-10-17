@@ -327,6 +327,11 @@ US_STATES: Dict[str, str] = {
     "ARMED FORCES PACIFIC": "AP", "AP": "AP",
 }
 
+# US Domestic jurisdictions using USPS Publication 28 addressing (50 States, DC, Territories & COFA states)
+US_DOMESTIC_ISO3: frozenset[str] = frozenset({
+    "USA", "PRI", "VIR", "GUM", "ASM", "MNP", "FSM", "MHL", "PLW", "UMI",
+})
+
 # Country name/alias -> ISO-3166-1 alpha-3 code
 COUNTRY_MAP: Dict[str, str] = {
     'AW': 'ABW', '533': 'ABW', 'ABW': 'ABW', 'ARUBA': 'ABW',

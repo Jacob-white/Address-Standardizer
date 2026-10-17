@@ -20,6 +20,8 @@ from address_standardizer.international import (
     OffshoreGrammar,
     RomanceGrammar,
     SingaporeGrammar,
+    SoutheastAsiaGrammar,
+    EurasiaGrammar,
     UKGrammar,
 )
 from address_standardizer.international.base import CountryGrammarRegistry
@@ -102,6 +104,8 @@ ALL_GRAMMARS = [
     MenaAfricaGrammar,
     HongKongGrammar,
     SingaporeGrammar,
+    SoutheastAsiaGrammar,
+    EurasiaGrammar,
     AustraliaGrammar,
     IndiaGrammar,
     IrelandGrammar,

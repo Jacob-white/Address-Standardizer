@@ -64,7 +64,7 @@ COMPOUND_SUFFIXES = (
 )
 
 
-_GERMAN_COUNTRIES = frozenset({"DEU", "AUT", "CHE"})
+_GERMAN_COUNTRIES = frozenset({"DEU", "AUT", "CHE", "LIE"})
 # "Hauptstr." / "Hauptstr" / "Str." -> STRASSE ; "Marktpl." / "Pl." -> PLATZ (dotted forms only for Platz, which is
 # otherwise ambiguous). Already spelled-out "Straße"/"Strasse" is left to the caller's upper-casing.
 _RE_DE_STR = re.compile(r"(?<=[A-Za-zÄÖÜäöüß])[Ss]tr\.?(?=[\s,]|$)|(?<![\w])[Ss]tr\.(?=[\s,]|$)")
@@ -113,29 +113,27 @@ class GermanicGrammar(CountryGrammar):
 
     country_iso3: ClassVar[str] = "DEU"
     supported_countries: ClassVar[Tuple[str, ...]] = (
-        "DEU",
-        "GERMANY",
-        "DEUTSCHLAND",
-        "AUT",
-        "AUSTRIA",
-        "OESTERREICH",
-        "CHE",
-        "SWITZERLAND",
-        "SCHWEIZ",
-        "SUISSE",
-        "SVIZZERA",
-        "NLD",
-        "NETHERLANDS",
-        "HOLLAND",
-        "DNK",
-        "DENMARK",
-        "SWE",
-        "SWEDEN",
-        "NOR",
-        "NORWAY",
-        "FIN",
-        "FINLAND",
-        "SUOMI",
+        "DEU", "GERMANY", "DEUTSCHLAND",
+        "AUT", "AUSTRIA", "OESTERREICH",
+        "CHE", "SWITZERLAND", "SCHWEIZ", "SUISSE", "SVIZZERA",
+        "NLD", "NETHERLANDS", "HOLLAND",
+        "DNK", "DENMARK",
+        "SWE", "SWEDEN",
+        "NOR", "NORWAY",
+        "FIN", "FINLAND", "SUOMI",
+        "BEL", "BELGIUM", "BELGIQUE", "BELGIE",
+        "LUX", "LUXEMBOURG",
+        "LIE", "LIECHTENSTEIN",
+        "ISL", "ICELAND", "ISLAND",
+        "FRO", "FAROE ISLANDS",
+        "GRL", "GREENLAND",
+        "ALA", "ALAND ISLANDS", "ÅLAND ISLANDS",
+        "SJM", "SVALBARD AND JAN MAYEN",
+        "ABW", "ARUBA",
+        "CUW", "CURACAO", "CURAÇAO",
+        "SXM", "SINT MAARTEN",
+        "BES", "BONAIRE",
+        "SUR", "SURINAME",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -213,7 +211,7 @@ class GermanicGrammar(CountryGrammar):
             if m_pf:
                 street_line = f"POSTFACH {m_pf.group(1)}"
                 s2_raw = f"{m_pf.group(2).strip()} {s2_raw}".strip() if s2_raw else m_pf.group(2).strip()
-        elif country_iso == "NLD":
+        elif country_iso in ("NLD", "BEL", "SUR", "ABW", "CUW", "SXM", "BES"):
             street_line = expand_dutch_street_abbreviations(street_line)
 
         # Check for Nordic floor/door (e.g. "45, 2. tv.")

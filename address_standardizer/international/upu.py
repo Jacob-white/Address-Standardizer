@@ -100,12 +100,19 @@ def format_upu_address(
     else:
         st2 = (getattr(parsed, "street2", None) or "").strip()
 
-    # Specialized street number adjustment for European postal-first style
+    # Specialized street number adjustment for European / continental postal-first style
     st_num = (getattr(parsed, "street_number", None) or "").strip()
     st_name = (getattr(parsed, "street_name", None) or "").strip()
 
-    if iso3 in EUROPEAN_POSTAL_FIRST_ISO3:
-        if iso3 in EUROPEAN_NUMBER_FIRST_ISO3:
+    is_postal_first = iso3 in EUROPEAN_POSTAL_FIRST_ISO3 or (
+        country_info is not None and country_info.postal_position == "before_city"
+    )
+    is_number_first = iso3 in EUROPEAN_NUMBER_FIRST_ISO3 or (
+        country_info is not None and country_info.house_number_position == "before_street"
+    )
+
+    if is_postal_first:
+        if is_number_first:
             # France/Belgium: house number before street
             if st_num and st_name and not (st_name.startswith(st_num + " ") or st_name == st_num):
                 st1 = f"{st_num} {st_name}".strip()
@@ -122,7 +129,7 @@ def format_upu_address(
         lines.append(recipient.strip())
 
     # Template selection
-    if not has_postal or not postal:
+    if not has_postal or not postal or (country_info is not None and country_info.postal_position == "none"):
         # -------------------------------------------------------------------
         # Non-postal nation layout (e.g. UAE, Qatar, Panama, Bahamas, Seychelles)
         # -------------------------------------------------------------------
@@ -141,7 +148,7 @@ def format_upu_address(
         elif state:
             lines.append(state)
 
-    elif iso3 in EAST_ASIAN_ISO3:
+    elif iso3 in EAST_ASIAN_ISO3 or (country_info is not None and country_info.postal_position == "leading_top"):
         # -------------------------------------------------------------------
         # East Asian top-down style (Japan, China, South Korea, Taiwan)
         # 〒<postal_code>\n<state/prefecture><city><street>\n<COUNTRY>
@@ -167,9 +174,9 @@ def format_upu_address(
         elif st2:
             lines.append(st2)
 
-    elif iso3 in EUROPEAN_POSTAL_FIRST_ISO3:
+    elif is_postal_first:
         # -------------------------------------------------------------------
-        # European postal-first style
+        # European / continental postal-first style
         # <street> <house_number>\n<postal_code> <city>\n<COUNTRY>
         # -------------------------------------------------------------------
         if building and building != st1:

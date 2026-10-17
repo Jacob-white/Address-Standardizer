@@ -28,9 +28,9 @@ from address_standardizer.international.diacritics import (
 )
 from address_standardizer.tables import COUNTRY_NAME_MAP, GLOBAL_METRO_TO_COUNTRY
 
-# Secondary unit indicators (Polish, Czech, Romanian, Greek, Cyrillic, Latin)
+# Secondary unit indicators (Polish, Czech, Romanian, Greek, Cyrillic, Baltic, Balkan)
 RE_EE_SECONDARY = re.compile(
-    r"\b(?:(?:m\.|m)\s*(?=\d)|lok\.|mieszkanie|lokal|ap\.|apt|apartament|byt|bl\.|bloc|sc\.|scara|et\.|etaj|кв\.|кв|квартира|ап\.|оф\.|офис|офіс|вх\.|вход|ет\.|етаж|διαμ\.|diam\.|orofos)\s*#?\s*([A-Za-z0-9\-]+)",
+    r"\b(?:(?:m\.|m)\s*(?=\d)|lok\.|mieszkanie|lokal|ap\.|apt|apartament|byt|bl\.|bloc|sc\.|scara|et\.|etaj|кв\.|кв|квартира|ап\.|оф\.|офис|офіс|вх\.|вход|ет\.|етаж|krt\.|dz\.|stan|butas|διαμ\.|diam\.|orofos)\s*#?\s*([A-Za-z0-9\-]+)",
     re.IGNORECASE,
 )
 
@@ -40,7 +40,7 @@ RE_EE_HOUSE_NUM = re.compile(
 )
 
 # Countries whose single-line addresses are written "[postcode] City, Street type-name, number" (city first, no marker).
-_CITY_FIRST_COUNTRIES = frozenset({"RUS", "UKR", "BGR", "SRB", "HUN"})
+_CITY_FIRST_COUNTRIES = frozenset({"RUS", "UKR", "BGR", "SRB", "HUN", "BLR", "MDA"})
 
 # Cyrillic street-type words (lower case, trailing dot removed): full words and common abbreviations.
 _CYR_STREET_TYPES = frozenset({
@@ -139,6 +139,18 @@ class EasternEuropeGrammar(CountryGrammar):
         "SRB", "SERBIA", "SRBIJA", "СРБИЈА", "RS",
         "UKR", "UKRAINE", "UKRAYINA", "УКРАЇНА", "УКРАИНА", "UA",
         "RUS", "RUSSIA", "RUSSIAN FEDERATION", "ROSSIYA", "РОССИЯ", "РОССИЙСКАЯ ФЕДЕРАЦИЯ", "RU",
+        "SVK", "SLOVAKIA", "SLOVENSKO",
+        "SVN", "SLOVENIA", "SLOVENIJA",
+        "HRV", "CROATIA", "HRVATSKA",
+        "BIH", "BOSNIA AND HERZEGOVINA", "BOSNIA",
+        "MNE", "MONTENEGRO", "CRNA GORA",
+        "MKD", "NORTH MACEDONIA", "MACEDONIA",
+        "ALB", "ALBANIA", "SHQIPERIA",
+        "EST", "ESTONIA", "EESTI",
+        "LVA", "LATVIA", "LATVIJA",
+        "LTU", "LITHUANIA", "LIETUVA",
+        "BLR", "BELARUS", "BELARUS'",
+        "MDA", "MOLDOVA",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -225,6 +237,10 @@ class EasternEuropeGrammar(CountryGrammar):
             return "UKR"
         if c in ("RUS", "RUSSIA", "RUSSIAN FEDERATION", "ROSSIYA", "РОССИЯ", "РОССИЙСКАЯ ФЕДЕРАЦИЯ", "RU"):
             return "RUS"
+        from address_standardizer.international.countries import CountryRegistry
+        info = CountryRegistry.get(c)
+        if info and info.alpha3 in self.supported_countries:
+            return info.alpha3
         return "POL"
 
     def parse(self, raw_tokens: List[str], metadata: dict) -> ParsedAddressComponents:

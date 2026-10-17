@@ -11,6 +11,16 @@ _SCRIPT_FAMILIES = (
     frozenset({"JPN", "KOR", "CHN", "TWN", "HKG", "MAC", "PRK"}),
     frozenset({"RUS", "BGR", "UKR", "SRB", "BLR", "KAZ", "MKD", "MNE", "MDA", "KGZ", "TJK", "MNG", "BIH"}),
     frozenset({"GRC", "CYP"}),
+    frozenset({"ISR"}),
+    frozenset({"GEO"}),
+    frozenset({"ARM"}),
+    frozenset({"BGD", "IND"}),
+    frozenset({"LKA"}),
+    frozenset({"MMR"}),
+    frozenset({"KHM"}),
+    frozenset({"LAO"}),
+    frozenset({"ETH", "ERI"}),
+    frozenset({"THA"}),
 )
 
 
@@ -24,6 +34,16 @@ _RE_KANA = re.compile(r"[぀-ヿㇰ-ㇿｦ-ﾟ]")
 _RE_HANGUL = re.compile(r"[가-힯ᄀ-ᇿ㄰-㆏]")
 _RE_CYRILLIC = re.compile(r"[Ѐ-ӿ]")
 _RE_GREEK = re.compile(r"[Ͱ-Ͽἀ-῿]")
+_RE_HEBREW = re.compile(r"[\u0590-\u05FF]")
+_RE_GEORGIAN = re.compile(r"[\u10A0-\u10FF\u1C90-\u1CBF]")
+_RE_ARMENIAN = re.compile(r"[\u0530-\u058F]")
+_RE_BENGALI = re.compile(r"[\u0980-\u09FF]")
+_RE_SINHALA = re.compile(r"[\u0D80-\u0DFF]")
+_RE_MYANMAR = re.compile(r"[\u1000-\u109F]")
+_RE_KHMER = re.compile(r"[\u1780-\u17FF]")
+_RE_LAO = re.compile(r"[\u0E80-\u0EFF]")
+_RE_ETHIOPIC = re.compile(r"[\u1200-\u137F]")
+_RE_THAI = re.compile(r"[\u0E00-\u0E7F]")
 _RE_LATIN_LETTER = re.compile(r"[A-Za-zÀ-ɏ]")
 
 _RE_JP_PREF = re.compile(r"(?:^|[\s,〒\d-])(?:北海道|[一-鿿]{2,3}[都府県])")
@@ -77,6 +97,26 @@ def detect_script_country(text: Optional[str]) -> Optional[str]:
         return None
     if _share(_RE_GREEK, text) >= _MIN_SCRIPT_SHARE:
         return "GRC"
+    if _share(_RE_HEBREW, text) >= _MIN_SCRIPT_SHARE:
+        return "ISR"
+    if _share(_RE_GEORGIAN, text) >= _MIN_SCRIPT_SHARE:
+        return "GEO"
+    if _share(_RE_ARMENIAN, text) >= _MIN_SCRIPT_SHARE:
+        return "ARM"
+    if _share(_RE_BENGALI, text) >= _MIN_SCRIPT_SHARE:
+        return "BGD"
+    if _share(_RE_SINHALA, text) >= _MIN_SCRIPT_SHARE:
+        return "LKA"
+    if _share(_RE_MYANMAR, text) >= _MIN_SCRIPT_SHARE:
+        return "MMR"
+    if _share(_RE_KHMER, text) >= _MIN_SCRIPT_SHARE:
+        return "KHM"
+    if _share(_RE_LAO, text) >= _MIN_SCRIPT_SHARE:
+        return "LAO"
+    if _share(_RE_ETHIOPIC, text) >= _MIN_SCRIPT_SHARE:
+        return "ETH"
+    if _share(_RE_THAI, text) >= _MIN_SCRIPT_SHARE:
+        return "THA"
     if _share(_RE_CYRILLIC, text) >= _MIN_SCRIPT_SHARE:
         if _RE_UA_LETTERS.search(text):
             return "UKR"

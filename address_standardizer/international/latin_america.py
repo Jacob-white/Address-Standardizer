@@ -260,6 +260,20 @@ class LatinAmericaGrammar(CountryGrammar):
         "COL", "COLOMBIA", "CO",
         "ARG", "ARGENTINA", "AR",
         "CHL", "CHILE", "CL",
+        "PER", "PERU", "PERÚ",
+        "ECU", "ECUADOR",
+        "VEN", "VENEZUELA",
+        "URY", "URUGUAY",
+        "PRY", "PARAGUAY",
+        "BOL", "BOLIVIA",
+        "CRI", "COSTA RICA",
+        "GTM", "GUATEMALA",
+        "DOM", "DOMINICAN REPUBLIC",
+        "CUB", "CUBA",
+        "HND", "HONDURAS",
+        "NIC", "NICARAGUA",
+        "SLV", "EL SALVADOR",
+        "HTI", "HAITI",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -281,7 +295,7 @@ class LatinAmericaGrammar(CountryGrammar):
         return clean
 
     def extract_premise_and_thoroughfare(
-        self, street_line: str
+        self, street_line: str, country_iso: Optional[str] = None
     ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
         """Extract (premise, street_number, thoroughfare) from Latin American address line."""
         if not street_line:
@@ -303,6 +317,9 @@ class LatinAmericaGrammar(CountryGrammar):
             st_num = m_prefix.group(3).strip().upper()
             if prefix_cand in LATAM_ROAD_TYPES:
                 norm_prefix = LATAM_ROAD_TYPES[prefix_cand]
+                c_check = country_iso or getattr(self, "_current_country", None)
+                if c_check in ("PER", "PE", "PERU") and prefix_cand in ("AV", "AVE", "AVENIDA"):
+                    norm_prefix = "AVE"
                 st_name = f"{norm_prefix} {rest_name.upper()} {st_num}"
                 return None, st_num, st_name
 
@@ -322,6 +339,10 @@ class LatinAmericaGrammar(CountryGrammar):
             return "ARG"
         if c in ("CHL", "CHILE", "CL"):
             return "CHL"
+        from address_standardizer.international.countries import CountryRegistry
+        info = CountryRegistry.get(c)
+        if info and info.alpha3 in self.supported_countries:
+            return info.alpha3
         return "MEX"
 
     def parse(self, raw_tokens: List[str], metadata: dict) -> ParsedAddressComponents:
@@ -530,7 +551,7 @@ class LatinAmericaGrammar(CountryGrammar):
             unit_type, unit_number = merge_units(sec_units, s2_type, s2_number)
 
         # Normalize thoroughfare
-        _, st_num, thoroughfare = self.extract_premise_and_thoroughfare(st1_base)
+        _, st_num, thoroughfare = self.extract_premise_and_thoroughfare(st1_base, country_iso)
 
         norm_postal = self.normalize_postal_code(postal_raw)
         norm_city = normalize_to_canonical_unicode(RE_COMMA_DOT.sub(" ", city_raw).strip().upper())
