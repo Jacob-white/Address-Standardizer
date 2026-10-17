@@ -10,7 +10,7 @@ from address_standardizer.international.base import (
     split_intl_secondary_unit,
 )
 from address_standardizer.international.diacritics import normalize_to_canonical_unicode
-from address_standardizer.tables import COUNTRY_NAME_MAP, GLOBAL_METRO_TO_COUNTRY
+from address_standardizer.tables import GLOBAL_METRO_TO_COUNTRY
 
 # Road type abbreviations for Romance languages
 ROMANCE_ROAD_TYPES: Dict[str, str] = {
@@ -365,17 +365,12 @@ class RomanceGrammar(CountryGrammar):
         # Handle comma-delimited single string when city_raw is empty
         if not city_raw and s1_raw and "," in s1_raw:
             parts_comma = [p.strip() for p in s1_raw.split(",") if p.strip()]
-            if len(parts_comma) >= 2 and (
-                parts_comma[-1].upper() in self.supported_countries
-                or parts_comma[-1].upper() in COUNTRY_NAME_MAP
-                or parts_comma[-1].upper()
-                in ("USA", "US", "UNITED STATES", "CANADA", "UK", "UNITED KINGDOM", "FRANCE", "SPAIN", "MEXICO", "COLOMBIA", "ARGENTINA", "BRAZIL")
-            ):
+            if len(parts_comma) >= 2:
                 from address_standardizer.international.countries import CountryRegistry
                 info = CountryRegistry.get(parts_comma[-1])
                 if info and info.alpha3 in self.supported_countries:
                     country_iso = info.alpha3
-                parts_comma = parts_comma[:-1]
+                    parts_comma = parts_comma[:-1]
 
             # Scan from right for State / Postal / City
             rem_parts: List[str] = []

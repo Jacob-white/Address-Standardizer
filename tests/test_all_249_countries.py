@@ -506,3 +506,52 @@ def test_other_regional_grammars_resolve_country_iso():
     assert mena._resolve_country_iso(None) == "ARE"
     assert mena._resolve_country_iso("UNKNOWN_COUNTRY") == "ARE"
 
+
+def test_universal_international_grammar_edges():
+    from address_standardizer.international.base import UniversalInternationalGrammar
+
+    univ = UniversalInternationalGrammar()
+
+    # Dutch/Belgian abbreviation in UniversalInternationalGrammar
+    p_bel = univ.standardize(street1="Kerkstr. 10 Ln. 5", country="BEL")
+    assert "KERKSTRAAT 10 LAAN 5" in p_bel.format_street1()
+
+    # Sublocality splitting in street1 when city is known
+    p_subloc = univ.standardize(street1="10 Main St, Downtown", city="Sydney")
+    assert p_subloc.dependent_locality == "DOWNTOWN"
+    assert p_subloc.format_street1() == "10 MAIN ST"
+
+
+def test_offshore_and_romance_grammar_trailing_country_edges():
+    from address_standardizer.international.offshore import OffshoreGrammar
+    from address_standardizer.international.romance import RomanceGrammar
+
+    off = OffshoreGrammar()
+    # 2 parts with trailing offshore country
+    r_off1 = off.parse([], {"street1": "Ugland House, South Church St, Cayman Islands"})
+    assert r_off1.country_iso3 == "CYM"
+    # 2 parts without trailing offshore country
+    r_off2 = off.parse([], {"street1": "Ugland House, South Church St, George Town"})
+    assert r_off2.country_iso3 == "CYM"
+    # 1 part with trailing comma
+    r_off3 = off.parse([], {"street1": "Ugland House,"})
+    assert r_off3.country_iso3 == "CYM"
+    # 2 parts with country not in supported offshore countries
+    r_off4 = off.parse([], {"street1": "Ugland House, France"})
+    assert r_off4.country_iso3 == "CYM"
+
+    rom = RomanceGrammar()
+    # 2 parts with trailing romance country
+    r_rom1 = rom.parse([], {"street1": "10 Rue de la Paix, France"})
+    assert r_rom1.country_iso3 == "FRA"
+    # 2 parts without trailing romance country
+    r_rom2 = rom.parse([], {"street1": "10 Rue de la Paix, Paris"})
+    assert r_rom2.country_iso3 == "FRA"
+    # 1 part with trailing comma
+    r_rom3 = rom.parse([], {"street1": "10 Rue de la Paix,"})
+    assert r_rom3.country_iso3 == "FRA"
+    # 2 parts with country not in supported romance countries
+    r_rom4 = rom.parse([], {"street1": "10 Rue de la Paix, Japan"})
+    assert r_rom4.country_iso3 == "FRA"
+
+
