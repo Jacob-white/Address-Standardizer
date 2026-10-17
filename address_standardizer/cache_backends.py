@@ -53,6 +53,22 @@ class CacheBackend(Protocol):
     def stats(self) -> Dict[str, Any]: ...
 
 
+_OPTIONAL_METADATA_FIELDS = (
+    "deliverability",
+    "secondary_prompt_required",
+    "prompt_message",
+    "suggested_secondary_units",
+    "latitude",
+    "longitude",
+    "precision",
+    "accuracy_radius_meters",
+    "census_tract",
+    "fips_code",
+    "is_locality_only",
+    "is_city_level",
+)
+
+
 def deserialize_value(payload: str) -> Any:
     """Rebuilds a cached value from its JSON payload (raises on a payload that cannot be rebuilt)."""
     data = json.loads(payload)
@@ -93,30 +109,9 @@ def deserialize_value(payload: str) -> Any:
         std.corporate_risk_score = data.get("corporate_risk_score", 0.0)
         std.corporate_risk_flags = data.get("corporate_risk_flags") or []
 
-        if "deliverability" in data and data["deliverability"] is not None:
-            std.deliverability = data["deliverability"]
-        if "secondary_prompt_required" in data and data["secondary_prompt_required"] is not None:
-            std.secondary_prompt_required = data["secondary_prompt_required"]
-        if "prompt_message" in data and data["prompt_message"] is not None:
-            std.prompt_message = data["prompt_message"]
-        if "suggested_secondary_units" in data and data["suggested_secondary_units"] is not None:
-            std.suggested_secondary_units = data["suggested_secondary_units"]
-        if "latitude" in data and data["latitude"] is not None:
-            std.latitude = data["latitude"]
-        if "longitude" in data and data["longitude"] is not None:
-            std.longitude = data["longitude"]
-        if "precision" in data and data["precision"] is not None:
-            std.precision = data["precision"]
-        if "accuracy_radius_meters" in data and data["accuracy_radius_meters"] is not None:
-            std.accuracy_radius_meters = data["accuracy_radius_meters"]
-        if "census_tract" in data and data["census_tract"] is not None:
-            std.census_tract = data["census_tract"]
-        if "fips_code" in data and data["fips_code"] is not None:
-            std.fips_code = data["fips_code"]
-        if "is_locality_only" in data and data["is_locality_only"] is not None:
-            std.is_locality_only = data["is_locality_only"]
-        if "is_city_level" in data and data["is_city_level"] is not None:
-            std.is_city_level = data["is_city_level"]
+        for field in _OPTIONAL_METADATA_FIELDS:
+            if data.get(field) is not None:
+                setattr(std, field, data[field])
 
         if data.get("audit_record_payload"):
             from address_standardizer.audit import StewardshipAuditRecord
