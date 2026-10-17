@@ -138,6 +138,7 @@ def test_explain_parse_tool():
 
 
 def test_create_mcp_server_success_and_call_tool():
+    pytest.importorskip("mcp")
     server = create_mcp_server()
     assert server is not None
 

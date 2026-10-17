@@ -239,4 +239,3 @@ func TestWithRetryOn429(t *testing.T) {
 		t.Errorf("expected Street1 '100 MAIN ST', got %s", res.Street1)
 	}
 }
-
