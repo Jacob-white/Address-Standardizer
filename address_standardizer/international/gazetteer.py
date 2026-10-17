@@ -14,12 +14,19 @@ from address_standardizer.international.diacritics import fold_to_ascii_key
 _RAW: Dict[Tuple[str, ...], Tuple[str, ...]] = {
     ("ID", "IDN"): (
         "Jakarta", "South Jakarta", "North Jakarta", "East Jakarta", "West Jakarta", "Central Jakarta", "Jakarta Selatan",
-        "Jakarta Utara", "Jakarta Timur", "Jakarta Barat", "Jakarta Pusat", "Surabaya", "Bandung", "Medan", "Semarang",
+        "Jakarta Utara", "Jakarta Timur", "Jakarta Barat", "Jakarta Pusat", "Kota Jakarta Pusat", "Kota Jakarta Selatan",
+        "Kota Jakarta Barat", "Kota Jakarta Timur", "Kota Jakarta Utara", "Surabaya", "Bandung", "Medan", "Semarang",
         "Makassar", "Palembang", "Tangerang", "Tangerang Selatan", "Depok", "Bekasi", "Bogor", "Batam", "Pekanbaru",
         "Bandar Lampung", "Malang", "Padang", "Denpasar", "Samarinda", "Balikpapan", "Banjarmasin", "Pontianak",
         "Yogyakarta", "Surakarta", "Solo", "Manado", "Mataram", "Jayapura", "Cimahi", "Cirebon", "Sidoarjo", "Gresik",
         "Kota Bandung", "Kota Surabaya", "Kota Medan", "Kota Semarang", "Kota Malang", "Kota Bogor", "Kota Depok",
-        "Kota Bekasi", "Kota Tangerang", "Kota Yogyakarta", "DKI Jakarta", "Kupang", "Ambon", "Palu", "Kendari", "Jambi", "Bengkulu", "Banda Aceh", "Serang", "Tasikmalaya", "Kediri",
+        "Kota Bekasi", "Kota Tangerang", "Kota Yogyakarta", "DKI Jakarta", "Kupang", "Ambon", "Palu", "Kendari",
+        "Jambi", "Bengkulu", "Banda Aceh", "Serang", "Tasikmalaya", "Kediri", "Perak Barat",
+    ),
+    ("PH", "PHL"): (
+        "Manila", "Quezon City", "Davao City", "Davao", "Cebu City", "Cebu", "Makati", "Makati City", "Taguig",
+        "Taguig City", "Pasig", "Pasig City", "Caloocan", "Zamboanga City", "Pasay", "Parañaque", "Mandaluyong",
+        "Baguio", "Muntinlupa", "Iloilo City", "Marikina", "Bacolod", "Mandaue", "Lapu-Lapu City", "Angeles",
     ),
     ("IN", "IND"): (
         "Mumbai", "Delhi", "New Delhi", "Bengaluru", "Bangalore", "Hyderabad", "Ahmedabad", "Chennai", "Kolkata",
@@ -31,10 +38,11 @@ _RAW: Dict[Tuple[str, ...], Tuple[str, ...]] = {
         "Dehradun", "Mangalore", "Kozhikode", "Panaji", "Shimla", "Jamshedpur", "Salem", "Tiruchirappalli",
     ),
     ("VN", "VNM"): (
-        "Hà Nội", "Hanoi", "Hồ Chí Minh", "Thành phố Hồ Chí Minh", "Ho Chi Minh City", "TP. Hồ Chí Minh",
-        "Thành phố Đà Nẵng", "Đà Nẵng", "Da Nang", "Hải Phòng", "Cần Thơ", "Huế", "Nha Trang", "Biên Hòa", "Vũng Tàu",
-        "Đà Lạt", "Hội An", "Thủ Đức", "Quy Nhơn", "Buôn Ma Thuột", "Thái Nguyên", "Nam Định", "Hạ Long", "Vinh",
-        "Thanh Hóa", "Hải Dương", "Bắc Ninh", "Thủ Dầu Một",
+        "Hà Nội", "Hanoi", "Hồ Chí Minh", "Thành phố Hồ Chí Minh", "Ho Chi Minh City", "TP. Hồ Chí Minh", "TP.HCM",
+        "TPHCM", "Thành phố Thủ Đức", "TP. Thủ Đức", "Thành phố Đà Nẵng", "Đà Nẵng", "Da Nang", "Hải Phòng", "Cần Thơ",
+        "Huế", "Nha Trang", "Biên Hòa", "Vũng Tàu", "Đà Lạt", "Hội An", "Thủ Đức", "Quy Nhơn", "Buôn Ma Thuột",
+        "Thái Nguyên", "Nam Định", "Hạ Long", "Vinh", "Thanh Hóa", "Hải Dương", "Bắc Ninh", "Thủ Dầu Một",
+        "Quận Tây Hồ", "Q.Tây Hồ", "Tây Hồ",
     ),
     ("KE", "KEN"): (
         "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret", "Thika", "Malindi", "Kitale", "Garissa", "Kakamega",
@@ -48,10 +56,11 @@ _RAW: Dict[Tuple[str, ...], Tuple[str, ...]] = {
     ),
     ("SA", "SAU"): (
         "Riyadh", "Jeddah", "Makkah", "Makkah al Mukarramah", "Mecca", "Madinah", "Al Madinah", "Al Madinah al Munawwarah",
-        "Medina", "Dammam", "Al Khobar", "Khobar", "Dhahran", "Tabuk", "Buraydah", "Abha", "Khamis Mushait", "Hail",
-        "Najran", "Jazan", "Yanbu", "Al Jubail", "Jubail", "Taif", "Al Hofuf", "Hofuf", "Al Qatif", "Qatif",
-        "الرياض", "جدة", "مكة المكرمة", "المدينة المنورة", "الدمام", "الخبر", "الظهران", "تبوك", "بريدة", "أبها",
-        "حائل", "نجران", "جازان", "ينبع", "الجبيل", "الطائف", "الهفوف", "القطيف",
+        "Medina", "Dammam", "Al Khobar", "AlKhobar", "Al Khubar", "Al Khubar Ash Shamaliyah", "Khobar", "Dhahran",
+        "Tabuk", "Buraydah", "Abha", "Khamis Mushait", "Hail", "Najran", "Jazan", "Yanbu", "Al Jubail", "Jubail",
+        "Taif", "Al Hofuf", "Hofuf", "Al Qatif", "Qatif",
+        "الرياض", "جدة", "مكة المكرمة", "المدينة المنورة", "الدمام", "الخبر", "الخبر الشمالية", "الظهران", "تبوك",
+        "بريدة", "أبها", "حائل", "نجران", "جازان", "ينبع", "الجبيل", "الطائف", "الهفوف", "القطيف",
     ),
     ("EG", "EGY"): (
         "Cairo", "Giza", "Alexandria", "New Cairo", "Nasr City", "Maadi", "Heliopolis", "6th of October City",
@@ -76,10 +85,11 @@ _RAW: Dict[Tuple[str, ...], Tuple[str, ...]] = {
         "Valledupar", "Sincelejo", "Tunja", "Floridablanca", "Palmira", "Riohacha", "Chía", "Zipaquirá", "Rionegro",
     ),
     ("PE", "PER"): (
-        "Lima", "Arequipa", "Trujillo", "Chiclayo", "Piura", "Iquitos", "Cusco", "Cuzco", "Huancayo", "Tacna",
-        "Pucallpa", "Chimbote", "Ica", "Juliaca", "Cajamarca", "Ayacucho", "Puno", "Tarapoto", "Huánuco",
-        "San Isidro", "Miraflores", "Surquillo", "Barranco", "San Borja", "Santiago de Surco", "La Molina",
-        "Jesús María", "Lince", "Magdalena del Mar", "San Miguel", "Callao", "Chorrillos", "Pueblo Libre",
+        "Lima", "Cercado de Lima", "Arequipa", "Trujillo", "Chiclayo", "Piura", "Iquitos", "Cusco", "Cuzco", "Huancayo",
+        "Tacna", "Pucallpa", "Chimbote", "Ica", "Juliaca", "Cajamarca", "Ayacucho", "Puno", "Tarapoto", "Huánuco",
+        "San Isidro", "Miraflores", "Surquillo", "Barranco", "San Borja", "Santiago de Surco", "La Molina", "La Victoria",
+        "Jesús María", "Lince", "Magdalena del Mar", "San Miguel", "Callao", "Chorrillos", "Pueblo Libre", "Los Olivos",
+        "San Martín de Porres", "Comas", "Ate",
     ),
     ("AR", "ARG"): (
         "Buenos Aires", "Córdoba", "Rosario", "Mendoza", "La Plata", "San Miguel de Tucumán", "Tucumán",

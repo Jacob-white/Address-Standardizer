@@ -680,7 +680,7 @@ class UniversalInternationalGrammar(CountryGrammar):
                     norm_s1 = ""
                 else:
                     m_pc_city = re.match(r"^(\d{4})\s+([A-Za-zÀ-ÿ].*)$", parts_comma[0])
-                    if m_pc_city and (country_iso == "HUN" or not postal_raw):
+                    if m_pc_city and country_iso == "HUN":
                         postal_raw = m_pc_city.group(1)
                         city_raw = m_pc_city.group(2)
                         norm_s1_base, norm_s2_base = split_intl_secondary_unit(parts_comma[1], "")
@@ -713,7 +713,7 @@ class UniversalInternationalGrammar(CountryGrammar):
                 # "217/27 Moo 9 Beach Rd., Nongprue, Banglamung" + city: letters-only parts after a numbered street
                 # are the sub-locality (dependent locality), not part of the street.
                 s1_parts = [p.strip() for p in s1_raw.split(",") if p.strip()]
-                if len(s1_parts) >= 2 and s1_parts[0][0].isdigit() and not any(
+                if len(s1_parts) >= 2 and any(ch.isdigit() for ch in s1_parts[0]) and not any(
                     ch.isdigit() for ch in ",".join(s1_parts[1:])
                 ):
                     dep_locality = ", ".join(s1_parts[1:]).upper()

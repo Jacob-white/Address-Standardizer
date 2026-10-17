@@ -347,7 +347,7 @@ POSTAL_RULES: Dict[str, PostalRule] = {
     "CHL": _rule("CHL", r"^\d{7}$|^\d{3}-?\d{4}$", 7, 7, desc="7 digits (3+4)", example="8320000"),
     "COL": _rule("COL", r"^\d{6}$", 6, 6, desc="6 digits", example="110111"),
     "CRI": _rule("CRI", r"^\d{5}$", 5, 5, desc="5 digits", example="10101"),
-    "ECU": _rule("ECU", r"^\d{6}$", 6, 6, desc="6 digits", example="170504"),
+    "ECU": _rule("ECU", r"^(?:(?:EC)?\d{6}|\d{2}-\d{2}-\d{2})$", 6, 8, allows_alnum=True, desc="6 digits", example="170504"),
     "FLK": _rule("FLK", r"^FIQQ\s*1ZZ$", 7, 7, allows_alnum=True, desc="FIQQ 1ZZ", example="FIQQ 1ZZ"),
     "GUF": _rule("GUF", r"^973\d{2}$", 5, 5, desc="5 digits (973xx)", example="97300"),
     "GTM": _rule("GTM", r"^\d{5}$", 5, 5, desc="5 digits", example="01001"),
@@ -805,7 +805,7 @@ def _unanchored(pattern: "re.Pattern[str]") -> "re.Pattern[str]":
     """A search version of an anchored validation pattern: ``^code$`` becomes ``(?<![A-Z0-9])code(?![A-Z0-9])``."""
     cached = _UNANCHORED_CACHE.get(pattern.pattern)
     if cached is None:
-        body = pattern.pattern.removeprefix("^").removesuffix("$")
+        body = pattern.pattern.removeprefix("^").removesuffix("$").replace("$|^", "|")
         cached = re.compile(r"(?<![A-Za-z0-9])(?:" + body + r")(?![A-Za-z0-9])", pattern.flags | re.IGNORECASE)
         _UNANCHORED_CACHE[pattern.pattern] = cached
     return cached
