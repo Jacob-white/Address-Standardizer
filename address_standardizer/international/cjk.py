@@ -72,7 +72,7 @@ RE_CJK_LEADING_POSTAL = re.compile(r"^(?:〒\s*)?(\d{3}(?:-\d{2,4})?)\s+(\S.*)$"
 CITY_LEVEL_DIVISIONS = frozenset(
     {p for p in KR_PROVINCES if p.endswith(("특별시", "광역시", "특별자치시")) or p in (
         "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종")}
-    | {d for d in TW_DIVISIONS if d.endswith("市")}
+    | set(TW_DIVISIONS)
 )
 _DISTRICT_SUFFIXES = ("区", "區", "县", "縣", "군", "구", "郡", "町", "村", "鄉", "鎮", "乡", "镇", "旗")
 _ADMIN_SUFFIXES = _DISTRICT_SUFFIXES + ("都", "道", "府", "県", "省", "市", "시")
@@ -169,7 +169,7 @@ RE_JP_PLAIN_BLOCK = re.compile(r"(?<!第)(?<=[\u3040-\u30ff\u3400-\u4dbf\u4e01-\
 RE_JP_GRID_BLOCK = re.compile(rf"^(.*\d+条[東西南北]\s*\d+丁目)\s*(\d+(?:{_JP_DASH}\d+)*)?$")
 RE_JP_GRID_SPACE = re.compile(r"(\d+条[東西南北])\s+(\d+丁目)")
 RE_JP_BAN_BLOCK = re.compile(r"(?<=[^\d\s目])(\d+番地?(?:\d+号?)?)$")
-RE_TW_NUMBER_TAIL = re.compile(r"^(.*[路街段巷弄道])(\d+(?:之\d+)?(?:-\d+)?[號号]?)$")
+RE_TW_NUMBER_TAIL = re.compile(r"^(.*[路街段巷弄道])(\d+(?:之\d+)?(?:-\d+)?[號号]?(?:之\d+)?)$")
 RE_KR_NUMBER_TAIL = re.compile(r"^(.*[로길])(\d+(?:-\d+)?)$")
 
 
@@ -324,7 +324,7 @@ class CJKGrammar(CountryGrammar):
         # Native CJK thoroughfare with trailing number:
         # e.g. "霞が関1-1-1", "南京西路100号", "세종대로 110", "信義路五段7號"
         # Non-overlapping atomic pattern avoids polynomial backtracking on unbroken digit strings
-        m_cjk_num = re.search(r"(\d+(?:[\-\/]\d+)*(?:号|號)?)\s*$", line_slice)
+        m_cjk_num = re.search(r"(\d+(?:[\-\/]\d+)*(?:之\d+)?(?:号|號)?(?:之\d+)?)\s*$", line_slice)
         if m_cjk_num:
             st_num = m_cjk_num.group(1).strip()
             return None, st_num, line
@@ -411,7 +411,7 @@ class CJKGrammar(CountryGrammar):
         # 2. Single-line Romaji unpunctuated parsing
         # -------------------------------------------------------------
         if not city_raw and s1_raw and not _is_cjk(s1_raw):
-            work = s1_raw.strip()
+            work = strip_trailing_country(s1_raw.strip())[0]
             # Extract postal code if present at start or end
             m_pc_lead = re.match(r"^(\d{3}-?\d{4}|\d{5,6})\b\s*(.*)$", work)
             if m_pc_lead and not postal_raw:
@@ -477,7 +477,7 @@ class CJKGrammar(CountryGrammar):
                 is_div_token
                 and w_tokens[0] in CITY_LEVEL_DIVISIONS
                 and len(w_tokens) >= 2
-                and not _is_district_token(w_tokens[1])
+                and not _is_admin_token(w_tokens[1])
             )
             jp_split = split_jp_tokens(w_tokens) if country_iso == "JPN" else None
             if jp_split or city_level or (len(w_tokens) >= 3 and is_div_token):
