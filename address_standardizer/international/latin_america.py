@@ -55,33 +55,77 @@ LATAM_ROAD_TYPES: Dict[str, str] = {
     "TRANSVERSAL": "TRANSV",
     "TRANSV": "TRANSV",
     "CIRCULAR": "CIRC",
-    "AUTOPISTA": "AUTOP",
+    "AUTOPISTA": "AUTOPISTA",
+    "AUTOP": "AUTOPISTA",
     "PASEO": "PASEO",
-    "CALZADA": "CALZ",
-    "CALZ": "CALZ",
+    "CALZADA": "CALZADA",
+    "CALZ": "CALZADA",
     "CAMINO": "CAMINO",
-    "CARRETERA": "CTRA",
-    "CTRA": "CTRA",
-    "PASAJE": "PJE",
-    "PJE": "PJE",
-    "CERRADA": "CDA",
-    "CDA": "CDA",
-    "PROLONGACION": "PROL",
-    "PROLONGACIÓN": "PROL",
-    "PLAZA": "PZ",
+    "CARRETERA": "CARRETERA",
+    "CTRA": "CARRETERA",
+    "PASAJE": "PASAJE",
+    "PJE": "PASAJE",
+    "CERRADA": "CERRADA",
+    "CDA": "CERRADA",
+    "PROLONGACION": "PROLONGACIÓN",
+    "PROLONGACIÓN": "PROLONGACIÓN",
+    "PROL": "PROLONGACIÓN",
+    "PLAZA": "PLAZA",
+    "PZ": "PLAZA",
     # Portuguese (Brazil)
     "RUA": "RUA",
     "R": "RUA",
-    "ALAMEDA": "AL",
-    "AL": "AL",
-    "TRAVESSA": "TV",
-    "TV": "TV",
-    "RODOVIA": "ROD",
-    "ROD": "ROD",
-    "PRAÇA": "PRACA",
-    "PRACA": "PRACA",
-    "ESTRADA": "EST",
+    "ALAMEDA": "ALAMEDA",
+    "AL": "ALAMEDA",
+    "TRAVESSA": "TRAVESSA",
+    "TV": "TRAVESSA",
+    "RODOVIA": "RODOVIA",
+    "ROD": "RODOVIA",
+    "PRAÇA": "PRAÇA",
+    "PRACA": "PRAÇA",
+    "ESTRADA": "ESTRADA",
+    "EST": "ESTRADA",
     "LARGO": "LARGO",
+    # Peru
+    "JIRÓN": "JIRÓN",
+    "JIRON": "JIRÓN",
+    "JR": "JIRÓN",
+}
+
+# Mexican states and federal entities (codes and uppercase names)
+MX_STATES: Dict[str, str] = {
+    "AGS": "AGS", "AGUASCALIENTES": "AGS",
+    "BC": "BC", "BAJA CALIFORNIA": "BC",
+    "BCS": "BCS", "BAJA CALIFORNIA SUR": "BCS",
+    "CAMP": "CAMP", "CAMPECHE": "CAMP",
+    "CHIS": "CHIS", "CHIAPAS": "CHIS",
+    "CHIH": "CHIH", "CHIHUAHUA": "CHIH",
+    "COAH": "COAH", "COAHUILA": "COAH",
+    "COL": "COL", "COLIMA": "COL",
+    "CDMX": "CDMX", "CIUDAD DE MEXICO": "CDMX", "CIUDAD DE MÉXICO": "CDMX", "DISTRITO FEDERAL": "CDMX", "DF": "CDMX",
+    "DGO": "DGO", "DURANGO": "DGO",
+    "GTO": "GTO", "GUANAJUATO": "GTO",
+    "GRO": "GRO", "GUERRERO": "GRO",
+    "HGO": "HGO", "HIDALGO": "HGO",
+    "JAL": "JAL", "JALISCO": "JAL",
+    "MEX": "MEX", "ESTADO DE MEXICO": "MEX", "ESTADO DE MÉXICO": "MEX", "EDO DE MEXICO": "MEX",
+    "MICH": "MICH", "MICHOACAN": "MICH", "MICHOACÁN": "MICH",
+    "MOR": "MOR", "MORELOS": "MOR",
+    "NAY": "NAY", "NAYARIT": "NAY",
+    "NL": "NL", "NUEVO LEON": "NL", "NUEVO LEÓN": "NL",
+    "OAX": "OAX", "OAXACA": "OAX",
+    "PUE": "PUE", "PUEBLA": "PUE",
+    "QRO": "QRO", "QUERETARO": "QRO", "QUERÉTARO": "QRO",
+    "Q ROO": "Q ROO", "QUINTANA ROO": "Q ROO",
+    "SLP": "SLP", "SAN LUIS POTOSI": "SLP", "SAN LUIS POTOSÍ": "SLP",
+    "SIN": "SIN", "SINALOA": "SIN",
+    "SON": "SON", "SONORA": "SON",
+    "TAB": "TAB", "TABASCO": "TAB",
+    "TAMPS": "TAMPS", "TAMAULIPAS": "TAMPS",
+    "TLAX": "TLAX", "TLAXCALA": "TLAX",
+    "VER": "VER", "VERACRUZ": "VER",
+    "YUC": "YUC", "YUCATAN": "YUC", "YUCATÁN": "YUC",
+    "ZAC": "ZAC", "ZACATECAS": "ZAC",
 }
 
 # Brazilian states: two-letter UF codes and (upper-case, accent-folded or not) names.
@@ -156,7 +200,20 @@ CL_CITY_STATE: Dict[str, str] = {
     "COPIAPO": "REGIÓN DE ATACAMA",
 }
 
-LATAM_CITY_STATE: Dict[str, Dict[str, str]] = {"MEX": MX_CITY_STATE, "ARG": AR_CITY_STATE, "CHL": CL_CITY_STATE}
+# Peruvian regional capitals and Lima districts -> department/region
+PE_CITY_STATE: Dict[str, str] = {
+    "LIMA": "LIMA", "MIRAFLORES": "LIMA", "SAN ISIDRO": "LIMA", "SANTIAGO DE SURCO": "LIMA",
+    "SURCO": "LIMA", "SAN BORJA": "LIMA", "BARRANCO": "LIMA", "LA MOLINA": "LIMA",
+    "SAN MIGUEL": "LIMA", "MAGDALENA DEL MAR": "LIMA", "CALLAO": "CALLAO",
+    "AREQUIPA": "AREQUIPA", "CUSCO": "CUSCO", "TRUJILLO": "LA LIBERTAD",
+    "CHICLAYO": "LAMBAYEQUE", "PIURA": "PIURA", "HUANCAYO": "JUNÍN", "IQUITOS": "LORETO",
+}
+
+LATAM_CITY_STATE: Dict[str, Dict[str, str]] = {
+    "MEX": MX_CITY_STATE,
+    "ARG": AR_CITY_STATE,
+    "CHL": CL_CITY_STATE,
+}
 
 # Brazilian CEP: 12345-678 or 12345678
 RE_BRA_CEP = re.compile(r"^\b(\d{5})-?(\d{3})\b$")
@@ -192,7 +249,7 @@ RE_FLOOR_DOOR = re.compile(r"\b(\d+)(?:\s*[ºª°]\s*|o\s+)([A-Za-z0-9\-]{1,3})\
 
 
 class LatinAmericaGrammar(CountryGrammar):
-    """Regional grammar family for Latin America (MEX, BRA, COL, ARG, CHL)."""
+    """Regional grammar family for Latin America (MEX, BRA, COL, ARG, CHL, PER, ECU)."""
 
     split_commaless_line: ClassVar[bool] = True
 
@@ -281,7 +338,7 @@ class LatinAmericaGrammar(CountryGrammar):
         # Argentine CPA is "X5000" (province letter + 4 digits) or the full "X5000ABC"; a short 3-digit code opening
         # the locality part ("500 Córdoba") is a mistyped postcode there. Elsewhere only the full CPA shape is read.
         cpa = r"[A-Z]\d{4}(?:[A-Z]{3})?" if country_iso == "ARG" else r"[A-Z]\d{4}[A-Z]{3}"
-        lead_digits = r"\d{3,8}" if country_iso == "ARG" else r"\d{5,8}"
+        lead_digits = r"\d{3,8}" if country_iso in ("ARG", "MEX", "ECU", "PER") else r"\d{5,8}"
         lead_pc = rf"\d{{5}}(?:-\d{{3}})?|{cpa}|{lead_digits}"
         end_pc = rf"\d{{5}}(?:-\d{{3}})?|{cpa}|{pc_digits}"
 
@@ -329,7 +386,7 @@ class LatinAmericaGrammar(CountryGrammar):
                         RE_ARG_CPA.match(part.strip())
                         and (country_iso == "ARG" or not part.strip().isdigit() or not rem_parts)
                     )
-                    or re.match(r"^\d{5,8}$", part.strip())
+                    or (re.match(r"^\d{5,8}$", part.strip()) and country_iso != "BRA")
                 ):
                     postal_raw = part.strip()
                     continue

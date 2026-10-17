@@ -51,6 +51,15 @@ NO_STREET_NUMBER = "NO_STREET_NUMBER"
 ERR_PARSE_FAILED = "ERR_PARSE_FAILED"
 ERR_EMPTY_ADDRESS = "ERR_EMPTY_ADDRESS"
 ERR_EMPTY_STREET = "ERR_EMPTY_STREET"
+ERR_CITY_ANOMALY = "ERR_CITY_ANOMALY"
+ERR_UNRESOLVED_LOCALITY = "ERR_UNRESOLVED_LOCALITY"
+WARN_POSTAL_IN_CITY = "WARN_POSTAL_IN_CITY"
+WARN_SINGLE_LINE_NO_COMMA = "WARN_SINGLE_LINE_NO_COMMA"
+
+_BARE_DIRECTIONALS = frozenset({
+    "N", "S", "E", "W", "NE", "NW", "SE", "SW",
+    "NORTH", "SOUTH", "EAST", "WEST", "NORTHEAST", "NORTHWEST", "SOUTHEAST", "SOUTHWEST",
+})
 
 
 @dataclass
@@ -123,7 +132,10 @@ class ConfidenceScorer:
         """
         Calculates composite confidence score S in [0.0, 1.0] and determines routing tier.
         """
-        raw = raw_input or {}
+        if isinstance(raw_input, str):
+            raw = {"raw_address": raw_input, "street1": raw_input}
+        else:
+            raw = raw_input or {}
         raw_s1 = (raw.get("street1") or "").strip()
         raw_s2 = (raw.get("street2") or "").strip()
         raw_combined = f"{raw_s1} {raw_s2}".strip().upper()
@@ -203,6 +215,13 @@ class ConfidenceScorer:
         has_dual_address = False
         is_landmark_campus = False
         if std_address.is_us:
+            # Check for city anomaly (digits or bare directional)
+            if std_address.city:
+                c_up = std_address.city.strip().upper()
+                if any(ch.isdigit() for ch in std_address.city) or c_up in _BARE_DIRECTIONALS:
+                    s_parse -= 0.25
+                    reason_codes.append(ERR_CITY_ANOMALY)
+
             # Check for leading house number if street1 present
             st1 = std_address.street1.strip()
             is_po_box = st1.startswith("PO BOX")
@@ -254,7 +273,9 @@ class ConfidenceScorer:
                         reason_codes.append(WARN_TYPO_HEALED)
         else:
             # International parse
-            pass
+            if std_address.city and (re.match(r"^\d+", std_address.city.strip()) or (not std_address.postal_code and bool(re.search(r"\b\d{2,}\b", std_address.city)))):
+                s_parse -= 0.25
+                reason_codes.append(WARN_POSTAL_IN_CITY)
 
         s_parse = max(0.0, min(1.0, s_parse))
 
@@ -344,8 +365,14 @@ class ConfidenceScorer:
                 s_geo = 0.85
             else:
                 s_geo = 0.50
+
+            if std_address.city and (any(ch.isdigit() for ch in std_address.city) or std_address.city.strip().upper() in _BARE_DIRECTIONALS):
+                s_geo = max(0.0, s_geo - 0.30)
         else:
-            s_geo = 0.90 if std_address.city and std_address.country else 0.60
+            if std_address.city and (re.match(r"^\d+", std_address.city.strip()) or (not std_address.postal_code and bool(re.search(r"\b\d{2,}\b", std_address.city)))):
+                s_geo = 0.50
+            else:
+                s_geo = 0.90 if std_address.city and std_address.country else 0.60
 
         s_geo = max(0.0, min(1.0, s_geo))
 
@@ -384,7 +411,15 @@ class ConfidenceScorer:
             else:
                 s_cross = 0.80
         else:
-            s_cross = 1.0
+            if std_address.city and (re.match(r"^\d+", std_address.city.strip()) or (not std_address.postal_code and bool(re.search(r"\b\d{2,}\b", std_address.city)))):
+                s_cross = 0.50
+            else:
+                s_cross = 1.0
+
+        if "," not in raw_combined and not std_address.state and std_address.country in ("USA", "CAN", "AUS", "IND", "BRA", "MEX", "PER"):
+            s_parse = max(0.0, s_parse - 0.10)
+            s_geo = max(0.0, s_geo - 0.15)
+            reason_codes.append(WARN_SINGLE_LINE_NO_COMMA)
 
         s_cross = max(0.0, min(1.0, s_cross))
 

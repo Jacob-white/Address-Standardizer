@@ -265,3 +265,13 @@ def fast_tokenize_dispatch(text: str) -> List[str]:
         return result
     import re
     return re.findall(r"[\w#/-]+", text.upper())
+
+
+def damerau_levenshtein_dispatch(s1: str, s2: str) -> int:
+    """Dispatches Damerau-Levenshtein edit distance to native engine, falling back to pure Python."""
+    ok, result = try_native("damerau_levenshtein_distance", s1, s2)
+    if ok:
+        return result
+    from address_standardizer.fuzzy import _pure_damerau_levenshtein_distance
+    return _pure_damerau_levenshtein_distance(s1, s2)
+

@@ -71,6 +71,67 @@ pub fn compute_soundex(token: &str) -> String {
     soundex(token)
 }
 
+/// Computes true Damerau-Levenshtein edit distance between s1 and s2.
+/// Matches Python implementation in `address_standardizer.fuzzy._pure_damerau_levenshtein_distance`.
+pub fn damerau_levenshtein(s1: &str, s2: &str) -> usize {
+    if s1 == s2 {
+        return 0;
+    }
+    let chars1: Vec<char> = s1.chars().collect();
+    let chars2: Vec<char> = s2.chars().collect();
+    let len1 = chars1.len();
+    let len2 = chars2.len();
+    if len1 == 0 {
+        return len2;
+    }
+    if len2 == 0 {
+        return len1;
+    }
+
+    let inf = len1 + len2;
+    let mut da: std::collections::HashMap<char, usize> = std::collections::HashMap::new();
+    let mut h = vec![vec![0usize; len2 + 2]; len1 + 2];
+
+    h[0][0] = inf;
+    for i in 0..=len1 {
+        h[i + 1][0] = inf;
+        h[i + 1][1] = i;
+    }
+    for j in 0..=len2 {
+        h[0][j + 1] = inf;
+        h[1][j + 1] = j;
+    }
+
+    for i in 1..=len1 {
+        let mut db = 0;
+        for j in 1..=len2 {
+            let i1 = *da.get(&chars2[j - 1]).unwrap_or(&0);
+            let j1 = db;
+            let cost = if chars1[i - 1] == chars2[j - 1] {
+                db = j;
+                0
+            } else {
+                1
+            };
+
+            let deletion = h[i][j + 1] + 1;
+            let insertion = h[i + 1][j] + 1;
+            let substitution = h[i][j] + cost;
+            let transposition = h[i1][j1] + (i - i1 - 1) + 1 + (j - j1 - 1);
+
+            h[i + 1][j + 1] = deletion.min(insertion).min(substitution).min(transposition);
+        }
+        da.insert(chars1[i - 1], i);
+    }
+
+    h[len1 + 1][len2 + 1]
+}
+
+#[pyfunction]
+pub fn damerau_levenshtein_distance(s1: &str, s2: &str) -> usize {
+    damerau_levenshtein(s1, s2)
+}
+
 #[pyfunction]
 pub fn get_engine_name() -> &'static str {
     "Rust_PyO3"
@@ -89,13 +150,14 @@ pub fn get_capabilities(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     dict.set_item("is_native", true)?;
     dict.set_item("version", VERSION)?;
     dict.set_item("pure_python", false)?;
-    dict.set_item("native_functions", vec!["compute_soundex"])?;
+    dict.set_item("native_functions", vec!["compute_soundex", "damerau_levenshtein_distance"])?;
     Ok(dict)
 }
 
 #[pymodule]
 fn _address_standardizer_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(compute_soundex, m)?)?;
+    m.add_function(wrap_pyfunction!(damerau_levenshtein_distance, m)?)?;
     m.add_function(wrap_pyfunction!(get_engine_name, m)?)?;
     m.add_function(wrap_pyfunction!(is_native, m)?)?;
     m.add_function(wrap_pyfunction!(get_capabilities, m)?)?;
@@ -104,7 +166,19 @@ fn _address_standardizer_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::soundex;
+    use super::{damerau_levenshtein, soundex};
+
+    #[test]
+    fn test_damerau_levenshtein_vectors() {
+        assert_eq!(damerau_levenshtein("", ""), 0);
+        assert_eq!(damerau_levenshtein("a", ""), 1);
+        assert_eq!(damerau_levenshtein("", "a"), 1);
+        assert_eq!(damerau_levenshtein("CA", "ABC"), 2);
+        assert_eq!(damerau_levenshtein("MAIN", "MANI"), 1);
+        assert_eq!(damerau_levenshtein("STREET", "STEET"), 1);
+        assert_eq!(damerau_levenshtein("AVENUE", "AVE"), 3);
+        assert_eq!(damerau_levenshtein("straße", "strasse"), 2);
+    }
 
     #[test]
     fn classic_vectors() {

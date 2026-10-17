@@ -25,6 +25,7 @@ from address_standardizer.international.base import (
 from address_standardizer.international.diacritics import (
     normalize_to_canonical_unicode,
 )
+from address_standardizer.tables import GLOBAL_METRO_TO_COUNTRY
 
 # Japanese 47 Prefectures
 JP_PREFECTURES = (
@@ -403,10 +404,43 @@ class CJKGrammar(CountryGrammar):
                 city_raw = parts[1]
                 street_line = parts[0]
             elif len(parts) == 1:
+                s1_raw = parts[0]
                 street_line = parts[0]
 
         # -------------------------------------------------------------
-        # 2. Native CJK Unparsed Hierarchy Parsing
+        # 2. Single-line Romaji unpunctuated parsing
+        # -------------------------------------------------------------
+        if not city_raw and s1_raw and not _is_cjk(s1_raw):
+            work = s1_raw.strip()
+            # Extract postal code if present at start or end
+            m_pc_lead = re.match(r"^(\d{3}-?\d{4}|\d{5,6})\b\s*(.*)$", work)
+            if m_pc_lead and not postal_raw:
+                postal_raw = m_pc_lead.group(1)
+                work = m_pc_lead.group(2).strip()
+            else:
+                m_pc_end = re.search(r"\b(\d{3}-?\d{4}|\d{5,6})$", work)
+                if m_pc_end and not postal_raw:
+                    postal_raw = m_pc_end.group(1)
+                    work = work[:m_pc_end.start()].strip()
+            tokens = work.split(maxsplit=1)
+            if len(tokens) == 2 and (
+                tokens[0].upper() in GLOBAL_METRO_TO_COUNTRY
+                or tokens[0].upper() in (
+                    "KYOTO", "TOKYO", "OSAKA", "NAGOYA", "YOKOHAMA", "FUKUOKA",
+                    "SAPPORO", "KOBE", "SENDAI", "HIROSHIMA", "KAWASAKI", "SAITAMA", "CHIBA", "NARA"
+                )
+                or tokens[0].upper().endswith(("-SHI", "-KU"))
+            ):
+                city_raw = tokens[0]
+                street_line = tokens[1]
+                m_num = re.search(r"^(.*?[A-Za-z])(\d+.*)$", street_line)
+                if m_num:
+                    street_line = f"{m_num.group(1)} {m_num.group(2)}"
+            else:
+                street_line = work
+
+        # -------------------------------------------------------------
+        # 3. Native CJK Unparsed Hierarchy Parsing
         # -------------------------------------------------------------
         elif not city_raw and s1_raw and _is_cjk(s1_raw):
             work = s1_raw.strip()

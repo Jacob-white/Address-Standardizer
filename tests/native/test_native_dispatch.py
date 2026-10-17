@@ -90,6 +90,10 @@ class TestNativeDispatchFallback:
         assert k2 == "100 WALL ST||NEW YORK|NY|10005|USA"
         assert k3 == "100|W400|10005"
 
+        # 6. damerau_levenshtein_dispatch
+        assert _native_dispatch.damerau_levenshtein_dispatch("MAIN", "MANI") == 1
+
+
 
 class TestNativeDispatchWithMockExtension:
     """Tests native module injection, mock routing, and override mechanisms."""
@@ -122,6 +126,7 @@ class TestNativeDispatchWithMockExtension:
         mock_native.compute_soundex.return_value = "N999"
         mock_native.generate_phonetic_address_key.return_value = "NATIVE_PHON"
         mock_native.generate_keys.return_value = ("K1", "K2", "K3")
+        mock_native.damerau_levenshtein_distance.return_value = 1
 
         # Inject mock native module
         _native_dispatch.set_native_module(mock_native)
@@ -153,6 +158,10 @@ class TestNativeDispatchWithMockExtension:
 
         assert _native_dispatch.generate_keys_dispatch("Test") == ("K1", "K2", "K3")
         mock_native.generate_keys.assert_called_once()
+
+        assert _native_dispatch.damerau_levenshtein_dispatch("MAIN", "MANI") == 1
+        mock_native.damerau_levenshtein_distance.assert_called_once_with("MAIN", "MANI")
+
 
         # Test force_pure_python bypasses native
         _native_dispatch.force_pure_python(True)

@@ -589,13 +589,24 @@ def standardize_address(
     is_us =country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
     if is_us:
         city_raw, state_raw = swap_us_city_state(city_raw, state_raw)
-    elif country_iso in ("CAN", "AUS"):
+    elif country_iso in ("CAN", "AUS", "BRA", "IND", "MEX"):
         from address_standardizer.international.australia import AU_STATES
+        from address_standardizer.international.india import IN_STATES
+        from address_standardizer.international.latin_america import BR_STATES, MX_STATES
         from address_standardizer.tables import CANADIAN_PROVINCES
 
-        city_raw, state_raw = swap_region_city_state(
-            city_raw, state_raw, CANADIAN_PROVINCES if country_iso == "CAN" else AU_STATES
-        )
+        if country_iso == "CAN":
+            regs = CANADIAN_PROVINCES
+        elif country_iso == "AUS":
+            regs = AU_STATES
+        elif country_iso == "BRA":
+            regs = BR_STATES
+        elif country_iso == "IND":
+            regs = IN_STATES
+        else:
+            regs = MX_STATES
+
+        city_raw, state_raw = swap_region_city_state(city_raw, state_raw, regs)
 
     # Strip terminal sovereign country before US or international parsing if structured components present
     if city_raw or state_raw or postal_raw:

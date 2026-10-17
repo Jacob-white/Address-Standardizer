@@ -21,9 +21,9 @@ from address_standardizer._patterns import MULTI_WORD_CITIES
 
 
 @functools.lru_cache(maxsize=16384)
-def damerau_levenshtein_distance(s1: str, s2: str) -> int:
+def _pure_damerau_levenshtein_distance(s1: str, s2: str) -> int:
     """
-    Computes true Damerau-Levenshtein edit distance between s1 and s2.
+    Computes true Damerau-Levenshtein edit distance between s1 and s2 in pure Python.
     Supports insertion, deletion, substitution, and transposition of adjacent characters.
     """
     len1, len2 = len(s1), len(s2)
@@ -65,6 +65,18 @@ def damerau_levenshtein_distance(s1: str, s2: str) -> int:
         da[s1[i - 1]] = i
 
     return h[len1 + 1][len2 + 1]
+
+
+def damerau_levenshtein_distance(s1: str, s2: str) -> int:
+    """Computes true Damerau-Levenshtein edit distance between s1 and s2.
+
+    Accelerated by native Rust extension if loaded, with pure Python fallback.
+    """
+    from address_standardizer._native_dispatch import try_native
+
+    ok, result = try_native("damerau_levenshtein_distance", s1, s2)
+    return result if ok else _pure_damerau_levenshtein_distance(s1, s2)
+
 
 
 # ---------------------------------------------------------------------------

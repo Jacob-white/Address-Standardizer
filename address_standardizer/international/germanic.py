@@ -79,6 +79,18 @@ def expand_german_street_abbreviations(street_line: str) -> str:
     return _RE_DE_PL.sub("PLATZ", out)
 
 
+_RE_NL_LN = re.compile(r"(?<=[A-Za-zÄÖÜäöüËëÏï])[Ll]n\.(?=[\s,]|$)|(?<![\w])[Ll]n\.(?=[\s,]|$)", re.IGNORECASE)
+_RE_NL_STR = re.compile(r"(?<=[A-Za-zÄÖÜäöüËëÏï])[Ss]tr\.(?=[\s,]|$)|(?<![\w])[Ss]tr\.(?=[\s,]|$)", re.IGNORECASE)
+
+
+def expand_dutch_street_abbreviations(street_line: str) -> str:
+    """Expand Dutch `Ln.`/`ln.` to LAAN and `Str.`/`str.` to STRAAT."""
+    if not street_line:
+        return street_line
+    out = _RE_NL_LN.sub("LAAN", street_line)
+    return _RE_NL_STR.sub("STRAAT", out)
+
+
 def is_valid_dutch_postcode(raw_code: str) -> bool:
     """Validate Netherlands postal code (4 digits + 2 letters, excluding SA/SD/SS)."""
     if not raw_code:
@@ -201,6 +213,8 @@ class GermanicGrammar(CountryGrammar):
             if m_pf:
                 street_line = f"POSTFACH {m_pf.group(1)}"
                 s2_raw = f"{m_pf.group(2).strip()} {s2_raw}".strip() if s2_raw else m_pf.group(2).strip()
+        elif country_iso == "NLD":
+            street_line = expand_dutch_street_abbreviations(street_line)
 
         # Check for Nordic floor/door (e.g. "45, 2. tv.")
         m_nordic_fd = RE_NORDIC_FLOOR_DOOR.search(street_line)
