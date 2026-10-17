@@ -343,8 +343,15 @@ def swap_us_city_state(city: Optional[str], state: Optional[str]) -> Tuple[Optio
 def swap_region_city_state(city: Optional[str], state: Optional[str], regions) -> Tuple[Optional[str], Optional[str]]:
     """Generic form of :func:`swap_us_city_state`: swap only when ``city`` is one of the country's regions (code or
     name, upper-case keys in ``regions``) and ``state`` is not."""
-    if city and state and city.strip(" .").upper() in regions and state.strip(" .").upper() not in regions:
-        return state, city
+    if city and state:
+        c_clean = city.strip(" .").upper()
+        s_clean = state.strip(" .").upper()
+        c_folded = unicodedata.normalize("NFKD", c_clean).encode("ascii", "ignore").decode("ascii")
+        s_folded = unicodedata.normalize("NFKD", s_clean).encode("ascii", "ignore").decode("ascii")
+        is_city_reg = c_clean in regions or c_folded in regions
+        is_state_reg = s_clean in regions or s_folded in regions
+        if is_city_reg and not is_state_reg:
+            return state, city
     return city, state
 
 

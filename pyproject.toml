@@ -81,7 +81,7 @@ where = ["."]
 include = ["address_standardizer*"]
 
 [tool.setuptools.package-data]
-address_standardizer = ["service/static/*.html"]
+address_standardizer = ["service/static/*.html", "reference/data/*.tsv.gz"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

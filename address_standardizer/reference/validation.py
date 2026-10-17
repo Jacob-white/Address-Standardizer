@@ -171,6 +171,18 @@ def apply_reference_validation(std_address: Any, provider: ReferenceProvider) ->
     std_address.reference_validation = validation
     existing = list(std_address.failure_reason_codes)
     std_address.failure_reason_codes = existing + [c for c in validation.reason_codes if c not in existing]
+    conf = getattr(std_address, "confidence_score", None)
+    if conf is not None and conf > 0.0:
+        if ERR_POSTAL_UNKNOWN in validation.reason_codes or ERR_POSTAL_STATE_MISMATCH in validation.reason_codes:
+            std_address.confidence_score = round(max(0.0, std_address.confidence_score - 0.25), 4)
+            if std_address.confidence_score < 0.80:
+                std_address.routing_tier = "MANUAL_STEWARDSHIP"
+            else:
+                std_address.routing_tier = "FUZZY_REVIEW"
+        elif WARN_POSTAL_PLACE_MISMATCH in validation.reason_codes:
+            std_address.confidence_score = round(max(0.0, std_address.confidence_score - 0.12), 4)
+            if getattr(std_address, "routing_tier", "") == "AUTO_PASS":
+                std_address.routing_tier = "FUZZY_REVIEW"
     return std_address
 
 

@@ -362,7 +362,7 @@ def split_intl_secondary_unit(street1: str, street2: str, *, native_types: bool 
 
     # Pre-split leading Asian/International floor numbers: "8F SHIN-OTEMACHI BLDG" -> st1="SHIN-OTEMACHI BLDG", st2="FL 8"
     m_floor = re.match(r"^([B]?\d+)F\b\s+(.*)$", st1, re.IGNORECASE)
-    if m_floor:
+    if m_floor and re.search(r"^\d|\b(?:BLDG|BUILDING|TOWER|MANSION|CTR|CENTER|PLAZA|HALL|CORP|ANNEX|WING|BLK|BLOCK)\b", m_floor.group(2), re.IGNORECASE):
         st2_cand = f"FL {m_floor.group(1).upper()}"
         st2 = f"{st2_cand} {st2}".strip() if st2 else st2_cand
         st1 = m_floor.group(2).strip()
@@ -602,6 +602,11 @@ class UniversalInternationalGrammar(CountryGrammar):
         postal_raw = metadata.get("postal_code", "")
         country_iso = metadata.get("country", self.country_iso3)
 
+        if country_iso in ("BEL", "NLD") and s1_raw:
+            s1_raw = re.sub(r"(?<=[A-Za-zÄÖÜäöüËëÏï])[Ll]n\.(?=[\s,0-9]|$)", "laan", s1_raw)
+            s1_raw = re.sub(r"(?<![\w])[Ll]n\.(?=[\s,0-9]|$)", "LAAN", s1_raw)
+            s1_raw = re.sub(r"(?<=[A-Za-zÄÖÜäöüËëÏï])[Ss]tr\.(?=[\s,0-9]|$)", "straat", s1_raw)
+
         norm_s1 = ""
         norm_s2 = ""
         dep_locality: Optional[str] = None
@@ -644,7 +649,12 @@ class UniversalInternationalGrammar(CountryGrammar):
                     norm_s1_base, norm_s2_base = split_intl_secondary_unit(parts_comma[0], "")
                     norm_s1 = norm_s1_base
                     norm_s2 = norm_s2_base
-                    city_raw = parts_comma[1]
+                    m_pc = re.match(r"^(\d{3,6})\s+([^\d].*)$", parts_comma[1])
+                    if m_pc and not postal_raw:
+                        postal_raw = m_pc.group(1)
+                        city_raw = m_pc.group(2)
+                    else:
+                        city_raw = parts_comma[1]
                     rem_loc = parts_comma[2]
                     m_can = RE_CAN_PROV_POSTAL.match(rem_loc.upper())
                     if m_can:
@@ -669,10 +679,18 @@ class UniversalInternationalGrammar(CountryGrammar):
                     postal_raw = parts_comma[1]
                     norm_s1 = ""
                 else:
-                    norm_s1_base, norm_s2_base = split_intl_secondary_unit(parts_comma[0], "")
-                    norm_s1 = norm_s1_base
-                    norm_s2 = norm_s2_base
-                    city_raw = parts_comma[1]
+                    m_pc_city = re.match(r"^(\d{4})\s+([A-Za-zÀ-ÿ].*)$", parts_comma[0])
+                    if m_pc_city and (country_iso == "HUN" or not postal_raw):
+                        postal_raw = m_pc_city.group(1)
+                        city_raw = m_pc_city.group(2)
+                        norm_s1_base, norm_s2_base = split_intl_secondary_unit(parts_comma[1], "")
+                        norm_s1 = norm_s1_base
+                        norm_s2 = norm_s2_base
+                    else:
+                        norm_s1_base, norm_s2_base = split_intl_secondary_unit(parts_comma[0], "")
+                        norm_s1 = norm_s1_base
+                        norm_s2 = norm_s2_base
+                        city_raw = parts_comma[1]
             elif len(parts_comma) == 1:
                 p0 = parts_comma[0].strip().upper()
                 if p0 in GLOBAL_METRO_TO_COUNTRY or p0 in (

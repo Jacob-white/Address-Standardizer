@@ -175,6 +175,8 @@ class IndiaGrammar(CountryGrammar):
         if state_raw:
             s_up = state_raw.strip().upper()
             norm_state = IN_STATES.get(s_up, s_up)
+        elif city_raw and city_raw.strip().upper() in IN_CITY_STATES:
+            norm_state = IN_STATES[city_raw.strip().upper()]
 
         # Detect SEZ units
         sec_unit_str = ""
@@ -207,6 +209,8 @@ class IndiaGrammar(CountryGrammar):
             if m_s:
                 if not norm_state:
                     norm_state = s_code
+                if not city_raw and s_name in IN_CITY_STATES:
+                    city_raw = s_name
                 combined = combined[:m_s.start()] + " " + combined[m_s.end():]
                 combined = " ".join(combined.strip(" ,.-").split())
                 break

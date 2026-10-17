@@ -17,6 +17,10 @@ from address_standardizer.reference.geonames import (
     build_geonames_index,
     download_geonames,
 )
+from address_standardizer.reference.us_zip5 import (
+    USZip5Provider,
+    get_default_us_zip5_provider,
+)
 from address_standardizer.reference.validation import (
     ERR_POSTAL_STATE_MISMATCH,
     ERR_POSTAL_UNKNOWN,
@@ -37,8 +41,10 @@ __all__ = [
     "ReferencePlace",
     "ReferenceProvider",
     "ReferenceValidation",
+    "USZip5Provider",
     "WARN_POSTAL_PLACE_MISMATCH",
     "build_geonames_index",
     "download_geonames",
+    "get_default_us_zip5_provider",
     "validate_against_reference",
 ]

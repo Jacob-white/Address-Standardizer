@@ -698,6 +698,11 @@ def _parse_us_street_tokens(address_str: str, enable_fuzzy: bool = True, city_ra
                 street_parts = city_parts + state_parts + street_parts
                 city_parts = []
                 state_parts = []
+            elif city_parts and all(c in DIRECTIONALS for c in city_parts) and state_parts and zip_parts:
+                for c in city_parts:
+                    street_parts.append(DIRECTIONALS[c])
+                city_parts = list(state_parts)
+                state_parts = []
             else:
                 street_parts.extend(state_parts)
                 state_parts = []

@@ -127,6 +127,14 @@ from address_standardizer._native_dispatch import (
     standardize_record_dispatch,
     standardize_batch_dispatch,
 )
+from address_standardizer.reference import (
+    ReferencePlace,
+    ReferenceProvider,
+    ReferenceValidation,
+    USZip5Provider,
+    get_default_us_zip5_provider,
+    validate_against_reference,
+)
 try:
     from address_standardizer.arrow import (
         standardize_arrow,
@@ -251,6 +259,12 @@ __all__ = [
     "standardize_polars",
     "register_duckdb_udfs",
     "create_app",
+    "ReferencePlace",
+    "ReferenceProvider",
+    "ReferenceValidation",
+    "USZip5Provider",
+    "get_default_us_zip5_provider",
+    "validate_against_reference",
     "__version__",
 ]
 
