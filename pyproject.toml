@@ -54,6 +54,9 @@ translit = [
 otel = [
     "opentelemetry-api>=1.20",
 ]
+mcp = [
+    "mcp>=1.0.0",
+]
 arrow = [
     "pyarrow>=14.0.0",
     "polars>=0.20.0",
@@ -75,6 +78,7 @@ docs = [
 
 [project.scripts]
 address-standardizer = "address_standardizer.cli:main"
+address-standardizer-mcp = "address_standardizer.mcp.server:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -10,6 +10,8 @@ __version__ = "3.3.0"
 
 from address_standardizer.models import StandardizedAddress
 from address_standardizer.standardizer import (
+    AddressValidationResult,
+    validate_address,
     standardize_address,
     generate_normalized_address_key,
     generate_building_key,
@@ -153,6 +155,19 @@ try:
 except ImportError:
     create_app = None
 
+try:
+    from address_standardizer.schemas import (
+        AddressInputSchema,
+        AddressSchema,
+        StandardizedAddressPydantic,
+        ValidationResultSchema,
+    )
+except ImportError:
+    AddressInputSchema = None
+    AddressSchema = None
+    StandardizedAddressPydantic = None
+    ValidationResultSchema = None
+
 
 __all__ = [
     "StandardizedAddress",
@@ -265,6 +280,12 @@ __all__ = [
     "USZip5Provider",
     "get_default_us_zip5_provider",
     "validate_against_reference",
+    "validate_address",
+    "AddressValidationResult",
+    "AddressInputSchema",
+    "AddressSchema",
+    "StandardizedAddressPydantic",
+    "ValidationResultSchema",
     "__version__",
 ]
 

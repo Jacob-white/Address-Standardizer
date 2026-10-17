@@ -77,12 +77,20 @@ func WithTimeout(d time.Duration) Option {
 	}
 }
 
+// WithRetry configures automatic retry with exponential backoff and jitter for transient errors.
+func WithRetry(config RetryConfig) Option {
+	return func(c *Client) {
+		c.retryConfig = &config
+	}
+}
+
 // Client interacts with the Address Standardizer microservice daemon.
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
-	headers    map[string]string
-	timeout    time.Duration
+	baseURL     string
+	httpClient  *http.Client
+	headers     map[string]string
+	timeout     time.Duration
+	retryConfig *RetryConfig
 }
 
 // NewClient initializes a new Address Standardizer client.
@@ -110,6 +118,21 @@ func NewClient(baseURL string, opts ...Option) *Client {
 	return c
 }
 
+func isRetryableStatusCode(code int, customCodes []int) bool {
+	if len(customCodes) == 0 {
+		return code == http.StatusTooManyRequests ||
+			code == http.StatusBadGateway ||
+			code == http.StatusServiceUnavailable ||
+			code == http.StatusGatewayTimeout
+	}
+	for _, c := range customCodes {
+		if c == code {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Client) doRequest(ctx context.Context, method, path string, body interface{}, target interface{}) error {
 	if c.timeout > 0 {
 		var cancel context.CancelFunc
@@ -118,43 +141,121 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body interf
 	}
 
 	fullURL := c.baseURL + path
-	var bodyReader io.Reader
+	var data []byte
 	if body != nil {
-		data, err := json.Marshal(body)
+		var err error
+		data, err = json.Marshal(body)
 		if err != nil {
 			return fmt.Errorf("failed to marshal request body: %w", err)
 		}
-		bodyReader = bytes.NewReader(data)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, fullURL, bodyReader)
-	if err != nil {
-		return fmt.Errorf("failed to create http request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	for k, v := range c.headers {
-		req.Header.Set(k, v)
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		respBytes, _ := io.ReadAll(resp.Body)
-		return &APIError{StatusCode: resp.StatusCode, Body: string(respBytes)}
-	}
-
-	if target != nil {
-		if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
-			return fmt.Errorf("failed to decode response: %w", err)
+	maxRetries := 0
+	baseDelay := 200 * time.Millisecond
+	maxDelay := 3 * time.Second
+	var retryCodes []int
+	if c.retryConfig != nil {
+		maxRetries = c.retryConfig.MaxRetries
+		if c.retryConfig.BaseDelay > 0 {
+			baseDelay = c.retryConfig.BaseDelay
 		}
+		if c.retryConfig.MaxDelay > 0 {
+			maxDelay = c.retryConfig.MaxDelay
+		}
+		retryCodes = c.retryConfig.RetryableStatusCodes
 	}
-	return nil
+
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		var bodyReader io.Reader
+		if data != nil {
+			bodyReader = bytes.NewReader(data)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, fullURL, bodyReader)
+		if err != nil {
+			return fmt.Errorf("failed to create http request: %w", err)
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		for k, v := range c.headers {
+			req.Header.Set(k, v)
+		}
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			lastErr = fmt.Errorf("request failed: %w", err)
+			if attempt < maxRetries {
+				delay := baseDelay * time.Duration(1<<attempt)
+				if delay > maxDelay {
+					delay = maxDelay
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(delay):
+				}
+				continue
+			}
+			return lastErr
+		}
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			respBytes, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			apiErr := &APIError{StatusCode: resp.StatusCode, Body: string(respBytes)}
+			if attempt < maxRetries && isRetryableStatusCode(resp.StatusCode, retryCodes) {
+				delay := baseDelay * time.Duration(1<<attempt)
+				if delay > maxDelay {
+					delay = maxDelay
+				}
+				if ra := resp.Header.Get("Retry-After"); ra != "" {
+					if secs, err := strconv.ParseFloat(ra, 64); err == nil && secs > 0 {
+						delay = time.Duration(secs * float64(time.Second))
+						if delay > maxDelay {
+							delay = maxDelay
+						}
+					}
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(delay):
+				}
+				continue
+			}
+			return apiErr
+		}
+
+		defer resp.Body.Close()
+		if target != nil {
+			if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+				return fmt.Errorf("failed to decode response: %w", err)
+			}
+		}
+		return nil
+	}
+	return lastErr
+}
+
+// ValidatePostalCode validates a postal code format against official national standards.
+func (c *Client) ValidatePostalCode(ctx context.Context, postalCode, country string) (*PostalValidationResult, error) {
+	if country == "" {
+		country = "US"
+	}
+	req := map[string]string{
+		"postal_code": postalCode,
+		"country":     country,
+	}
+	var out PostalValidationResult
+	if err := c.doRequest(ctx, http.MethodPost, "/v1/validate-postal", req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // Standardize parses and standardizes a single address.

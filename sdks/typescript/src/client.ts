@@ -9,6 +9,7 @@ import {
   BatchStandardizeRequest,
   ClientOptions,
   HealthResponse,
+  PostalValidationResult,
   RequestOptions,
   StandardizeRequest,
   StandardizeResponse,
@@ -44,6 +45,10 @@ export class AddressStandardizerClient {
   private readonly timeoutMs: number;
   private readonly fetchFn: typeof fetch;
   private readonly defaultHeaders: Record<string, string>;
+  private readonly maxRetries: number;
+  private readonly baseDelayMs: number;
+  private readonly maxDelayMs: number;
+  private readonly retryableStatusCodes: Set<number>;
 
   constructor(options: ClientOptions = {}) {
     this.baseUrl = trimTrailingSlashes(options.baseUrl || "http://localhost:8000");
@@ -55,6 +60,10 @@ export class AddressStandardizerClient {
       Accept: "application/json",
       ...(options.headers || {}),
     };
+    this.maxRetries = options.retry?.maxRetries ?? 3;
+    this.baseDelayMs = options.retry?.baseDelayMs ?? 200;
+    this.maxDelayMs = options.retry?.maxDelayMs ?? 3000;
+    this.retryableStatusCodes = new Set(options.retry?.retryableStatusCodes ?? [429, 502, 503, 504]);
   }
 
   /**
@@ -103,27 +112,45 @@ export class AddressStandardizerClient {
 
   private async request<T>(path: string, init: RequestInit = {}, options?: RequestOptions, asText = false): Promise<T> {
     const url = `${this.baseUrl}${path}`;
-    const scope = this.abortScope(options);
-    scope.touch();
-    try {
-      const response = await this.fetchFn(url, {
-        ...init,
-        headers: {
-          ...this.defaultHeaders,
-          ...(init.headers || {}),
-        },
-        signal: scope.signal,
-      });
+    let attempt = 0;
 
-      if (!response.ok) {
-        await this.failFromResponse(response);
+    while (true) {
+      const scope = this.abortScope(options);
+      scope.touch();
+      try {
+        const response = await this.fetchFn(url, {
+          ...init,
+          headers: {
+            ...this.defaultHeaders,
+            ...(init.headers || {}),
+          },
+          signal: scope.signal,
+        });
+
+        if (!response.ok) {
+          if (attempt < this.maxRetries && this.retryableStatusCodes.has(response.status)) {
+            let delayMs = Math.min(this.maxDelayMs, Math.random() * (this.baseDelayMs * Math.pow(2, attempt)));
+            const retryAfter = response.headers?.get?.("retry-after") ?? response.headers?.get?.("Retry-After");
+            if (retryAfter) {
+              const seconds = parseFloat(retryAfter);
+              if (!isNaN(seconds) && seconds > 0) {
+                delayMs = Math.min(this.maxDelayMs, seconds * 1000);
+              }
+            }
+            attempt++;
+            scope.dispose();
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            continue;
+          }
+          await this.failFromResponse(response);
+        }
+
+        return (asText ? await response.text() : await response.json()) as T;
+      } catch (err) {
+        throw scope.wrap(err);
+      } finally {
+        scope.dispose();
       }
-
-      return (asText ? await response.text() : await response.json()) as T;
-    } catch (err) {
-      throw scope.wrap(err);
-    } finally {
-      scope.dispose();
     }
   }
 
@@ -135,6 +162,20 @@ export class AddressStandardizerClient {
     return this.request<StandardizeResponse>("/v1/standardize", {
       method: "POST",
       body: JSON.stringify(payload),
+    }, options);
+  }
+
+  /**
+   * Validate a postal code format against official national standards across 249 ISO countries.
+   */
+  async validatePostalCode(
+    postalCode: string,
+    country: string = "US",
+    options?: RequestOptions
+  ): Promise<PostalValidationResult> {
+    return this.request<PostalValidationResult>("/v1/validate-postal", {
+      method: "POST",
+      body: JSON.stringify({ postal_code: postalCode, country }),
     }, options);
   }
 

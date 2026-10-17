@@ -329,3 +329,35 @@ class TestServerHardening:
         status_code, latency = asyncio.run(scenario())
         assert status_code == 200
         assert latency < 1.0
+
+    def test_validate_postal_endpoints(self, client):
+        # POST valid US
+        r = client.post("/v1/validate-postal", json={"postal_code": "94043", "country": "US"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["is_valid"] is True
+        assert data["country_iso2"] == "US"
+        assert data["country_iso3"] == "USA"
+        assert data["has_postal_system"] is True
+
+        # GET valid US via postal_code
+        r = client.get("/v1/validate-postal?postal_code=94043&country=US")
+        assert r.status_code == 200
+        assert r.json()["is_valid"] is True
+
+        # GET valid UK via code alias
+        r = client.get("/v1/validate-postal?code=SW1A 1AA&country=GB")
+        assert r.status_code == 200
+        assert r.json()["is_valid"] is True
+        assert r.json()["country_iso2"] == "GB"
+
+        # GET non-postal country
+        r = client.post("/v1/validate-postal", json={"postal_code": "", "country": "AE"})
+        assert r.status_code == 200
+        assert r.json()["is_valid"] is True
+        assert r.json()["has_postal_system"] is False
+
+        # Missing postal_code query param
+        r = client.get("/v1/validate-postal")
+        assert r.status_code == 422
+

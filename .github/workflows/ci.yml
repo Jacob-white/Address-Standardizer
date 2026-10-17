@@ -30,7 +30,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -r requirements-dev.txt
-      - run: pip install -e ".[server,arrow]"
+      - run: pip install -e ".[server,arrow,mcp]"
       - run: ruff check .
       - name: Tests with coverage (excluding absolute-throughput SLA tests)
         run: pytest -m "not perf" --cov --cov-report=term
@@ -55,7 +55,7 @@ jobs:
         run: cargo test --locked
       - run: pip install maturin
       - run: pip install -r requirements-dev.txt
-      - run: pip install -e ".[server,arrow]"
+      - run: pip install -e ".[server,arrow,mcp]"
       - name: Build the native extension and place it next to the editable install
         # maturin's wheel carries only the Rust module and shares the project name with the Python package, so it is
         # unpacked into site-packages rather than pip-installed (which would replace the Python package).
@@ -87,7 +87,7 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 8.0.x
-      - run: pip install -e ".[server,dev]"
+      - run: pip install -e ".[server,dev,mcp]"
       - name: SDK models match the server's OpenAPI schema
         run: pytest tests/test_sdk_contract.py
       - name: Start server

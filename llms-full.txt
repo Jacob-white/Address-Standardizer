@@ -1,0 +1,43 @@
+# Address-Standardizer: Full Technical Reference & API Manual
+
+## Architectural Contracts
+Address-Standardizer standardizes physical and postal addresses across 249 ISO jurisdictions. It uses a multi-tier execution pipeline:
+1. Fast-Path Regex & Structured Trie: Sub-millisecond parsing for clean addresses.
+2. Deterministic Rule Matrix: Reverse-anchor token scanning with 44 stable transformation rules.
+3. Statistical CRF Fallback: Conditional Random Field token segmentation via usaddress.
+4. Native Acceleration: Optional Rust PyO3 extension (`src/lib.rs`) with pure-Python fallback.
+
+## Confidence Scoring & Routing State Machine
+The composite confidence score S is computed as:
+  S = 0.35 * S_parse + 0.35 * S_ref + 0.15 * S_geo + 0.15 * S_cross
+
+Routing decisions follow strict thresholds:
+- AUTO_PASS: S >= 0.95 and zero fatal ERR_* codes.
+- FUZZY_REVIEW: 0.80 <= S < 0.95 and zero fatal ERR_* codes.
+- MANUAL_STEWARDSHIP: S < 0.80 or any critical error (ERR_MISSING_HOUSE_NUM, ERR_PARSE_FAILED, ERR_ZIP_STATE_MISMATCH).
+
+## Failure & Warning Reason Codes
+- ERR_MISSING_HOUSE_NUM: Street line lacks a house number.
+- ERR_ZIP_STATE_MISMATCH: Postal code contradicts state.
+- ERR_AMBIGUOUS_DUAL_ADDR: Both street address and PO Box present.
+- ERR_DPV_UNCONFIRMED: Delivery point not found in postal database.
+- WARN_MISSING_SECONDARY_UNIT: Multi-unit building missing Suite/Apt (DPV N1).
+- WARN_SINGLE_LINE_NO_COMMA: Unpunctuated line; accuracy degrades without commas.
+- WARN_TYPO_HEALED: Typo corrected within Damerau-Levenshtein distance <= 2.
+- WARN_CRA_HUB_DETECTED: Address is a commercial registered agent hub.
+
+## Model Context Protocol (MCP) Integration
+Run as stdio server:
+  address-standardizer mcp --transport stdio
+Tools:
+- `standardize_address`: Single address normalization, confidence scoring, deliverability, and optional geocoding.
+- `batch_standardize`: Batch normalization (up to 500 records).
+- `validate_postal`: Postal code format validation and diagnostics across 249 ISO countries.
+- `autocomplete_address`: Real-time typeahead with proximity biasing.
+- `explain_parse`: Full audit trace and alternative interpretations.
+
+## Analytical Stack UDF Integration
+- Apache Arrow: `address_standardizer.arrow.standardize_arrow(table)`
+- Polars: `address_standardizer.arrow.standardize_polars(df_or_lf)`
+- DuckDB: `address_standardizer.arrow.register_duckdb_udfs(con)`
+  Registers SQL functions: `standardize_address(...)`, `standardize_address_text(...)`, `standardize_address_key(...)`.

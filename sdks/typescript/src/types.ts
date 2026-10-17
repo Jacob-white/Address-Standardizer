@@ -136,11 +136,30 @@ export interface HealthResponse {
   uptime_seconds: number;
 }
 
+export interface PostalValidationResult {
+  is_valid: boolean;
+  postal_code: string;
+  country_iso2: string;
+  country_iso3: string;
+  country_name: string;
+  has_postal_system: boolean;
+  format_pattern?: string | null;
+  diagnostics: string;
+}
+
+export interface RetryOptions {
+  maxRetries?: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  retryableStatusCodes?: number[];
+}
+
 export interface ClientOptions {
   baseUrl?: string;
   timeoutMs?: number;
   fetch?: typeof fetch;
   headers?: Record<string, string>;
+  retry?: RetryOptions;
 }
 
 /** Per-call options accepted by every client method. */

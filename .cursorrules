@@ -1,0 +1,13 @@
+# Cursor Rules for Address-Standardizer
+
+# Core Architecture & Invariants
+- 100% statement and branch test coverage enforced (`fail_under = 100`, `branch = true`).
+- Zero linter warnings: maintain clean `ruff check` and `ruff format --check`.
+- Pure-Python fallback guaranteed if Rust extension (`src/lib.rs`) is not compiled.
+- Multi-tier confidence scoring: AUTO_PASS (>= 0.95), FUZZY_REVIEW (0.80 - 0.95), MANUAL_STEWARDSHIP (< 0.80).
+- Registered Agent Hub and Private Residence invariants: never merge corporate entities without matching secondary units.
+
+# Development Best Practices
+- When writing tests, cover all statements and both branches of every conditional.
+- Respect resource constraints: limit pytest runs and avoid heavy parallel test execution.
+- Maintain synchronized version across `pyproject.toml`, `Cargo.toml`, `address_standardizer/__init__.py`, `sdks/typescript/package.json`, and `sdks/dotnet/AddressStandardizer.Client.csproj`.
