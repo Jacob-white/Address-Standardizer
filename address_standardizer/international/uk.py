@@ -346,7 +346,20 @@ class UKGrammar(CountryGrammar):
     """Royal Mail PAF / BS 7666 compliant United Kingdom grammar."""
 
     country_iso3: ClassVar[str] = "GBR"
-    supported_countries: ClassVar[Tuple[str, ...]] = ("GBR", "UK", "UNITED KINGDOM", "JEY", "GGY", "IMN")
+    supported_countries: ClassVar[Tuple[str, ...]] = (
+        "GBR", "UK", "UNITED KINGDOM",
+        "JEY", "JERSEY",
+        "GGY", "GUERNSEY",
+        "IMN", "ISLE OF MAN",
+        "GIB", "GIBRALTAR",
+        "FLK", "FALKLAND ISLANDS",
+        "SHN", "SAINT HELENA",
+        "PCN", "PITCAIRN",
+        "IOT", "BRITISH INDIAN OCEAN TERRITORY",
+        "SGS", "SOUTH GEORGIA",
+        "MLT", "MALTA",
+        "CYP", "CYPRUS",
+    )
 
     def standardize(
         self,

@@ -10,7 +10,7 @@ from address_standardizer.international.base import (
     split_intl_secondary_unit,
 )
 from address_standardizer.international.diacritics import normalize_to_canonical_unicode
-from address_standardizer.tables import COUNTRY_NAME_MAP, GLOBAL_METRO_TO_COUNTRY
+from address_standardizer.tables import GLOBAL_METRO_TO_COUNTRY
 
 # Road type abbreviations for Romance languages
 ROMANCE_ROAD_TYPES: Dict[str, str] = {
@@ -273,16 +273,26 @@ class RomanceGrammar(CountryGrammar):
 
     country_iso3: ClassVar[str] = "FRA"
     supported_countries: ClassVar[Tuple[str, ...]] = (
-        "FRA",
-        "FRANCE",
-        "ESP",
-        "SPAIN",
-        "ESPANA",
-        "ITA",
-        "ITALY",
-        "ITALIA",
-        "PRT",
-        "PORTUGAL",
+        "FRA", "FRANCE",
+        "ESP", "SPAIN", "ESPANA",
+        "ITA", "ITALY", "ITALIA",
+        "PRT", "PORTUGAL",
+        "MCO", "MONACO",
+        "AND", "ANDORRA",
+        "SMR", "SAN MARINO",
+        "VAT", "VATICAN CITY", "HOLY SEE",
+        "GLP", "GUADELOUPE",
+        "MTQ", "MARTINIQUE",
+        "GUF", "FRENCH GUIANA",
+        "REU", "REUNION", "RÉUNION",
+        "MYT", "MAYOTTE",
+        "SPM", "SAINT PIERRE AND MIQUELON",
+        "BLM", "SAINT BARTHELEMY", "SAINT BARTHÉLEMY",
+        "MAF", "SAINT MARTIN",
+        "NCL", "NEW CALEDONIA",
+        "PYF", "FRENCH POLYNESIA",
+        "WLF", "WALLIS AND FUTUNA",
+        "ATF", "FRENCH SOUTHERN TERRITORIES",
     )
     # MEX/COL/ARG/BRA are owned by LatinAmericaGrammar (colonias, CEP/CPA, Manzana/Lote); each country code is
     # registered by exactly one grammar. tests/test_intl_latam_europe_review.py enforces this.
@@ -355,13 +365,12 @@ class RomanceGrammar(CountryGrammar):
         # Handle comma-delimited single string when city_raw is empty
         if not city_raw and s1_raw and "," in s1_raw:
             parts_comma = [p.strip() for p in s1_raw.split(",") if p.strip()]
-            if len(parts_comma) >= 2 and (
-                parts_comma[-1].upper() in self.supported_countries
-                or parts_comma[-1].upper() in COUNTRY_NAME_MAP
-                or parts_comma[-1].upper()
-                in ("USA", "US", "UNITED STATES", "CANADA", "UK", "UNITED KINGDOM", "FRANCE", "SPAIN", "MEXICO", "COLOMBIA", "ARGENTINA", "BRAZIL")
-            ):
-                parts_comma = parts_comma[:-1]
+            if len(parts_comma) >= 2:
+                from address_standardizer.international.countries import CountryRegistry
+                info = CountryRegistry.get(parts_comma[-1])
+                if info and info.alpha3 in self.supported_countries:
+                    country_iso = info.alpha3
+                    parts_comma = parts_comma[:-1]
 
             # Scan from right for State / Postal / City
             rem_parts: List[str] = []

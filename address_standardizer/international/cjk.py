@@ -266,6 +266,9 @@ class CJKGrammar(CountryGrammar):
         "CHN", "CHINA", "CN", "ZHONGGUO",
         "KOR", "SOUTH KOREA", "KOREA", "KR", "DAEHAN MINGUK", "REPUBLIC OF KOREA",
         "TWN", "TAIWAN", "TW", "ROC",
+        "MAC", "MACAU", "MACAO",
+        "MNG", "MONGOLIA",
+        "PRK", "NORTH KOREA",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -344,6 +347,12 @@ class CJKGrammar(CountryGrammar):
             return "KOR"
         if c in ("TWN", "TAIWAN", "TW", "ROC"):
             return "TWN"
+        if c in ("MAC", "MACAU", "MACAO"):
+            return "MAC"
+        if c in ("MNG", "MONGOLIA"):
+            return "MNG"
+        if c in ("PRK", "NORTH KOREA"):
+            return "PRK"
         return "JPN"
 
     def parse(self, raw_tokens: List[str], metadata: dict) -> ParsedAddressComponents:

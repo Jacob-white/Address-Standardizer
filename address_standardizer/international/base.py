@@ -33,6 +33,7 @@ from address_standardizer.tables import (
     GLOBAL_METRO_TO_COUNTRY,
     SECONDARY_UNITS,
     STREET_SUFFIXES,
+    US_DOMESTIC_ISO3,
     US_STATES,
 )
 
@@ -798,7 +799,7 @@ class CountryGrammarRegistry:
             elif len(c_clean_alphanumeric) == 3 and c_clean_alphanumeric.isascii() and c_clean_alphanumeric.isalpha():
                 country_cand = c_clean_alphanumeric
 
-        if country_cand and country_cand not in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM", ""):
+        if country_cand and country_cand not in US_DOMESTIC_ISO3 and country_cand != "":
             return country_cand
 
         is_valid_us_state = False
@@ -812,7 +813,7 @@ class CountryGrammarRegistry:
         if is_valid_us_state:
             return "USA"
 
-        if country_cand in ("PRI", "GUM", "VIR", "MNP", "ASM"):
+        if country_cand in US_DOMESTIC_ISO3 and country_cand != "USA":
             return country_cand
 
         if city_raw:

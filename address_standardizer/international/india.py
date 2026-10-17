@@ -102,10 +102,14 @@ class IndiaGrammar(CountryGrammar):
     country_iso3: ClassVar[str] = "IND"
     split_commaless_line: ClassVar[bool] = True
     supported_countries: ClassVar[Tuple[str, ...]] = (
-        "IND",
-        "IN",
-        "INDIA",
-        "BHARAT",
+        "IND", "IN", "INDIA", "BHARAT",
+        "PAK", "PAKISTAN",
+        "BGD", "BANGLADESH",
+        "LKA", "SRI LANKA",
+        "NPL", "NEPAL",
+        "BTN", "BHUTAN",
+        "MDV", "MALDIVES",
+        "AFG", "AFGHANISTAN",
     )
 
     def normalize_postal_code(self, raw_code: str) -> str:
@@ -152,6 +156,10 @@ class IndiaGrammar(CountryGrammar):
         state_raw = metadata.get("state") or ""
         post_raw = metadata.get("postal_code") or ""
         raw_full = metadata.get("raw_street_address") or ""
+        country_raw = metadata.get("country", self.country_iso3)
+        from address_standardizer.international.countries import CountryRegistry
+        info = CountryRegistry.get(country_raw)
+        country_iso = info.alpha3 if (info and info.alpha3 in self.supported_countries) else self.country_iso3
 
         combined = f"{s1} {s2}".strip()
         if raw_full and not combined:
@@ -247,7 +255,7 @@ class IndiaGrammar(CountryGrammar):
             city=city_raw.strip().upper() if city_raw else "",
             state=norm_state,
             postal_code=norm_post or "",
-            country_iso3=self.country_iso3,
+            country_iso3=country_iso,
             raw_tokens=raw_tokens,
             confidence_score=0.95,
         )

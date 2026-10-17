@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 
 from address_standardizer.tables import (
     STREET_SUFFIXES,
+    US_DOMESTIC_ISO3,
     US_STATES,
     COUNTRY_MAP,
     COUNTRY_NAME_MAP,
@@ -124,7 +125,7 @@ def normalize_country_code(
                 country_cand = info.alpha3
 
     # If country is explicitly non-US, return it immediately
-    if country_cand and country_cand not in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM", ""):
+    if country_cand and country_cand not in US_DOMESTIC_ISO3 and country_cand != "":
         return country_cand
 
     # Check state indicator
@@ -141,7 +142,7 @@ def normalize_country_code(
     if is_valid_us_state:
         return "USA"
 
-    if country_cand in ("PRI", "GUM", "VIR", "MNP", "ASM"):
+    if country_cand in US_DOMESTIC_ISO3 and country_cand != "USA":
         return country_cand
 
     # Cross-Border Foreign Operating Bank Branches / Metadata check:

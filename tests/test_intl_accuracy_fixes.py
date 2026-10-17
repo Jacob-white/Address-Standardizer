@@ -158,7 +158,8 @@ def test_commaless_street_number_postcode_city(raw, country, street, city, posta
 
 
 def test_split_commaless_locality_helper_edges():
-    assert split_commaless_locality("Rua 25 de Março São Paulo 01307-011", "BRA") is None  # no house number
+    assert split_commaless_locality("Rua 25 de Março Bairro Alto 01307-011", "BRA") is None  # no house number and unlisted city
+    assert split_commaless_locality("Rua 25 de Março São Paulo 01307-011", "BRA") == ("Rua 25 de Março", "São Paulo", "01307-011")  # known city from gazetteer
     assert split_commaless_locality("Rua das Flores 12 de Maio 01307-011", "BRA") is None  # connector after number
     assert split_commaless_locality("12 São Paulo 01307-011", "BRA") is None  # nothing but digits before the number
     assert split_commaless_locality("Rua 12 São Paulo 01307-011", "BRA") == ("Rua 12", "São Paulo", "01307-011")

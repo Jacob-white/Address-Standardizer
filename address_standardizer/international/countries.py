@@ -28,10 +28,176 @@ class CountryInfo:
     has_postal_codes: bool
     region: str
 
+    @property
+    def house_number_position(self) -> str:
+        """UPU S42 house number position: 'before_street', 'after_street', or 'cjk_hierarchical'."""
+        if self.alpha3 in _EAST_ASIAN_ISO3:
+            return "cjk_hierarchical"
+        if self.alpha3 in _STREET_FIRST_ISO3:
+            return "after_street"
+        return "before_street"
 
-# ---------------------------------------------------------------------------
-# 249 ISO-3166-1 Country Catalog
-# ---------------------------------------------------------------------------
+    @property
+    def postal_position(self) -> str:
+        """UPU S42 postal code placement: 'before_city', 'after_city', 'leading_top', or 'none'."""
+        if not self.has_postal_codes:
+            return "none"
+        if self.alpha3 in _EAST_ASIAN_ISO3:
+            return "leading_top"
+        if self.alpha3 in _EUROPEAN_POSTAL_FIRST_ISO3:
+            return "before_city"
+        return "after_city"
+
+    @property
+    def uses_administrative_state(self) -> bool:
+        """True if the jurisdiction commonly uses a state/province/territory division in addressing."""
+        return self.alpha3 in _STATE_REQUIRED_ISO3
+
+    @property
+    def grammar_family(self) -> str:
+        """Name of the regional grammar family handling this jurisdiction."""
+        return _ISO3_TO_GRAMMAR.get(self.alpha3, "UniversalInternationalGrammar")
+
+
+_EAST_ASIAN_ISO3: Set[str] = {
+    "JPN", "CHN", "KOR", "TWN", "HKG", "MAC",
+}
+
+_EUROPEAN_POSTAL_FIRST_ISO3: Set[str] = {
+    "DEU", "AUT", "CHE", "FRA", "NLD", "BEL", "LUX", "ITA", "ESP", "PRT",
+    "DNK", "SWE", "NOR", "FIN", "POL", "CZE", "SVK", "HUN", "GRC", "ROU",
+    "BGR", "HRV", "SVN", "EST", "LVA", "LTU", "ISL", "MCO", "AND", "SMR",
+    "VAT", "LIE", "CYP", "MLT", "ALB", "BIH", "MKD", "MNE", "SRB", "UKR",
+    "BLR", "MDA", "GEO", "ARM", "AZE", "KAZ", "UZB", "KGZ", "TJK", "TKM",
+    "GLP", "MTQ", "GUF", "REU", "MYT", "SPM", "BLM", "MAF", "NCL", "PYF", "WLF",
+}
+
+_STREET_FIRST_ISO3: Set[str] = {
+    # Continental Europe (excluding France/Belgium number-first)
+    "DEU", "AUT", "CHE", "NLD", "DNK", "SWE", "NOR", "FIN", "POL", "CZE", "SVK", "HUN",
+    "GRC", "ROU", "BGR", "HRV", "SVN", "EST", "LVA", "LTU", "ISL", "LIE", "ALB", "BIH",
+    "MKD", "MNE", "SRB", "UKR", "BLR", "MDA", "ESP", "ITA", "PRT", "SMR", "VAT", "AND",
+    # Latin America
+    "MEX", "BRA", "ARG", "CHL", "PER", "ECU", "VEN", "URY", "PRY", "BOL", "CRI", "GTM",
+    "DOM", "CUB", "HND", "NIC", "SLV", "PAN",
+    # Eurasia & Middle East
+    "TUR", "KAZ", "UZB", "KGZ", "TJK", "TKM", "AZE", "GEO", "ARM",
+    "SAU", "EGY", "ARE", "MAR", "DZA", "TUN", "ISR", "JOR", "LBN", "OMN", "KWT", "QAT",
+    "BHR", "IRQ", "IRN", "YEM", "SYR", "PSE", "SDN", "LBY",
+    # Southeast Asia number-last
+    "IDN", "VNM",
+}
+
+_STATE_REQUIRED_ISO3: Set[str] = {
+    "USA", "CAN", "AUS", "BRA", "MEX", "IND", "MYS", "IDN", "NGA", "ARG",
+    "VEN", "COL", "PHL", "CHN", "JPN", "KOR", "TWN", "ITA", "ESP", "DEU",
+    "RUS", "PAK", "MMR", "ZAF", "FSM", "MHL", "PLW",
+}
+
+_ISO3_TO_GRAMMAR: Dict[str, str] = {
+    # US Domestic Engine
+    "USA": "USDomesticEngine", "PRI": "USDomesticEngine", "VIR": "USDomesticEngine",
+    "GUM": "USDomesticEngine", "ASM": "USDomesticEngine", "MNP": "USDomesticEngine",
+    "FSM": "USDomesticEngine", "MHL": "USDomesticEngine", "PLW": "USDomesticEngine", "UMI": "USDomesticEngine",
+    # UK & Commonwealth
+    "GBR": "UKGrammar", "GGY": "UKGrammar", "JEY": "UKGrammar", "IMN": "UKGrammar",
+    "GIB": "UKGrammar", "FLK": "UKGrammar", "SHN": "UKGrammar", "PCN": "UKGrammar",
+    "IOT": "UKGrammar", "SGS": "UKGrammar", "MLT": "UKGrammar", "CYP": "UKGrammar",
+    # Canada
+    "CAN": "CanadaGrammar",
+    # Australia & Oceania
+    "AUS": "AustraliaGrammar", "CCK": "AustraliaGrammar", "CXR": "AustraliaGrammar",
+    "NFK": "AustraliaGrammar", "HMD": "AustraliaGrammar", "ATA": "AustraliaGrammar",
+    "NZL": "NewZealandGrammar", "COK": "NewZealandGrammar", "NIU": "NewZealandGrammar", "TKL": "NewZealandGrammar",
+    # Ireland
+    "IRL": "IrelandGrammar",
+    # Germanic & Nordic
+    "DEU": "GermanicGrammar", "AUT": "GermanicGrammar", "CHE": "GermanicGrammar",
+    "LIE": "GermanicGrammar", "NLD": "GermanicGrammar", "BEL": "GermanicGrammar",
+    "LUX": "GermanicGrammar", "DNK": "GermanicGrammar", "SWE": "GermanicGrammar",
+    "NOR": "GermanicGrammar", "FIN": "GermanicGrammar", "ISL": "GermanicGrammar",
+    "FRO": "GermanicGrammar", "GRL": "GermanicGrammar", "ALA": "GermanicGrammar",
+    "SJM": "GermanicGrammar", "ABW": "GermanicGrammar", "CUW": "GermanicGrammar",
+    "SXM": "GermanicGrammar", "BES": "GermanicGrammar", "SUR": "GermanicGrammar",
+    # Romance & Francophone
+    "FRA": "RomanceGrammar", "ESP": "RomanceGrammar", "ITA": "RomanceGrammar",
+    "PRT": "RomanceGrammar", "MCO": "RomanceGrammar", "AND": "RomanceGrammar",
+    "SMR": "RomanceGrammar", "VAT": "RomanceGrammar", "GLP": "RomanceGrammar",
+    "MTQ": "RomanceGrammar", "GUF": "RomanceGrammar", "REU": "RomanceGrammar",
+    "MYT": "RomanceGrammar", "SPM": "RomanceGrammar", "BLM": "RomanceGrammar",
+    "MAF": "RomanceGrammar", "NCL": "RomanceGrammar", "PYF": "RomanceGrammar",
+    "WLF": "RomanceGrammar", "ATF": "RomanceGrammar",
+    # Eastern Europe & Baltics
+    "POL": "EasternEuropeGrammar", "CZE": "EasternEuropeGrammar", "SVK": "EasternEuropeGrammar",
+    "HUN": "EasternEuropeGrammar", "ROU": "EasternEuropeGrammar", "MDA": "EasternEuropeGrammar",
+    "BGR": "EasternEuropeGrammar", "GRC": "EasternEuropeGrammar", "SRB": "EasternEuropeGrammar",
+    "HRV": "EasternEuropeGrammar", "SVN": "EasternEuropeGrammar", "BIH": "EasternEuropeGrammar",
+    "MNE": "EasternEuropeGrammar", "MKD": "EasternEuropeGrammar", "ALB": "EasternEuropeGrammar",
+    "EST": "EasternEuropeGrammar", "LVA": "EasternEuropeGrammar", "LTU": "EasternEuropeGrammar",
+    "RUS": "EasternEuropeGrammar", "UKR": "EasternEuropeGrammar", "BLR": "EasternEuropeGrammar",
+    # Latin America
+    "MEX": "LatinAmericaGrammar", "BRA": "LatinAmericaGrammar", "ARG": "LatinAmericaGrammar",
+    "CHL": "LatinAmericaGrammar", "COL": "LatinAmericaGrammar", "PER": "LatinAmericaGrammar",
+    "ECU": "LatinAmericaGrammar", "VEN": "LatinAmericaGrammar", "URY": "LatinAmericaGrammar",
+    "PRY": "LatinAmericaGrammar", "BOL": "LatinAmericaGrammar", "CRI": "LatinAmericaGrammar",
+    "GTM": "LatinAmericaGrammar", "DOM": "LatinAmericaGrammar", "CUB": "LatinAmericaGrammar",
+    "HND": "LatinAmericaGrammar", "NIC": "LatinAmericaGrammar", "SLV": "LatinAmericaGrammar",
+    "HTI": "LatinAmericaGrammar",
+    # Offshore & Caribbean
+    "BMU": "OffshoreGrammar", "CYM": "OffshoreGrammar", "VGB": "OffshoreGrammar",
+    "PAN": "OffshoreGrammar", "TCA": "OffshoreGrammar", "AIA": "OffshoreGrammar",
+    "MSR": "OffshoreGrammar", "BHS": "OffshoreGrammar", "BRB": "OffshoreGrammar",
+    "JAM": "OffshoreGrammar", "TTO": "OffshoreGrammar", "ATG": "OffshoreGrammar",
+    "BLZ": "OffshoreGrammar", "DMA": "OffshoreGrammar", "GRD": "OffshoreGrammar",
+    "GUY": "OffshoreGrammar", "KNA": "OffshoreGrammar", "LCA": "OffshoreGrammar",
+    "VCT": "OffshoreGrammar",
+    # Southeast Asia
+    "IDN": "SoutheastAsiaGrammar", "MYS": "SoutheastAsiaGrammar", "PHL": "SoutheastAsiaGrammar",
+    "THA": "SoutheastAsiaGrammar", "VNM": "SoutheastAsiaGrammar", "KHM": "SoutheastAsiaGrammar",
+    "LAO": "SoutheastAsiaGrammar", "MMR": "SoutheastAsiaGrammar", "BRN": "SoutheastAsiaGrammar",
+    "TLS": "SoutheastAsiaGrammar",
+    # Singapore & Hong Kong
+    "SGP": "SingaporeGrammar", "HKG": "HongKongGrammar",
+    # East Asia
+    "JPN": "CJKGrammar", "CHN": "CJKGrammar", "KOR": "CJKGrammar",
+    "TWN": "CJKGrammar", "MAC": "CJKGrammar", "MNG": "CJKGrammar", "PRK": "CJKGrammar",
+    # South Asia
+    "IND": "IndiaGrammar", "PAK": "IndiaGrammar", "BGD": "IndiaGrammar",
+    "LKA": "IndiaGrammar", "NPL": "IndiaGrammar", "BTN": "IndiaGrammar",
+    "MDV": "IndiaGrammar", "AFG": "IndiaGrammar",
+    # Eurasia: Türkiye, Caucasus & Central Asia
+    "TUR": "EurasiaGrammar", "GEO": "EurasiaGrammar", "ARM": "EurasiaGrammar",
+    "AZE": "EurasiaGrammar", "KAZ": "EurasiaGrammar", "UZB": "EurasiaGrammar",
+    "KGZ": "EurasiaGrammar", "TJK": "EurasiaGrammar", "TKM": "EurasiaGrammar",
+    # MENA & Africa
+    "ARE": "MenaAfricaGrammar", "SAU": "MenaAfricaGrammar", "EGY": "MenaAfricaGrammar",
+    "ZAF": "MenaAfricaGrammar", "NGA": "MenaAfricaGrammar", "KEN": "MenaAfricaGrammar",
+    "MAR": "MenaAfricaGrammar", "DZA": "MenaAfricaGrammar", "TUN": "MenaAfricaGrammar",
+    "ISR": "MenaAfricaGrammar", "JOR": "MenaAfricaGrammar", "LBN": "MenaAfricaGrammar",
+    "QAT": "MenaAfricaGrammar", "KWT": "MenaAfricaGrammar", "OMN": "MenaAfricaGrammar",
+    "BHR": "MenaAfricaGrammar", "GHA": "MenaAfricaGrammar", "ETH": "MenaAfricaGrammar",
+    "TZA": "MenaAfricaGrammar", "UGA": "MenaAfricaGrammar", "AGO": "MenaAfricaGrammar",
+    "BDI": "MenaAfricaGrammar", "BEN": "MenaAfricaGrammar", "BFA": "MenaAfricaGrammar",
+    "BWA": "MenaAfricaGrammar", "CAF": "MenaAfricaGrammar", "CIV": "MenaAfricaGrammar",
+    "CMR": "MenaAfricaGrammar", "COD": "MenaAfricaGrammar", "COG": "MenaAfricaGrammar",
+    "COM": "MenaAfricaGrammar", "CPV": "MenaAfricaGrammar", "DJI": "MenaAfricaGrammar",
+    "ERI": "MenaAfricaGrammar", "GAB": "MenaAfricaGrammar", "GIN": "MenaAfricaGrammar",
+    "GMB": "MenaAfricaGrammar", "GNB": "MenaAfricaGrammar", "GNQ": "MenaAfricaGrammar",
+    "IRQ": "MenaAfricaGrammar", "IRN": "MenaAfricaGrammar", "LBR": "MenaAfricaGrammar",
+    "LBY": "MenaAfricaGrammar", "LSO": "MenaAfricaGrammar", "MDG": "MenaAfricaGrammar",
+    "MLI": "MenaAfricaGrammar", "MOZ": "MenaAfricaGrammar", "MRT": "MenaAfricaGrammar",
+    "MUS": "MenaAfricaGrammar", "MWI": "MenaAfricaGrammar", "NAM": "MenaAfricaGrammar",
+    "NER": "MenaAfricaGrammar", "PSE": "MenaAfricaGrammar", "RWA": "MenaAfricaGrammar",
+    "SDN": "MenaAfricaGrammar", "SEN": "MenaAfricaGrammar", "SLE": "MenaAfricaGrammar",
+    "SOM": "MenaAfricaGrammar", "SSD": "MenaAfricaGrammar", "STP": "MenaAfricaGrammar",
+    "SWZ": "MenaAfricaGrammar", "SYC": "MenaAfricaGrammar", "SYR": "MenaAfricaGrammar",
+    "TCD": "MenaAfricaGrammar", "TGO": "MenaAfricaGrammar", "YEM": "MenaAfricaGrammar",
+    "ZMB": "MenaAfricaGrammar", "ZWE": "MenaAfricaGrammar", "ESH": "MenaAfricaGrammar",
+    "BVT": "MenaAfricaGrammar", "FJI": "MenaAfricaGrammar", "PNG": "MenaAfricaGrammar",
+    "WSM": "MenaAfricaGrammar", "TON": "MenaAfricaGrammar", "VUT": "MenaAfricaGrammar",
+    "SLB": "MenaAfricaGrammar", "KIR": "MenaAfricaGrammar", "TUV": "MenaAfricaGrammar",
+    "NRU": "MenaAfricaGrammar",
+}
 _COUNTRY_DATA: Tuple[CountryInfo, ...] = (
     CountryInfo(
         alpha2='AW',

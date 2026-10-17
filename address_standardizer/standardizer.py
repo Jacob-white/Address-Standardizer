@@ -51,6 +51,7 @@ from address_standardizer.phonetics import (
 )
 from address_standardizer.fast_path import fast_path_parse
 from address_standardizer.explain import _RECORDER as _explain_recorder
+from address_standardizer.tables import US_DOMESTIC_ISO3
 from address_standardizer.international import (
     CountryGrammarRegistry,
     fold_to_ascii_key,
@@ -402,7 +403,7 @@ def standardize_address(
         too_long = StandardizedAddress(
             street1="", street2="", city="", state="", postal_code="", country=too_long_iso,
             normalized_address_key=None, address_status="parse_failed", raw_street_address="",
-            is_us=too_long_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM"), building_key=None, phonetic_key=None,
+            is_us=too_long_iso in US_DOMESTIC_ISO3, building_key=None, phonetic_key=None,
             is_registered_agent_hub=False, rooftop_address=None,
         )
         too_long.country_iso3 = too_long_iso
@@ -593,7 +594,7 @@ def standardize_address(
                     s1_raw, city_raw, state_raw, postal_raw = _script_split
         if _xr is not None:
             _xr.country(country_raw, country_iso, state_raw, postal_raw, _script_iso)
-    is_us =country_iso in ("USA", "PRI", "GUM", "VIR", "MNP", "ASM")
+    is_us = country_iso in US_DOMESTIC_ISO3
     if is_us:
         city_raw, state_raw = swap_us_city_state(city_raw, state_raw)
     elif country_iso in ("CAN", "AUS", "BRA", "IND", "MEX"):

@@ -166,6 +166,15 @@ def test_universal_international_grammar():
     )
     assert p_prov.state == "ON"
 
+    # Dutch/Belgian abbreviation expansion in UniversalInternationalGrammar
+    p_bel = univ.standardize(street1="Kerkstr. 10 Ln. 5", country="BEL")
+    assert "KERKSTRAAT 10 LAAN 5" in p_bel.format_street1()
+
+    # Sublocality splitting in street1 when city is already known
+    p_subloc = univ.standardize(street1="10 Main St, Downtown", city="Sydney")
+    assert p_subloc.dependent_locality == "DOWNTOWN"
+    assert p_subloc.format_street1() == "10 MAIN ST"
+
 
 def test_country_grammar_registry():
     CountryGrammarRegistry.clear()

@@ -111,6 +111,87 @@ _RAW: Dict[Tuple[str, ...], Tuple[str, ...]] = {
         "Quito", "Guayaquil", "Cuenca", "Santo Domingo", "Machala", "Durán", "Manta", "Portoviejo", "Ambato", "Riobamba",
         "Loja", "Esmeraldas", "Ibarra", "Quevedo", "Milagro", "Latacunga", "Babahoyo", "Tulcán",
     ),
+    ("BR", "BRA"): (
+        "São Paulo", "Sao Paulo", "Rio de Janeiro", "Brasília", "Brasilia", "Salvador", "Fortaleza", "Belo Horizonte",
+        "Manaus", "Curitiba", "Recife", "Goiânia", "Goiania", "Belém", "Belem", "Porto Alegre", "Guarulhos", "Campinas",
+        "São Luís", "Sao Luis", "São Gonçalo", "Maceió", "Maceio", "Duque de Caxias", "Natal", "Teresina",
+        "São Bernardo do Campo", "Campo Grande", "Osasco", "Santo André", "João Pessoa", "Florianópolis",
+    ),
+    ("MX", "MEX"): (
+        "Ciudad de México", "CDMX", "Guadalajara", "Monterrey", "Puebla", "Tijuana", "León", "Leon", "Juárez", "Juarez",
+        "Zapopan", "Mérida", "Merida", "Cancún", "Cancun", "Querétaro", "Queretaro", "San Luis Potosí", "Aguascalientes",
+        "Hermosillo", "Mexicali", "Culiacán", "Culiacan", "Toluca", "Chihuahua", "Morelia", "Saltillo", "Veracruz",
+    ),
+    ("ZA", "ZAF"): (
+        "Johannesburg", "Cape Town", "Durban", "Pretoria", "Port Elizabeth", "Gqeberha", "Bloemfontein", "East London",
+        "Pietermaritzburg", "Nelspruit", "Mbombela", "Kimberley", "Polokwane", "Sandton", "Soweto", "Randburg", "Centurion",
+    ),
+    ("TR", "TUR"): (
+        "İstanbul", "Istanbul", "Ankara", "İzmir", "Izmir", "Bursa", "Antalya", "Adana", "Konya", "Gaziantep",
+        "Şanlıurfa", "Sanliurfa", "Kocaeli", "Mersin", "Diyarbakır", "Hatay", "Manisa", "Kayseri", "Samsun",
+        "Balıkesir", "Kahramanmaraş", "Van", "Aydın", "Denizli", "Sakarya", "Trabzon", "Kadıköy", "Kadikoy", "Besiktas",
+    ),
+    ("MY", "MYS"): (
+        "Kuala Lumpur", "George Town", "Ipoh", "Johor Bahru", "Petaling Jaya", "Shah Alam", "Malacca City", "Melaka",
+        "Kota Kinabalu", "Kuching", "Alor Setar", "Kuantan", "Putrajaya", "Cyberjaya", "Subang Jaya", "Klang",
+    ),
+    ("PK", "PAK"): (
+        "Karachi", "Lahore", "Faisalabad", "Rawalpindi", "Gujranwala", "Peshawar", "Multan", "Islamabad", "Quetta", "Sialkot",
+    ),
+    ("BD", "BGD"): (
+        "Dhaka", "Chittagong", "Chattogram", "Khulna", "Rajshahi", "Sylhet", "Barisal", "Rangpur", "Comilla", "Narayanganj", "Gazipur",
+    ),
+    ("LK", "LKA"): (
+        "Colombo", "Kandy", "Galle", "Jaffna", "Negombo", "Batticaloa", "Trincomalee", "Matara", "Anuradhapura", "Ratnapura",
+    ),
+    ("MA", "MAR"): (
+        "Casablanca", "Rabat", "Fes", "Fès", "Marrakech", "Tangier", "Tanger", "Agadir", "Meknes", "Meknès", "Oujda", "Kenitra", "Tetouan",
+    ),
+    ("DZ", "DZA"): (
+        "Algiers", "Alger", "Oran", "Constantine", "Annaba", "Blida", "Batna", "Djelfa", "Sétif", "Setif", "Sidi Bel Abbès", "Biskra",
+    ),
+    ("TN", "TUN"): (
+        "Tunis", "Sfax", "Sousse", "Kairouan", "Bizerte", "Gabès", "Gabes", "Ariana", "Gafsa", "Monastir", "Ben Arous",
+    ),
+    ("AE", "ARE"): (
+        "Dubai", "Abu Dhabi", "Sharjah", "Al Ain", "Ajman", "Ras Al Khaimah", "Fujairah", "Umm Al Quwain",
+    ),
+    ("IL", "ISR"): (
+        "Jerusalem", "Tel Aviv", "Tel Aviv-Yafo", "Haifa", "Rishon LeZion", "Petah Tikva", "Ashdod", "Netanya", "Beer Sheva", "Holon", "Bnei Brak",
+    ),
+    ("GH", "GHA"): (
+        "Accra", "Kumasi", "Tamale", "Sekondi-Takoradi", "Cape Coast", "Sunyani", "Koforidua", "Tema",
+    ),
+    ("ET", "ETH"): (
+        "Addis Ababa", "Dire Dawa", "Mekelle", "Gondar", "Bahir Dar", "Hawassa", "Jimma", "Dessie", "Jijiga",
+    ),
+    ("TZ", "TZA"): (
+        "Dar es Salaam", "Mwanza", "Arusha", "Dodoma", "Mbeya", "Morogoro", "Tanga", "Zanzibar City", "Zanzibar",
+    ),
+    ("UG", "UGA"): (
+        "Kampala", "Nansana", "Kira", "Mbarara", "Mukono", "Gulu", "Jinja", "Entebbe",
+    ),
+    ("KZ", "KAZ"): (
+        "Almaty", "Astana", "Shymkent", "Karaganda", "Aktobe", "Taraz", "Pavlodar", "Ust-Kamenogorsk", "Semey", "Atyrau",
+    ),
+    ("UZ", "UZB"): (
+        "Tashkent", "Samarkand", "Namangan", "Andijan", "Bukhara", "Nukus", "Fergana", "Qarshi",
+    ),
+    ("VE", "VEN"): (
+        "Caracas", "Maracaibo", "Valencia", "Barquisimeto", "Maracay", "Ciudad Guayana", "San Cristóbal", "Maturín",
+    ),
+    ("CR", "CRI"): (
+        "San José", "San Jose", "Alajuela", "Cartago", "Heredia", "Liberia", "Puntarenas", "Limón", "Limon",
+    ),
+    ("DO", "DOM"): (
+        "Santo Domingo", "Santiago de los Caballeros", "Santiago", "Santo Domingo Este", "Santo Domingo Norte", "Santo Domingo Oeste", "La Romana",
+    ),
+    ("GT", "GTM"): (
+        "Ciudad de Guatemala", "Guatemala City", "Mixco", "Villa Nueva", "Quetzaltenango", "San Miguel Petapa", "Escuintla", "Antigua Guatemala",
+    ),
+    ("PA", "PAN"): (
+        "Ciudad de Panamá", "Panama City", "Panamá", "Panama", "San Miguelito", "Tocumen", "David", "Las Cumbres", "Colón", "Colon", "La Chorrera",
+    ),
 }
 
 _TABLE: Dict[str, FrozenSet[str]] = {}

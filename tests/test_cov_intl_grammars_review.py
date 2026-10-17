@@ -384,7 +384,8 @@ def _lat(**md):
 def test_latam_country_resolution_defaults_to_mexico():
     f = LAT._resolve_country_iso
     assert [f(x) for x in (None, "col", "ARGENTINA", "chile", "BRASIL", "mx")] == ["MEX", "COL", "ARG", "CHL", "BRA", "MEX"]
-    assert f("Peru") == "MEX"
+    assert f("Iceland") == "MEX"
+    assert f("Peru") == "PER"
 
 
 def test_latam_postal_normalisation():
