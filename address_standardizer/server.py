@@ -258,7 +258,7 @@ class StandardizeRequest(BaseModel):
     city: Optional[str] = Field(default=None, description="City / Locality name")
     state: Optional[str] = Field(default=None, description="State / Province code")
     postal_code: Optional[str] = Field(default=None, description="Postal / ZIP code")
-    country: Optional[str] = Field(default="USA", description="Country name or ISO-3166 code")
+    country: Optional[str] = Field(default=None, description="Country name or ISO-3166 code")
     enable_geocoding: bool = Field(default=True, description="Enable offline rooftop/TIGER geocoding")
     enable_fuzzy: bool = Field(default=True, description="Enable Levenshtein typo correction")
     allow_locality: bool = Field(default=False, description="Allow locality-only / city-level fallback")
@@ -454,12 +454,14 @@ def _process_item_to_dict(
             city=item.get("city"),
             state=item.get("state"),
             postal_code=item.get("postal_code"),
-            country=item.get("country", "USA"),
+            country=item.get("country"),
             enable_geocoding=item.get("enable_geocoding", default_geocoding),
             enable_fuzzy=item.get("enable_fuzzy", default_fuzzy),
             allow_locality=item.get("allow_locality", default_allow_locality),
             correct_state_from_zip=item.get("correct_state_from_zip", default_correct_state_from_zip),
             include_metadata=item.get("include_metadata", True),
+            include_explanation=item.get("include_explanation", False),
+            alternatives=item.get("alternatives", 0),
         )
     elif isinstance(item, StandardizeRequest):
         req = item
@@ -764,7 +766,7 @@ def create_app(runtime: Optional[ServiceRuntime] = None) -> FastAPI:
         summary="Typeahead address autocomplete",
         tags=["Autocomplete"],
     )
-    async def autocomplete_post(request: AutocompleteRequest):
+    def autocomplete_post(request: AutocompleteRequest):
         """Real-time typeahead address suggestion with secondary unit prompting and proximity biasing."""
         suggestions = autocomplete_address(
             query=request.query,
@@ -798,7 +800,7 @@ def create_app(runtime: Optional[ServiceRuntime] = None) -> FastAPI:
         summary="Typeahead address autocomplete (GET)",
         tags=["Autocomplete"],
     )
-    async def autocomplete_get(
+    def autocomplete_get(
         q: str = Query(..., min_length=1, description="Partial address query"),
         limit: int = Query(10, ge=1, le=50, description="Max results"),
         state: Optional[str] = Query(None, description="Optional state filter"),
@@ -815,7 +817,7 @@ def create_app(runtime: Optional[ServiceRuntime] = None) -> FastAPI:
             longitude=lon,
             radius_miles=radius_miles,
         )
-        return await autocomplete_post(req)
+        return autocomplete_post(req)
 
     _register_review_routes(app, runtime)
     return app

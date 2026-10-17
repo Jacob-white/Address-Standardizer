@@ -536,7 +536,7 @@ class AutocompleteEngine:
             raw_ranges: List[Tuple[int, int]] = []
             full_repr_upper = full_repr.upper()
             full_repr_fold = unicodedata.normalize("NFKD", full_repr_upper).encode("ASCII", "ignore").decode("utf-8").upper()
-            for tok in (q_tokens + q_tokens_fold):
+            for tok in dict.fromkeys(q_tokens + q_tokens_fold):
                 start_idx = 0
                 while True:
                     idx = full_repr_upper.find(tok, start_idx)

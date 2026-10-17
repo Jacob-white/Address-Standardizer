@@ -648,6 +648,10 @@ class SpatialEngine:
                 if "is_us" in address and address["is_us"] is not None:
                     is_us = bool(address["is_us"])
                 country = address.get("country") or address.get("country_code") or country
+                if not country and norm_key and "|" in norm_key:
+                    parts = norm_key.split("|")
+                    if len(parts) >= 6 and parts[5].strip():
+                        country = parts[5].strip()
 
             if is_us is None:
                 if country:
@@ -675,6 +679,7 @@ class SpatialEngine:
                         h3_res10=row["h3_res10"],
                         parcel_id=row["parcel_id"],
                         execution_time_ms=round(ms, 4),
+                        metadata=json.loads(row["metadata_json"]) if row["metadata_json"] else {},
                     )
 
             if bld_key:
@@ -695,6 +700,7 @@ class SpatialEngine:
                         h3_res10=row["h3_res10"],
                         parcel_id=row["parcel_id"],
                         execution_time_ms=round(ms, 4),
+                        metadata=json.loads(row["metadata_json"]) if row["metadata_json"] else {},
                     )
 
             if parcel_id:
@@ -715,6 +721,7 @@ class SpatialEngine:
                         h3_res10=row["h3_res10"],
                         parcel_id=row["parcel_id"],
                         execution_time_ms=round(ms, 4),
+                        metadata=json.loads(row["metadata_json"]) if row["metadata_json"] else {},
                     )
 
             # Stage 2: Street Centerline Range Interpolation (US only)

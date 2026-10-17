@@ -84,7 +84,7 @@ def standardize_arrow(
     def _get_col_list(name: Optional[str]) -> List[Optional[str]]:
         if name and name in col_names:
             arr = table.column(name)
-            return [str(v.as_py()) if v.as_py() is not None else None for v in arr]
+            return [str(v) if v is not None else None for v in arr.to_pylist()]
         return [None] * num_rows
 
     s1_vals = _get_col_list(street1_col)
@@ -123,7 +123,7 @@ def standardize_arrow(
             city=city_vals[i],
             state=state_vals[i],
             postal_code=post_vals[i],
-            country=country_vals[i] or "USA",
+            country=country_vals[i],
             enable_geocoding=enable_geocoding,
             enable_fuzzy=enable_fuzzy,
             allow_locality=allow_locality,
@@ -358,6 +358,8 @@ def register_duckdb_udfs(connection: Optional[Any] = None) -> Any:
 
     # 1. 4-arg struct function: standardize_address(street1, city, state, postal_code)
     def udf_standardize_4(s1, city, state, postal):
+        if all(v is None for v in (s1, city, state, postal)):
+            return None
         res = standardize_address(
             street1=str(s1 or "") if s1 is not None else "",
             city=str(city or "") if city is not None else "",
@@ -372,17 +374,20 @@ def register_duckdb_udfs(connection: Optional[Any] = None) -> Any:
         udf_standardize_4,
         parameters=["VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR"],
         return_type=struct_type_str,
+        null_handling="special",
     )
 
     # 2. 6-arg struct function: standardize_address_full(street1, street2, city, state, postal_code, country)
     def udf_standardize_6(s1, s2, city, state, postal, country):
+        if all(v is None for v in (s1, s2, city, state, postal, country)):
+            return None
         res = standardize_address(
             street1=str(s1 or "") if s1 is not None else "",
             street2=str(s2 or "") if s2 is not None else "",
             city=str(city or "") if city is not None else "",
             state=str(state or "") if state is not None else "",
             postal_code=str(postal or "") if postal is not None else "",
-            country=str(country or "USA") if country is not None else "USA",
+            country=str(country or "") if country is not None else "",
             enable_geocoding=True,
         )
         return _std_dict(res)
@@ -392,10 +397,13 @@ def register_duckdb_udfs(connection: Optional[Any] = None) -> Any:
         udf_standardize_6,
         parameters=["VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR"],
         return_type=struct_type_str,
+        null_handling="special",
     )
 
     # 3. 1-arg struct function: standardize_address_text(address_text)
     def udf_standardize_text(addr_text):
+        if addr_text is None:
+            return None
         res = standardize_address(
             street1=str(addr_text or "") if addr_text is not None else "",
             enable_geocoding=True,
@@ -407,10 +415,13 @@ def register_duckdb_udfs(connection: Optional[Any] = None) -> Any:
         udf_standardize_text,
         parameters=["VARCHAR"],
         return_type=struct_type_str,
+        null_handling="special",
     )
 
     # 4. Scalar address key functions
     def udf_key_4(s1, city, state, postal):
+        if all(v is None for v in (s1, city, state, postal)):
+            return None
         res = standardize_address(
             street1=str(s1 or "") if s1 is not None else "",
             city=str(city or "") if city is not None else "",
@@ -424,9 +435,12 @@ def register_duckdb_udfs(connection: Optional[Any] = None) -> Any:
         udf_key_4,
         parameters=["VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR"],
         return_type="VARCHAR",
+        null_handling="special",
     )
 
     def udf_key_text(addr_text):
+        if addr_text is None:
+            return None
         res = standardize_address(street1=str(addr_text or "") if addr_text is not None else "")
         return res.normalized_address_key or ""
 
@@ -435,10 +449,13 @@ def register_duckdb_udfs(connection: Optional[Any] = None) -> Any:
         udf_key_text,
         parameters=["VARCHAR"],
         return_type="VARCHAR",
+        null_handling="special",
     )
 
     # 5. Deliverability classification functions
     def udf_deliv_4(s1, city, state, postal):
+        if all(v is None for v in (s1, city, state, postal)):
+            return None
         res = standardize_address(
             street1=str(s1 or "") if s1 is not None else "",
             city=str(city or "") if city is not None else "",
@@ -452,9 +469,12 @@ def register_duckdb_udfs(connection: Optional[Any] = None) -> Any:
         udf_deliv_4,
         parameters=["VARCHAR", "VARCHAR", "VARCHAR", "VARCHAR"],
         return_type="VARCHAR",
+        null_handling="special",
     )
 
     def udf_deliv_text(addr_text):
+        if addr_text is None:
+            return None
         res = standardize_address(street1=str(addr_text or "") if addr_text is not None else "")
         return res.deliverability or "UNDELIVERABLE"
 
@@ -463,6 +483,7 @@ def register_duckdb_udfs(connection: Optional[Any] = None) -> Any:
         udf_deliv_text,
         parameters=["VARCHAR"],
         return_type="VARCHAR",
+        null_handling="special",
     )
 
     return con

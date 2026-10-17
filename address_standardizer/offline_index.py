@@ -268,8 +268,47 @@ class OfflineReferenceIndex:
 
     def insert_records(self, records: List[Dict[str, Any]]):
         """Batch insert rooftop reference records."""
+        if not records:
+            return
+        tuples = []
         for rec in records:
-            self.insert_record(**rec)
+            tuples.append((
+                rec["address_key"].strip().upper(),
+                rec.get("building_key", "").strip().upper(),
+                rec.get("street1", "").strip().upper(),
+                rec.get("street2", "").strip().upper(),
+                rec.get("city", "").strip().upper(),
+                rec.get("state", "").strip().upper(),
+                rec.get("postal_code", "").strip(),
+                rec.get("country", "USA").strip().upper(),
+                float(rec["latitude"]),
+                float(rec["longitude"]),
+                rec.get("precision", "ROOFTOP"),
+                float(rec.get("accuracy_radius_meters", 5.0)),
+                rec.get("parcel_id"),
+                1 if rec.get("is_multi_unit", False) else 0,
+                json.dumps(rec.get("known_units") or []),
+                rec.get("rdi", "Unknown"),
+                1 if rec.get("is_cmra", False) else 0,
+                1 if rec.get("is_vacant", False) else 0,
+                rec.get("census_tract"),
+                rec.get("fips_code"),
+                json.dumps(rec.get("metadata") or {}),
+            ))
+        with self._lock:
+            conn = self._get_conn()
+            with conn:
+                conn.executemany(
+                    """
+                    INSERT OR REPLACE INTO rooftop_reference (
+                        address_key, building_key, street1, street2, city, state, postal_code,
+                        country, latitude, longitude, precision, accuracy_radius_meters,
+                        parcel_id, is_multi_unit, known_units, rdi, is_cmra, is_vacant,
+                        census_tract, fips_code, metadata_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    tuples,
+                )
 
     def insert_street_range(
         self,
@@ -322,8 +361,40 @@ class OfflineReferenceIndex:
 
     def insert_street_ranges(self, ranges: List[Dict[str, Any]]):
         """Batch insert street edge ranges."""
+        if not ranges:
+            return
+        tuples = []
         for r in ranges:
-            self.insert_street_range(**r)
+            parity = r.get("parity", "B").strip().upper()
+            if parity not in ("O", "E", "B"):
+                raise ValueError("parity must be 'O', 'E' or 'B'")
+            tuples.append((
+                r["street_name"].strip().upper(),
+                r["postal_code"].strip(),
+                r["state"].strip().upper(),
+                int(r["from_number"]),
+                int(r["to_number"]),
+                float(r["start_latitude"]),
+                float(r["start_longitude"]),
+                float(r["end_latitude"]),
+                float(r["end_longitude"]),
+                r.get("census_tract"),
+                r.get("fips_code"),
+                parity,
+            ))
+        with self._lock:
+            conn = self._get_conn()
+            with conn:
+                conn.executemany(
+                    """
+                    INSERT INTO street_ranges (
+                        street_name, postal_code, state, from_number, to_number,
+                        start_latitude, start_longitude, end_latitude, end_longitude,
+                        census_tract, fips_code, parity
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    tuples,
+                )
 
     def count_ranges(self) -> int:
         """Returns total records in the street_ranges table."""
@@ -556,7 +627,7 @@ class OfflineReferenceIndex:
 
                 # 4. Street number transposition healing against reference index
                 st_tokens = st1.split()
-                if st_tokens and any(c.isdigit() for c in st_tokens[0]):
+                if len(st_tokens) >= 2 and any(c.isdigit() for c in st_tokens[0]):
                     num_part = st_tokens[0]
                     rest_part = " ".join(st_tokens[1:])
                     cur = conn.execute(

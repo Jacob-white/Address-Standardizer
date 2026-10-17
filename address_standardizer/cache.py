@@ -189,9 +189,6 @@ class SQLiteCache:
                 );
                 """
             )
-            self._conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_l2_cache_key ON l2_address_cache(cache_key);"
-            )
             try:
                 self._conn.execute(
                     "CREATE INDEX IF NOT EXISTS idx_l2_created_at ON l2_address_cache(created_at);"

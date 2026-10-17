@@ -55,6 +55,9 @@ class CacheBackend(Protocol):
 
 _OPTIONAL_METADATA_FIELDS = (
     "deliverability",
+    "secondary_prompt_required",
+    "prompt_message",
+    "suggested_secondary_units",
     "latitude",
     "longitude",
     "precision",
@@ -70,7 +73,10 @@ def deserialize_value(payload: str) -> Any:
     """Rebuilds a cached value from its JSON payload (raises on a payload that cannot be rebuilt)."""
     data = json.loads(payload)
     if isinstance(data, dict) and data.get("__class__") == "StandardizedAddress":
-        from address_standardizer.models import StandardizedAddress
+        from address_standardizer.models import StandardizedAddress, LocalityOnlyStatus
+        status = data["address_status"]
+        if status in ("locality_only", "city_level"):
+            status = LocalityOnlyStatus("locality_only")
         std = StandardizedAddress(
             street1=data["street1"],
             street2=data["street2"],
@@ -79,7 +85,7 @@ def deserialize_value(payload: str) -> Any:
             postal_code=data["postal_code"],
             country=data["country"],
             normalized_address_key=data.get("normalized_address_key"),
-            address_status=data["address_status"],
+            address_status=status,
             raw_street_address=data["raw_street_address"],
             is_us=data["is_us"],
             is_private_residence=data.get("is_private_residence", False),

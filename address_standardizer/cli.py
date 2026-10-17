@@ -227,6 +227,7 @@ def _process_piped_stream(
         if confidence:
             data["confidence_score"] = res.confidence_score
             data["routing_tier"] = res.routing_tier
+            data["failure_reason_codes"] = res.failure_reason_codes
 
         if format_type == "table":
             _emit_cli_output(_format_table_row(data))
@@ -294,6 +295,9 @@ def _cmd_parse(args: argparse.Namespace) -> None:
         )
         return
 
+    from address_standardizer.audit import LEDGER_OVERRIDE
+    from address_standardizer.offline_index import get_default_offline_index
+
     st1 = args.street1
     if not st1 and args.address:
         st1 = " ".join(args.address)
@@ -302,115 +306,127 @@ def _cmd_parse(args: argparse.Namespace) -> None:
         from address_standardizer.reference import GeoNamesPostalProvider
 
         ref_provider = GeoNamesPostalProvider(args.reference_db)
-    res = standardize_address(
-        street1=st1,
-        street2=args.street2,
-        city=args.city,
-        state=args.state,
-        postal_code=args.postal_code,
-        country=args.country,
-        reference_provider=ref_provider,
-    )
-    data = res.as_dict()
-    if res.dependent_locality:
-        data["dependent_locality"] = res.dependent_locality
-    if res.building_name:
-        data["building_name"] = res.building_name
-    data["country_iso3"] = getattr(res, "country_iso3", None) or res.country or ""
-    if ref_provider is not None:
-        data["reference_validation"] = res.reference_validation.as_dict()
-        ref_provider.close()
 
-    if args.enable_geocoding:
-        engine_to_close = None
-        if args.spatial_db:
-            engine = SpatialEngine(db_path=args.spatial_db)
-            engine_to_close = engine
-            sp_res = engine.resolve(res)
-        else:
-            sp_res = resolve_spatial_coordinates(res)
-        if sp_res:
-            unresolved = sp_res.precision == "UNRESOLVED"  # an unresolved lookup must not look like (0, 0)
-            data["latitude"] = None if unresolved else sp_res.latitude
-            data["longitude"] = None if unresolved else sp_res.longitude
-            data["spatial_precision"] = sp_res.precision
-            data["geocode_precision"] = sp_res.precision
-            data["spatial_source"] = sp_res.source
-            data["accuracy_radius_meters"] = sp_res.accuracy_radius_meters
-            data["h3_r10_index"] = sp_res.h3_res10
-            data["spatial_result"] = sp_res.as_dict()
-            res.spatial_result = sp_res
-        if engine_to_close:
-            engine_to_close.close()
-
-    if getattr(args, "latin", False):
-        from address_standardizer.transliterate import LATIN_FIELDS, std_to_latin
-
-        data["native"] = {name: data.get(name) for name in LATIN_FIELDS}
-        data.update({name: value for name, value in std_to_latin(res).items() if name in LATIN_FIELDS})
-
-    if args.confidence:
-        data["confidence_score"] = res.confidence_score
-        data["routing_tier"] = res.routing_tier
-        data["failure_reason_codes"] = res.failure_reason_codes
-
-    if args.audit:
-        if not res.audit_record:
-            raw_dict = {
-                "street1": st1,
-                "street2": args.street2,
-                "city": args.city,
-                "state": args.state,
-                "postal_code": args.postal_code,
-                "country": args.country,
-            }
-            from address_standardizer.confidence import compute_confidence_score
-            conf = compute_confidence_score(res, raw_input=raw_dict)
-            res.audit_record = _audit_ledger(args).record_standardized_address(
-                res, conf, raw_input=raw_dict
-            )
-        if res.audit_record:
-            data["audit_record"] = res.audit_record.as_dict()
-
-    if args.geocode and res.is_us and res.street1:
-        geocoder = CensusGeocoder()
-        geo_res = geocoder.geocode_batch([("1", res.street1, res.city, res.state, res.postal_code)])
-        if "1" in geo_res:
-            data["latitude"] = geo_res["1"]["latitude"]
-            data["longitude"] = geo_res["1"]["longitude"]
-            data["geocode_precision"] = geo_res["1"]["precision"]
-
-    if args.cascade and res.is_us:
-        casc = resolve_verification_cascade(
-            street1=res.street1,
-            street2=res.street2,
-            city=res.city,
-            state=res.state,
-            postal_code=res.postal_code,
-            country=res.country,
-            normalized_address_key=res.normalized_address_key,
-            census_geocoder=CensusGeocoder(),
+    ledger = _audit_ledger(args)
+    token = LEDGER_OVERRIDE.set(ledger)
+    try:
+        res = standardize_address(
+            street1=st1,
+            street2=args.street2,
+            city=args.city,
+            state=args.state,
+            postal_code=args.postal_code,
+            country=args.country,
+            reference_provider=ref_provider,
+            explain=bool(getattr(args, "explain", False)),
+            alternatives=int(getattr(args, "alternatives", 0) or 0),
         )
-        if casc:
-            data["latitude"] = casc.latitude
-            data["longitude"] = casc.longitude
-            data["geocode_precision"] = casc.precision
-            data["accuracy_radius_meters"] = casc.accuracy_radius_meters
-            data["cascade_source"] = casc.source
-            data["cascade_stage"] = casc.stage
+        data = res.as_dict(
+            include_explanation=bool(getattr(args, "explain", False) or getattr(args, "alternatives", 0))
+        )
+        if res.dependent_locality:
+            data["dependent_locality"] = res.dependent_locality
+        if res.building_name:
+            data["building_name"] = res.building_name
+        data["country_iso3"] = getattr(res, "country_iso3", None) or res.country or ""
+        if ref_provider is not None:
+            data["reference_validation"] = res.reference_validation.as_dict()
 
-    if args.format == "upu":
-        _emit_cli_output(res.format_upu())
-    elif args.format == "text":
-        _emit_cli_output(_format_text_address(data))
-    elif args.format == "table":
-        _emit_cli_output(_format_table_header())
-        _emit_cli_output(_format_table_row(data))
-    elif args.format == "csv":
-        _emit_cli_output(_format_csv_header())
-        _emit_cli_output(_format_csv_row(data))
-    else:
-        _emit_cli_output(json.dumps(data, indent=2))
+        if args.enable_geocoding:
+            engine_to_close = None
+            if args.spatial_db:
+                engine = SpatialEngine(db_path=args.spatial_db)
+                engine_to_close = engine
+                sp_res = engine.resolve(res)
+            else:
+                sp_res = resolve_spatial_coordinates(res)
+            if sp_res:
+                unresolved = sp_res.precision == "UNRESOLVED"  # an unresolved lookup must not look like (0, 0)
+                data["latitude"] = None if unresolved else sp_res.latitude
+                data["longitude"] = None if unresolved else sp_res.longitude
+                data["spatial_precision"] = sp_res.precision
+                data["geocode_precision"] = sp_res.precision
+                data["spatial_source"] = sp_res.source
+                data["accuracy_radius_meters"] = sp_res.accuracy_radius_meters
+                data["h3_r10_index"] = sp_res.h3_res10
+                data["spatial_result"] = sp_res.as_dict()
+                res.spatial_result = sp_res
+            if engine_to_close:
+                engine_to_close.close()
+
+        if getattr(args, "latin", False):
+            from address_standardizer.transliterate import LATIN_FIELDS, std_to_latin
+
+            data["native"] = {name: data.get(name) for name in LATIN_FIELDS}
+            data.update({name: value for name, value in std_to_latin(res).items() if name in LATIN_FIELDS})
+
+        if args.confidence:
+            data["confidence_score"] = res.confidence_score
+            data["routing_tier"] = res.routing_tier
+            data["failure_reason_codes"] = res.failure_reason_codes
+
+        if args.audit:
+            if not res.audit_record:
+                raw_dict = {
+                    "street1": st1,
+                    "street2": args.street2,
+                    "city": args.city,
+                    "state": args.state,
+                    "postal_code": args.postal_code,
+                    "country": args.country,
+                }
+                from address_standardizer.confidence import compute_confidence_score
+                conf = compute_confidence_score(res, raw_input=raw_dict)
+                res.audit_record = ledger.record_standardized_address(
+                    res, conf, raw_input=raw_dict
+                )
+            if res.audit_record:
+                data["audit_record"] = res.audit_record.as_dict()
+
+        if args.geocode and res.is_us and res.street1:
+            geocoder = CensusGeocoder()
+            geo_res = geocoder.geocode_batch([("1", res.street1, res.city, res.state, res.postal_code)])
+            if "1" in geo_res:
+                data["latitude"] = geo_res["1"]["latitude"]
+                data["longitude"] = geo_res["1"]["longitude"]
+                data["geocode_precision"] = geo_res["1"]["precision"]
+
+        if args.cascade and res.is_us:
+            casc = resolve_verification_cascade(
+                street1=res.street1,
+                street2=res.street2,
+                city=res.city,
+                state=res.state,
+                postal_code=res.postal_code,
+                country=res.country,
+                normalized_address_key=res.normalized_address_key,
+                census_geocoder=CensusGeocoder(),
+                offline_index=get_default_offline_index(),
+            )
+            if casc:
+                data["latitude"] = casc.latitude
+                data["longitude"] = casc.longitude
+                data["geocode_precision"] = casc.precision
+                data["accuracy_radius_meters"] = casc.accuracy_radius_meters
+                data["cascade_source"] = casc.source
+                data["cascade_stage"] = casc.stage
+
+        if args.format == "upu":
+            _emit_cli_output(res.format_upu())
+        elif args.format == "text":
+            _emit_cli_output(_format_text_address(data))
+        elif args.format == "table":
+            _emit_cli_output(_format_table_header())
+            _emit_cli_output(_format_table_row(data))
+        elif args.format == "csv":
+            _emit_cli_output(_format_csv_header())
+            _emit_cli_output(_format_csv_row(data))
+        else:
+            _emit_cli_output(json.dumps(data, indent=2))
+    finally:
+        LEDGER_OVERRIDE.reset(token)
+        if ref_provider is not None:
+            ref_provider.close()
 
 
 def _cmd_validate_postal(args: argparse.Namespace) -> None:
@@ -928,6 +944,8 @@ def main():
     parse_parser.add_argument("--no-cache", action="store_true", help="Bypass multi-tier reference cache")
     parse_parser.add_argument("--reference-db", help="GeoNames postal index (see `data build geonames`): validate postal code / city / state and add reference_validation (single address only; docs/reference_data.md)")
     parse_parser.add_argument("--correct-state-from-zip", action="store_true", help="Replace a US state that contradicts the ZIP with the ZIP's state (reported as WARN_STATE_CORRECTED_FROM_ZIP). Default: keep the given state, flag ERR_ZIP_STATE_MISMATCH and mark the address UNDELIVERABLE.")
+    parse_parser.add_argument("--explain", action="store_true", help="Include normalization explanation trace in output")
+    parse_parser.add_argument("--alternatives", type=int, default=0, help="Number of candidate alternative standardizations to return (default: 0)")
 
     # Command: batch CSV processing
     batch_parser = subparsers.add_parser("batch", help="Batch standardize a CSV file")
