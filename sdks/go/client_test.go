@@ -165,3 +165,78 @@ func TestAPIErrorCarriesStatusAndBody(t *testing.T) {
 		t.Fatalf("unexpected APIError: %+v", apiErr)
 	}
 }
+
+func TestValidatePostalCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/validate-postal" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		var req map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("failed to decode request: %v", err)
+		}
+		if req["postal_code"] != "94043" || req["country"] != "US" {
+			t.Errorf("unexpected request payload: %+v", req)
+		}
+
+		resp := standardizer.PostalValidationResult{
+			IsValid:         true,
+			PostalCode:      "94043",
+			CountryISO2:     "US",
+			CountryISO3:     "USA",
+			CountryName:     "United States",
+			HasPostalSystem: true,
+			Diagnostics:     "Valid 5-digit ZIP format",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := standardizer.NewClient(server.URL)
+	res, err := client.ValidatePostalCode(context.Background(), "94043", "US")
+	if err != nil {
+		t.Fatalf("ValidatePostalCode failed: %v", err)
+	}
+	if !res.IsValid || res.CountryISO2 != "US" || res.PostalCode != "94043" {
+		t.Errorf("unexpected response: %+v", res)
+	}
+}
+
+func TestWithRetryOn429(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.Header().Set("Retry-After", "0.01")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"detail":"rate limit exceeded"}`))
+			return
+		}
+		resp := standardizer.StandardizedAddress{
+			Street1: "100 MAIN ST",
+			City:    "SEATTLE",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := standardizer.NewClient(server.URL, standardizer.WithRetry(standardizer.RetryConfig{
+		MaxRetries: 2,
+		BaseDelay:  5 * time.Millisecond,
+		MaxDelay:   20 * time.Millisecond,
+	}))
+
+	res, err := client.Standardize(context.Background(), standardizer.StandardizeRequest{Address: "100 Main St"})
+	if err != nil {
+		t.Fatalf("Standardize failed: %v", err)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+	if res.Street1 != "100 MAIN ST" {
+		t.Errorf("expected Street1 '100 MAIN ST', got %s", res.Street1)
+	}
+}
+

@@ -319,3 +319,72 @@ test("AutocompleteController - selecting a suggestion discards in-flight lookups
   assert.equal(controller.isLoading, false);
   assert.equal(controller.query, "100 WALL ST, NEW YORK, NY 10005");
 });
+
+test("AddressStandardizerClient - validatePostalCode", async () => {
+  const mockFetch = async (url, options) => {
+    assert.equal(url, "http://localhost:8000/v1/validate-postal");
+    assert.equal(options.method, "POST");
+    const body = JSON.parse(options.body);
+    assert.equal(body.postal_code, "94043");
+    assert.equal(body.country, "US");
+
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        is_valid: true,
+        postal_code: "94043",
+        country_iso2: "US",
+        country_iso3: "USA",
+        country_name: "United States",
+        has_postal_system: true,
+        format_pattern: "^\\d{5}$",
+        diagnostics: "Valid 5-digit ZIP format",
+      }),
+    };
+  };
+
+  const client = new AddressStandardizerClient({ fetch: mockFetch });
+  const result = await client.validatePostalCode("94043", "US");
+
+  assert.equal(result.is_valid, true);
+  assert.equal(result.country_iso2, "US");
+  assert.equal(result.postal_code, "94043");
+});
+
+test("AddressStandardizerClient - automatic retries on 429 with jitter", async () => {
+  let attempts = 0;
+  const mockFetch = async () => {
+    attempts++;
+    if (attempts === 1) {
+      return {
+        ok: false,
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { get: (name) => (name.toLowerCase() === "retry-after" ? "0.01" : null) },
+        text: async () => "Rate limit exceeded",
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        street1: "100 MAIN ST",
+        city: "SEATTLE",
+        state: "WA",
+        postal_code: "98101",
+        country: "USA",
+      }),
+    };
+  };
+
+  const client = new AddressStandardizerClient({
+    fetch: mockFetch,
+    retry: { maxRetries: 2, baseDelayMs: 5, maxDelayMs: 20 },
+  });
+
+  const res = await client.standardize("100 Main St, Seattle, WA 98101");
+  assert.equal(attempts, 2);
+  assert.equal(res.street1, "100 MAIN ST");
+});
+

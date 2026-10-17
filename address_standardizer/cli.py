@@ -846,6 +846,13 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     )
 
 
+def _cmd_mcp(args: argparse.Namespace) -> None:
+    from address_standardizer.mcp.server import main as mcp_main
+
+    mcp_args = ["--transport", args.transport, "--host", args.host, "--port", str(args.port)]
+    mcp_main(mcp_args)
+
+
 _COMMAND_HANDLERS = {
     "parse": _cmd_parse,
     "validate-postal": _cmd_validate_postal,
@@ -857,6 +864,7 @@ _COMMAND_HANDLERS = {
     "autocomplete": _cmd_autocomplete,
     "serve": _cmd_serve,
     "data": _cmd_data,
+    "mcp": _cmd_mcp,
 }
 
 
@@ -1071,6 +1079,20 @@ def main():
     serve_parser.add_argument("--port", type=_port_number, default=8000, help="Bind port (default: 8000)")
     serve_parser.add_argument("--workers", type=_positive_int, default=1, help="Number of worker processes (default: 1)")
     serve_parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+
+    # Command: mcp AI agent server
+    mcp_parser = subparsers.add_parser(
+        "mcp",
+        help="Start Model Context Protocol (MCP) server for AI agent integration",
+    )
+    mcp_parser.add_argument(
+        "--transport",
+        choices=["stdio", "sse", "streamable-http"],
+        default="stdio",
+        help="MCP transport protocol (default: stdio)",
+    )
+    mcp_parser.add_argument("--host", default="127.0.0.1", help="Bind host for SSE transport (default: 127.0.0.1)")
+    mcp_parser.add_argument("--port", type=_port_number, default=8000, help="Bind port for SSE transport (default: 8000)")
 
     from address_standardizer.reference._cli import add_data_parser
 

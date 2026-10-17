@@ -64,6 +64,11 @@ _RE_POSTAL_THEN_NAME = re.compile(r"^(?:\d{2}-\d{3}|\d{3}\s?\d{2}|\d{4,6})\s+[^\
 # Hungary writes "<postcode> City, Street type-name number[.]": a four-digit postcode opens the first part.
 _RE_HU_POSTAL_FIRST = re.compile(r"^(\d{4})\s+([^\W\d_].*)$")
 
+_HUN_STREET_TYPES = frozenset({
+    "utca", "út", "ut", "tér", "ter", "körút", "korut", "fasor", "sor", "köz", "koz",
+    "sétány", "setany", "rakpart", "dűlő", "dulo", "u", "krt",
+})
+
 
 def _type_word_index(words: List[str]) -> int:
     """Index of the first Cyrillic street-type word in ``words`` (case/dot-insensitive), else -1."""
@@ -73,12 +78,17 @@ def _type_word_index(words: List[str]) -> int:
     return -1
 
 
-_RE_TRAILING_HOUSE = re.compile(r"(?:^|\s)\d{1,3}(?:\s?[^\W\d_])?(?:[/\-]\d{1,3})?$")
+_RE_TRAILING_HOUSE = re.compile(r"(?:^|\s)\d{1,4}(?:\s?[^\W\d_])?(?:[/\-][A-Za-z0-9]+)?$")
 
 
 def _is_street_like(part: str) -> bool:
     """True when a comma-delimited part has a street type word or a trailing house number (so it is no bare city)."""
-    return _type_word_index(part.split()) >= 0 or bool(_RE_TRAILING_HOUSE.search(part))
+    words = part.split()
+    if _type_word_index(words) >= 0:
+        return True
+    if any(w.strip(".,;").lower() in _HUN_STREET_TYPES for w in words):
+        return True
+    return bool(_RE_TRAILING_HOUSE.search(part))
 
 
 def split_cyrillic_locality(line: str) -> Tuple[str, str, str]:

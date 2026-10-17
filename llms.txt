@@ -1,0 +1,46 @@
+# Address-Standardizer
+> High-performance, enterprise-grade address parsing, postal validation, and spatial geocoding in Python and native Rust.
+
+Address-Standardizer standardizes messy, unstructured, and international address strings into canonical USPS Publication 28 and UPU S42 components. It features offline SQLite R*Tree geocoding, 249 ISO country grammars, DPV footnotes, FinCEN corporate secrecy hub detection, Model Context Protocol (MCP) agent server, and Arrow/Polars/DuckDB analytical UDFs.
+
+## Installation & Setup
+- Core Python: `pip install address-standardizer`
+- AI Agent MCP Server: `pip install "address-standardizer[mcp]"`
+- Full Enterprise (FastAPI server + Arrow + Polars + DuckDB): `pip install "address-standardizer[server,arrow]"`
+- Docker Daemon: `docker run -p 8000:8000 ghcr.io/jacob-white/address-standardizer:latest`
+
+## Core Python API
+- `standardize_address(street1=None, ..., country=None, enable_geocoding=False, explain=False) -> StandardizedAddress`
+  Primary standardization entry point. Accepts single-line string or structured keyword arguments.
+- `batch_standardize(addresses, enable_geocoding=False) -> List[StandardizedAddress]`
+  Vectorized batch standardization for lists of strings or dictionaries.
+- `validate_address(address, country="US", strict=False) -> AddressValidationResult`
+  Single-call ergonomic validation returning boolean validity, deliverability, and failure reasons.
+- `validate_postal_code(postal_code: str, country_code: str = "US") -> bool`
+  Validates postal code against national standards across 249 ISO countries.
+- `autocomplete_address(query: str, limit: int = 5, latitude=None, longitude=None) -> List[dict]`
+  Real-time typeahead suggestions with proximity biasing.
+
+## Data Structures
+- `StandardizedAddress`:
+  - Fields: `street1`, `street2`, `city`, `state`, `postal_code`, `country`, `normalized_address_key`, `building_key`, `address_status`.
+  - Properties: `confidence_score` (0.0-1.0), `routing_tier` ("AUTO_PASS" | "FUZZY_REVIEW" | "MANUAL_STEWARDSHIP"), `deliverability` ("DELIVERABLE" | "REQUIRES_SECONDARY" | "UNDELIVERABLE"), `dpv_footnotes` (e.g. ["AA", "BB", "N1"]), `latitude`, `longitude`, `precision`.
+  - Serializers: `.as_dict()`, `.as_extended_dict()`, `.format_upu()`.
+
+## Model Context Protocol (MCP) Server
+- Run with stdio: `address-standardizer mcp` or `address-standardizer-mcp`
+- Run with SSE: `address-standardizer mcp --transport sse --port 8000`
+- Tools exposed: `standardize_address`, `batch_standardize`, `validate_postal`, `autocomplete_address`, `explain_parse`.
+
+## REST API Endpoints
+- `POST /v1/standardize`: Single address standardization.
+- `POST /v1/batch`: Batch standardization (supports `Accept: application/x-ndjson` streaming).
+- `POST /v1/autocomplete`: Typeahead autocomplete suggestions.
+- `POST /v1/validate-postal` & `GET /v1/validate-postal`: Dedicated postal code validation.
+- `GET /health`: Health and readiness probe.
+- `GET /metrics`: Prometheus and JSON operational metrics.
+
+## Key Invariants
+- 100% statement and branch test coverage enforced (`fail_under = 100`).
+- Pure Python fallback is guaranteed if compiled native extensions are absent.
+- Critical errors (`ERR_MISSING_HOUSE_NUM`, `parse_failed`) strictly route to `MANUAL_STEWARDSHIP`.

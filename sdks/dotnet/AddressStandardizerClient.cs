@@ -21,6 +21,7 @@ namespace AddressStandardizer.Client
         IAsyncEnumerable<StreamRecord> StreamBatchRecordsAsync(BatchStandardizeRequest request, CancellationToken cancellationToken = default);
         Task<List<AutocompleteSuggestion>> AutocompleteAsync(AutocompleteRequest request, CancellationToken cancellationToken = default);
         Task<List<AutocompleteSuggestion>> AutocompleteGetAsync(AutocompleteRequest request, CancellationToken cancellationToken = default);
+        Task<PostalValidationResult> ValidatePostalCodeAsync(string postalCode, string country = "US", CancellationToken cancellationToken = default);
         Task<HealthResponse> GetHealthAsync(CancellationToken cancellationToken = default);
     }
 
@@ -28,6 +29,7 @@ namespace AddressStandardizer.Client
     {
         private readonly HttpClient _httpClient;
         private readonly bool _ownsHttpClient;
+        private readonly RetryOptions? _retryOptions;
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
@@ -38,12 +40,12 @@ namespace AddressStandardizer.Client
         /// Creates a client for the service at <paramref name="baseUrl"/>. <paramref name="timeout"/> bounds each
         /// non-streaming call (default 100 s, the HttpClient default); streaming calls are cancelled through their token.
         /// </summary>
-        public AddressStandardizerClient(string baseUrl, TimeSpan? timeout = null)
-            : this(CreateHttpClient(baseUrl, timeout), ownsHttpClient: true)
+        public AddressStandardizerClient(string baseUrl, TimeSpan? timeout = null, RetryOptions? retryOptions = null)
+            : this(CreateHttpClient(baseUrl, timeout), ownsHttpClient: true, retryOptions: retryOptions)
         {
         }
 
-        public AddressStandardizerClient(HttpClient httpClient, bool ownsHttpClient = false)
+        public AddressStandardizerClient(HttpClient httpClient, bool ownsHttpClient = false, RetryOptions? retryOptions = null)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             if (_httpClient.BaseAddress == null)
@@ -51,6 +53,7 @@ namespace AddressStandardizer.Client
                 throw new ArgumentException("The HttpClient must have a BaseAddress (for example http://localhost:8000/).", nameof(httpClient));
             }
             _ownsHttpClient = ownsHttpClient;
+            _retryOptions = retryOptions;
         }
 
         private static HttpClient CreateHttpClient(string baseUrl, TimeSpan? timeout)
@@ -68,10 +71,47 @@ namespace AddressStandardizer.Client
             return client;
         }
 
+        private async Task<HttpResponseMessage> SendWithRetryAsync(Func<Task<HttpResponseMessage>> sendFunc, CancellationToken cancellationToken)
+        {
+            if (_retryOptions == null || _retryOptions.MaxRetries <= 0)
+            {
+                return await sendFunc().ConfigureAwait(false);
+            }
+
+            int attempt = 0;
+            var rand = new Random();
+            while (true)
+            {
+                var response = await sendFunc().ConfigureAwait(false);
+                if (response.IsSuccessStatusCode || attempt >= _retryOptions.MaxRetries || !_retryOptions.RetryableStatusCodes.Contains((int)response.StatusCode))
+                {
+                    return response;
+                }
+
+                TimeSpan delay = TimeSpan.FromMilliseconds(
+                    Math.Min(_retryOptions.MaxDelay.TotalMilliseconds,
+                    rand.NextDouble() * _retryOptions.BaseDelay.TotalMilliseconds * Math.Pow(2, attempt))
+                );
+
+                if (response.Headers.RetryAfter != null && response.Headers.RetryAfter.Delta.HasValue)
+                {
+                    delay = response.Headers.RetryAfter.Delta.Value;
+                }
+
+                response.Dispose();
+                attempt++;
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         public async Task<StandardizedAddress> StandardizeAsync(StandardizeRequest request, CancellationToken cancellationToken = default)
         {
-            using var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
-            using var response = await _httpClient.PostAsync("v1/standardize", content, cancellationToken).ConfigureAwait(false);
+            using var response = await SendWithRetryAsync(async () =>
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
+                return await _httpClient.PostAsync("v1/standardize", content, cancellationToken).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
+
             await EnsureSuccessAsync(response).ConfigureAwait(false);
 
             var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
@@ -86,13 +126,36 @@ namespace AddressStandardizer.Client
 
         public async Task<List<StandardizedAddress>> StandardizeBatchAsync(BatchStandardizeRequest request, CancellationToken cancellationToken = default)
         {
-            using var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
-            using var response = await _httpClient.PostAsync("v1/batch", content, cancellationToken).ConfigureAwait(false);
+            using var response = await SendWithRetryAsync(async () =>
+            {
+                var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
+                return await _httpClient.PostAsync("v1/batch", content, cancellationToken).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
+
             await EnsureSuccessAsync(response).ConfigureAwait(false);
 
             var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             var result = await JsonSerializer.DeserializeAsync<List<StandardizedAddress>>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
             return result ?? new List<StandardizedAddress>();
+        }
+
+        public async Task<PostalValidationResult> ValidatePostalCodeAsync(string postalCode, string country = "US", CancellationToken cancellationToken = default)
+        {
+            var req = new Dictionary<string, string>
+            {
+                ["postal_code"] = postalCode,
+                ["country"] = country,
+            };
+            using var response = await SendWithRetryAsync(async () =>
+            {
+                var content = new StringContent(JsonSerializer.Serialize(req, JsonOptions), Encoding.UTF8, "application/json");
+                return await _httpClient.PostAsync("v1/validate-postal", content, cancellationToken).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
+
+            await EnsureSuccessAsync(response).ConfigureAwait(false);
+            var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            var result = await JsonSerializer.DeserializeAsync<PostalValidationResult>(stream, JsonOptions, cancellationToken).ConfigureAwait(false);
+            return result ?? throw new InvalidOperationException("Empty response received from validate-postal endpoint.");
         }
 
         /// <summary>

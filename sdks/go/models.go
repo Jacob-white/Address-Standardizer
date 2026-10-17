@@ -1,5 +1,7 @@
 package standardizer
 
+import "time"
+
 // StandardizeRequest represents a single address standardization payload.
 type StandardizeRequest struct {
 	Address         string `json:"address,omitempty"`
@@ -129,3 +131,24 @@ type HealthResponse struct {
 // Bool returns a pointer to v, for setting optional request flags such as
 // EnableGeocoding. A nil flag is omitted so the server default applies.
 func Bool(v bool) *bool { return &v }
+
+// PostalValidationResult represents national postal validation diagnostics.
+type PostalValidationResult struct {
+	IsValid         bool    `json:"is_valid"`
+	PostalCode      string  `json:"postal_code"`
+	CountryISO2     string  `json:"country_iso2"`
+	CountryISO3     string  `json:"country_iso3"`
+	CountryName     string  `json:"country_name"`
+	HasPostalSystem bool    `json:"has_postal_system"`
+	FormatPattern   *string `json:"format_pattern,omitempty"`
+	Diagnostics     string  `json:"diagnostics"`
+}
+
+// RetryConfig configures automatic retry with exponential backoff and jitter.
+type RetryConfig struct {
+	MaxRetries           int
+	BaseDelay            time.Duration
+	MaxDelay             time.Duration
+	RetryableStatusCodes []int
+}
+

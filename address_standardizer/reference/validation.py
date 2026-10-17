@@ -66,6 +66,10 @@ class ReferenceValidation:
     candidate_places: List[str] = field(default_factory=list)
     detail: str = ""
 
+    @property
+    def is_confirmed(self) -> bool:
+        return self.status == "confirmed"
+
     def as_dict(self) -> Dict[str, Any]:
         return {
             "status": self.status,

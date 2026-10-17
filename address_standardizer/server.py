@@ -388,6 +388,24 @@ class AutocompleteResponse(BaseModel):
     count: int
 
 
+class ValidatePostalRequest(BaseModel):
+    """Input payload for postal code validation."""
+    postal_code: str = Field(..., description="Postal code to validate")
+    country: Optional[str] = Field(default="US", description="ISO country code or name (default: US)")
+
+
+class PostalValidationResponse(BaseModel):
+    """Validation diagnostics for international postal codes."""
+    is_valid: bool
+    postal_code: str
+    country_iso2: str
+    country_iso3: str
+    country_name: str
+    has_postal_system: bool
+    format_pattern: Optional[str] = None
+    diagnostics: str
+
+
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -818,6 +836,58 @@ def create_app(runtime: Optional[ServiceRuntime] = None) -> FastAPI:
             radius_miles=radius_miles,
         )
         return autocomplete_post(req)
+
+    @app.post(
+        "/v1/validate-postal",
+        response_model=PostalValidationResponse,
+        summary="Validate international postal code",
+        tags=["Postal"],
+    )
+    def validate_postal_post(request: ValidatePostalRequest):
+        """Validate a postal code format against official national standards across 249 countries."""
+        from address_standardizer.international.countries import CountryRegistry
+        from address_standardizer.international.postal import POSTAL_RULES, validate_postal_code, PostalValidationResult
+
+        country_str = request.country or "US"
+        c_info = CountryRegistry.get(country_str)
+        res = validate_postal_code(request.postal_code, country_code=country_str, return_details=True)
+        rule = POSTAL_RULES.get(c_info.alpha3) if c_info else None
+        pattern_str = None
+        if rule:
+            pattern_str = getattr(getattr(rule, "pattern", None), "pattern", getattr(rule, "regex", None))
+
+        is_valid = res.is_valid if isinstance(res, PostalValidationResult) else bool(res)
+        raw_pc = res.postal_code if isinstance(res, PostalValidationResult) else str(request.postal_code)
+        diagnostics = res.reason if isinstance(res, PostalValidationResult) else ("Valid" if res else "Invalid format")
+
+        return PostalValidationResponse(
+            is_valid=is_valid,
+            postal_code=raw_pc,
+            country_iso2=c_info.alpha2 if c_info else (country_str[:2].upper() if country_str else "US"),
+            country_iso3=c_info.alpha3 if c_info else (country_str[:3].upper() if country_str else "USA"),
+            country_name=c_info.name if c_info else country_str,
+            has_postal_system=c_info.has_postal_codes if c_info else True,
+            format_pattern=pattern_str,
+            diagnostics=diagnostics,
+        )
+
+    @app.get(
+        "/v1/validate-postal",
+        response_model=PostalValidationResponse,
+        summary="Validate international postal code (GET)",
+        tags=["Postal"],
+    )
+    def validate_postal_get(
+        postal_code: Optional[str] = Query(None, description="Postal code to validate"),
+        code: Optional[str] = Query(None, description="Postal code alias"),
+        country: Optional[str] = Query("US", description="ISO country code or name (default: US)"),
+    ):
+        """GET endpoint for postal code validation."""
+        pc = postal_code or code
+        if not pc:
+            raise HTTPException(status_code=422, detail="Query parameter 'postal_code' or 'code' is required")
+        req = ValidatePostalRequest(postal_code=pc, country=country)
+        return validate_postal_post(req)
 
     _register_review_routes(app, runtime)
     return app

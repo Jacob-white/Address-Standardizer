@@ -49,11 +49,16 @@ def test_python_dash_m_runs_cli_main(monkeypatch, capsys):
 def test_package_import_degrades_when_arrow_and_server_extras_are_missing(monkeypatch):
     monkeypatch.setitem(sys.modules, "address_standardizer.arrow", None)
     monkeypatch.setitem(sys.modules, "address_standardizer.server", None)
+    monkeypatch.setitem(sys.modules, "address_standardizer.schemas", None)
     copy = _load_copy("__init__.py", "address_standardizer_init_copy")
     assert copy.standardize_arrow is None
     assert copy.standardize_polars is None
     assert copy.register_duckdb_udfs is None
     assert copy.create_app is None
+    assert copy.AddressInputSchema is None
+    assert copy.AddressSchema is None
+    assert copy.StandardizedAddressPydantic is None
+    assert copy.ValidationResultSchema is None
     # the core API is still exported
     assert callable(copy.standardize_address)
 

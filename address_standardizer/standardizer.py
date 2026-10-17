@@ -13,10 +13,11 @@ Standardizes US and International addresses to USPS Publication 28 and ISO stand
 """
 
 import copy
-import unicodedata
 import logging
 import re
-from typing import Optional, Dict, Any
+import unicodedata
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Union
 
 from address_standardizer.models import StandardizedAddress, LocalityOnlyStatus
 from address_standardizer.confidence import (
@@ -262,6 +263,7 @@ def standardize_address(
     finalize: bool = True,
     correct_state_from_zip: Optional[bool] = None,
     reference_provider: Optional[Any] = None,
+    enable_reference_validation: bool = False,
     explain: bool = False,
     alternatives: int = 0,
     calibrator: Optional[Any] = None,
@@ -289,6 +291,11 @@ def standardize_address(
     confidence, heuristic unless a fitted ``calibrator`` is passed); ``alternatives=N`` (at most 5) attaches
     ``std.alternatives`` (next-best readings of an ambiguous input). Both bypass the result cache and are off by default.
     """
+    if reference_provider is None and enable_reference_validation:
+        from address_standardizer.reference.us_zip5 import get_default_us_zip5_provider
+
+        reference_provider = get_default_us_zip5_provider()
+
     if explain or alternatives:
         from address_standardizer.explain import standardize_explained
 
@@ -296,7 +303,7 @@ def standardize_address(
             street1=street1, street2=street2, city=city, state=state, postal_code=postal_code, country=country,
             is_vacant=is_vacant, enable_fuzzy=enable_fuzzy, enable_geocoding=enable_geocoding,
             allow_locality=allow_locality, finalize=finalize, correct_state_from_zip=correct_state_from_zip,
-            reference_provider=reference_provider, **kwargs,
+            reference_provider=reference_provider, enable_reference_validation=enable_reference_validation, **kwargs,
         ))
     if reference_provider is not None:
         from address_standardizer.reference.validation import apply_reference_validation
@@ -917,3 +924,83 @@ def standardize_address(
         )
         std_intl.country_iso3 = country_iso
         return _finish(std_intl)
+
+
+@dataclass
+class AddressValidationResult:
+    """Outcome of validating an address."""
+
+    is_valid: bool
+    deliverability: str
+    rejection_reason: Optional[str] = None
+    failure_reason_codes: List[str] = field(default_factory=list)
+    confidence_score: float = 0.0
+    routing_tier: str = "MANUAL_STEWARDSHIP"
+    standardized_address: Optional[StandardizedAddress] = None
+
+    @property
+    def is_deliverable(self) -> bool:
+        return self.is_valid and self.deliverability == "DELIVERABLE"
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "is_valid": self.is_valid,
+            "deliverability": self.deliverability,
+            "rejection_reason": self.rejection_reason,
+            "failure_reason_codes": list(self.failure_reason_codes),
+            "confidence_score": self.confidence_score,
+            "routing_tier": self.routing_tier,
+            "standardized_address": self.standardized_address.as_dict() if self.standardized_address else None,
+        }
+
+
+def validate_address(
+    address: Union[str, Dict[str, Any], None] = None,
+    country: Optional[str] = None,
+    strict: bool = False,
+    enable_reference_validation: bool = False,
+    **kwargs: Any,
+) -> AddressValidationResult:
+    """Lightweight address validation returning deliverability, validity, and error messages."""
+    if isinstance(address, dict):
+        addr_dict = dict(address)
+        if country and "country" not in addr_dict:
+            addr_dict["country"] = country
+        std = standardize_address(**addr_dict, enable_reference_validation=enable_reference_validation, **kwargs)
+    elif isinstance(address, str):
+        std = standardize_address(street1=address, country=country, enable_reference_validation=enable_reference_validation, **kwargs)
+    else:
+        std = standardize_address(country=country, enable_reference_validation=enable_reference_validation, **kwargs)
+
+    routing_str = str(std.routing_tier.value if hasattr(std.routing_tier, "value") else std.routing_tier)
+    deliv_str = str(std.deliverability.value if hasattr(std.deliverability, "value") else std.deliverability)
+    reasons = list(getattr(std, "failure_reason_codes", []) or [])
+
+    fatal_errors = [r for r in reasons if r.startswith("ERR_")]
+
+    if strict:
+        is_valid = (routing_str == "AUTO_PASS") and (deliv_str != "UNDELIVERABLE") and (len(fatal_errors) == 0)
+    else:
+        is_valid = (routing_str in ("AUTO_PASS", "FUZZY_REVIEW")) and (deliv_str != "UNDELIVERABLE") and (len(fatal_errors) == 0)
+
+    rejection = None
+    if not is_valid:
+        if fatal_errors:
+            rejection = f"Validation failed: {', '.join(fatal_errors)}"
+        elif deliv_str == "UNDELIVERABLE":
+            rejection = "Address is undeliverable"
+        elif routing_str == "MANUAL_STEWARDSHIP":
+            rejection = "Low confidence score requires manual stewardship"
+        else:
+            rejection = "Address validation failed strict requirements"
+
+    return AddressValidationResult(
+        is_valid=is_valid,
+        deliverability=deliv_str,
+        rejection_reason=rejection,
+        failure_reason_codes=reasons,
+        confidence_score=round(float(std.confidence_score), 4),
+        routing_tier=routing_str,
+        standardized_address=std,
+    )
+

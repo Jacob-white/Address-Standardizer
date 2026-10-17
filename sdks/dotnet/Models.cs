@@ -295,4 +295,40 @@ namespace AddressStandardizer.Client
         [JsonPropertyName("uptime_seconds")]
         public double UptimeSeconds { get; set; }
     }
+
+    public class PostalValidationResult
+    {
+        [JsonPropertyName("is_valid")]
+        public bool IsValid { get; set; }
+
+        [JsonPropertyName("postal_code")]
+        public string PostalCode { get; set; } = string.Empty;
+
+        [JsonPropertyName("country_iso2")]
+        public string CountryIso2 { get; set; } = string.Empty;
+
+        [JsonPropertyName("country_iso3")]
+        public string CountryIso3 { get; set; } = string.Empty;
+
+        [JsonPropertyName("country_name")]
+        public string CountryName { get; set; } = string.Empty;
+
+        [JsonPropertyName("has_postal_system")]
+        public bool HasPostalSystem { get; set; }
+
+        [JsonPropertyName("format_pattern")]
+        public string? FormatPattern { get; set; }
+
+        [JsonPropertyName("diagnostics")]
+        public string Diagnostics { get; set; } = string.Empty;
+    }
+
+    public class RetryOptions
+    {
+        public int MaxRetries { get; set; } = 3;
+        public TimeSpan BaseDelay { get; set; } = TimeSpan.FromMilliseconds(200);
+        public TimeSpan MaxDelay { get; set; } = TimeSpan.FromSeconds(3);
+        public HashSet<int> RetryableStatusCodes { get; set; } = new HashSet<int> { 429, 502, 503, 504 };
+    }
 }
+
