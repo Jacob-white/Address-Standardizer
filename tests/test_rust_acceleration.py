@@ -33,7 +33,12 @@ def test_capabilities_describe_what_is_really_accelerated():
     assert "version" in caps
     if is_native_available():
         assert caps.get("engine") == "Rust_PyO3"
-        assert caps.get("native_functions") == ["compute_soundex"]
+        native_fns = caps.get("native_functions") or []
+        assert "compute_soundex" in native_fns
+        if "damerau_levenshtein_distance" in native_fns:
+            assert native_fns == ["compute_soundex", "damerau_levenshtein_distance"]
+        else:
+            assert native_fns == ["compute_soundex"]
         assert "wasm_capable" not in caps  # there is no wasm build, so it is not advertised
 
 
