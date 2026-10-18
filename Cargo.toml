@@ -15,7 +15,7 @@ name = "_address_standardizer_rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pyo3 = "0.29"
+pyo3 = "0.30"
 
 [features]
 default = []
