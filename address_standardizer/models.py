@@ -319,7 +319,7 @@ class StandardizedAddress:
         val = getattr(self, "_latitude", None)
         if val is not None:
             return val
-        if self.spatial_result is not None:
+        if self.spatial_result is not None and self.spatial_result.precision != "UNRESOLVED":
             return self.spatial_result.latitude
         return None
 
@@ -332,7 +332,7 @@ class StandardizedAddress:
         val = getattr(self, "_longitude", None)
         if val is not None:
             return val
-        if self.spatial_result is not None:
+        if self.spatial_result is not None and self.spatial_result.precision != "UNRESOLVED":
             return self.spatial_result.longitude
         return None
 
