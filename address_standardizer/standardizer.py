@@ -201,7 +201,7 @@ def _finalize_standardized_address(
         from address_standardizer.spatial import resolve_spatial_coordinates
         sp = resolve_spatial_coordinates(std)
         std.spatial_result = sp
-        if sp is not None:
+        if sp is not None and sp.precision != "UNRESOLVED":
             std.latitude = sp.latitude
             std.longitude = sp.longitude
             std.precision = sp.precision
